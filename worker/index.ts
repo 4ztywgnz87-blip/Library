@@ -134,21 +134,21 @@ app.post('/sync', async (c) => {
 
   if (changes.length) {
     const stmt = c.env.DB.prepare(
-      `INSERT INTO records (kind, id, data, updated_at, server_ts, deleted) VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT (kind, id) DO UPDATE SET
+      `INSERT INTO records (owner, kind, id, data, updated_at, server_ts, deleted) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (owner, kind, id) DO UPDATE SET
          data = excluded.data, updated_at = excluded.updated_at,
          server_ts = excluded.server_ts, deleted = excluded.deleted
        WHERE excluded.updated_at > records.updated_at`,
     );
     await c.env.DB.batch(
-      changes.map((r) => stmt.bind(r.kind, r.id, JSON.stringify(r.data), r.updatedAt, now, r.deleted ? 1 : 0)),
+      changes.map((r) => stmt.bind(c.get('email'), r.kind, r.id, JSON.stringify(r.data), r.updatedAt, now, r.deleted ? 1 : 0)),
     );
   }
 
   const { results } = await c.env.DB.prepare(
-    'SELECT kind, id, data, updated_at, deleted FROM records WHERE server_ts > ?',
+    'SELECT kind, id, data, updated_at, deleted FROM records WHERE owner = ? AND server_ts > ?',
   )
-    .bind(since)
+    .bind(c.get('email'), since)
     .all<{ kind: SyncRecord['kind']; id: string; data: string; updated_at: number; deleted: number }>();
 
   const records: SyncRecord[] = results.map((r) => ({

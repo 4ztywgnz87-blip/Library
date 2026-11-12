@@ -1,14 +1,15 @@
 -- Synced records (books, profile, ...). Data is stored as JSON.
 CREATE TABLE records (
+  owner TEXT NOT NULL,           -- email of the reader: everyone has their own library
   kind TEXT NOT NULL,
   id TEXT NOT NULL,
   data TEXT NOT NULL,
   updated_at INTEGER NOT NULL,   -- client edit time (last write wins)
   server_ts INTEGER NOT NULL,    -- when the server stored it (for pulling changes)
   deleted INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (kind, id)
+  PRIMARY KEY (owner, kind, id)
 );
-CREATE INDEX records_server_ts ON records (server_ts);
+CREATE INDEX records_owner_ts ON records (owner, server_ts);
 
 CREATE TABLE login_tokens (
   token_hash TEXT PRIMARY KEY,

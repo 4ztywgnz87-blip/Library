@@ -1,4 +1,4 @@
-import { getMeta, setMeta } from '../db';
+import { db, getMeta, setMeta } from '../db';
 
 export type AuthState = 'checking' | 'in' | 'out';
 
@@ -32,5 +32,9 @@ export async function requestLoginLink(email: string) {
 
 export async function logout() {
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-  await setMeta('loggedIn', false);
+  // Each reader has their own library: clear this device's copy so the next person starts clean
+  await db.transaction('rw', db.books, db.meta, async () => {
+    await db.books.clear();
+    await db.meta.clear();
+  });
 }

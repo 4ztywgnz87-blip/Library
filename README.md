@@ -30,7 +30,7 @@ Without `RESEND_API_KEY`, the login link is printed in the `dev:api` terminal.
 npx wrangler login
 npx wrangler d1 create snug                 # copy the database_id into wrangler.jsonc
 npm run db:migrate:remote
-npx wrangler secret put ALLOWED_EMAIL       # her email (comma-separate to add a second one for testing)
+npx wrangler secret put ALLOWED_EMAIL       # allowed emails, comma-separated; each gets their own library
 npx wrangler secret put RESEND_API_KEY      # see "Login emails" below
 npm run deploy                              # → https://snug.<your-subdomain>.workers.dev
 ```
