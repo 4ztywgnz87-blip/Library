@@ -1,0 +1,83 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/inter/index.css';
+
+@theme {
+  --color-cream: #f6efe6;
+  --color-linen: #efe5d8;
+  --color-sand: #e4d3bf;
+  --color-oat: #d6c2a8;
+  --color-ink: #3b2a22;
+  --color-cocoa: #7a6455;
+  --color-mocha: #a08a78;
+  --color-wine: #7a2e3a;
+  --color-wine-dark: #5e2029;
+  --color-blush: #f1dcdc;
+  --color-gold: #c49a5a;
+  --color-wood: #8b5e3c;
+  --color-wood-light: #a47148;
+  --color-sage: #8f9e7f;
+
+  --font-serif: 'Fraunces Variable', Georgia, serif;
+  --font-sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
+
+  --shadow-soft: 0 1px 2px rgb(59 42 34 / 0.06), 0 6px 20px -6px rgb(59 42 34 / 0.18);
+  --shadow-book: 0 1px 1px rgb(59 42 34 / 0.15), 0 10px 24px -10px rgb(59 42 34 / 0.45);
+  --radius-card: 1.25rem;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    background: var(--color-cream);
+  }
+  body {
+    @apply bg-cream font-sans text-ink antialiased;
+    min-height: 100dvh;
+    overscroll-behavior-y: none;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-serif;
+    font-variation-settings: 'SOFT' 100, 'WONK' 1;
+  }
+  button {
+    cursor: pointer;
+  }
+  ::selection {
+    background: var(--color-blush);
+  }
+}
+
+@utility font-soft {
+  font-family: var(--font-serif);
+  font-variation-settings: 'SOFT' 100, 'WONK' 1;
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Soft paper grain behind everything */
+.paper::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+  background-image: radial-gradient(rgb(139 94 60 / 0.07) 1px, transparent 1px);
+  background-size: 18px 18px;
+}

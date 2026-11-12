@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#7A2E3A"/>
+  <!-- shelf -->
+  <rect x="96" y="372" width="320" height="18" rx="9" fill="#F6EFE6"/>
+  <!-- books -->
+  <rect x="124" y="176" width="58" height="196" rx="10" fill="#F6EFE6"/>
+  <rect x="190" y="208" width="50" height="164" rx="10" fill="#C49A5A"/>
+  <rect x="136" y="214" width="34" height="8" rx="4" fill="#7A2E3A" opacity=".5"/>
+  <rect x="136" y="326" width="34" height="8" rx="4" fill="#7A2E3A" opacity=".5"/>
+  <rect x="252" y="160" width="56" height="212" rx="10" fill="#E7B9A8"/>
+  <!-- leaning book -->
+  <rect x="318" y="196" width="50" height="182" rx="10" fill="#F6EFE6" transform="rotate(14 343 372)"/>
+  <!-- heart -->
+  <path d="M280 228c-8-12-26-8-26 6 0 12 26 26 26 26s26-14 26-26c0-14-18-18-26-6z" fill="#7A2E3A"/>
+</svg>

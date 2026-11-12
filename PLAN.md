@@ -1,4 +1,4 @@
-# Plan: boeken-app (werknaam "Nook")
+# Plan: Snug
 
 Een persoonlijke, cosy web-app waarin zij haar boeken bijhoudt, een geanimeerde boekenkast heeft
 en tips krijgt voor haar volgende boek: uit haar eigen kast of om te kopen.
@@ -34,7 +34,7 @@ en tips krijgt voor haar volgende boek: uit haar eigen kast of om te kopen.
 Elk boek krijgt automatisch: cover, auteur, samenvatting, genres, paginatal, serie en volgnummer.
 Zij kiest enkel de **status** en de **taal van haar exemplaar** (NL/EN). Ze kan ook aanduiden dat het een **speciale editie** is en daar een eigen foto van nemen.
 
-Voor de eerste keer vullen komt er een **snelle invoermodus**: meerdere covers na elkaar fotograferen of titels intypen, en alles in één keer bevestigen. Dit is handig om haar volledige kast en haar ratings uit Fable over te zetten.
+Fable wordt niet gekoppeld: ze voegt haar boeken en scores gewoon zelf toe.
 
 ### 2.2 Statussen
 - **Owned**: heb ik, nog niet gelezen
@@ -197,7 +197,7 @@ Mijn vorige schatting (€2–5) was te laag voor Opus.
 |---|---|---|
 | **0. Opzet** | project, design-tokens, hosting, login | lege app online op haar startscherm |
 | **1. Bibliotheek** | zoeken en toevoegen, statussen, kwartsterren, review, lijsten met filters, offline | ze kan haar boeken invoeren |
-| **2. Cover-foto + snelle invoer** | camera → herkenning, invoer in bulk, barcode | haar volledige kast en Fable-scores overzetten |
+| **2. Cover-foto** | camera → herkenning, barcode | boeken toevoegen met één foto |
 | **3. Series + auteurs** | seriepagina's, ontbrekende delen, aangekondigde boeken, favoriete auteurs | |
 | **4. Vragenlijst + aanbevelingen** | profielquiz, *What's next?*, winkelmodus | het hart van de app |
 | **5. Boekenkast** | geanimeerde kast met decoratie | de cosy kers op de taart |
@@ -206,8 +206,14 @@ Mijn vorige schatting (€2–5) was te laag voor Opus.
 
 Na elke fase krijgt ze een link om te testen, zodat ze kan meedenken.
 
-## 9. Nog te beslissen
-- [ ] Naam van de app
-- [ ] Sonnet 5.5 (± $6–9/jaar, aangeraden) of Opus 5.5 (± $15–20/jaar) voor aanbevelingen
-- [ ] Wie maakt het Anthropic-account aan en laadt het tegoed op (eenmalig $5–10)
-- [ ] E-mailadres waarmee zij inlogt
+## 9. Beslist
+- Naam: **Snug**
+- Aanbevelingen via **Claude Sonnet 5.5**, coverherkenning via Claude Haiku 5.5
+- Het Anthropic-account staat los van haar login (wordt beheerd door de maker)
+- Haar login-e-mail staat als geheime instelling op de server, niet in de code
+
+## 10. Testen zonder kosten
+- Zoeken op titel/auteur gebruikt geen AI en is altijd gratis (Google Books + Open Library)
+- `AI_MODE=mock`: de AI-functies geven nep-antwoorden, zo kunnen we schermen en flow gratis bijsturen
+- Echte AI-antwoorden testen we pas daarna, met een dagelijkse limiet en vooraf betaald tegoed
+- Antwoorden worden bewaard: dezelfde vraag twee keer stellen kost maar één keer

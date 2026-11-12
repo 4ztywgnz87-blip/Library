@@ -1,0 +1,7 @@
+# Copy to .dev.vars for local development (never commit .dev.vars)
+ALLOWED_EMAIL=her-email@example.com
+# Optional: without it, the login link is printed in the terminal
+RESEND_API_KEY=
+MAIL_FROM=Snug <onboarding@resend.dev>
+# Only needed when AI_MODE=live
+ANTHROPIC_API_KEY=
