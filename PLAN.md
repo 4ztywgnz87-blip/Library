@@ -1,0 +1,213 @@
+# Plan: boeken-app (werknaam "Nook")
+
+Een persoonlijke, cosy web-app waarin zij haar boeken bijhoudt, een geanimeerde boekenkast heeft
+en tips krijgt voor haar volgende boek: uit haar eigen kast of om te kopen.
+
+- App-taal: Engels
+- Gebruiker: enkel zij (later uitbreidbaar)
+- Toestellen: iPhone (hoofdgebruik), iPad, Mac/pc
+- Kosten: hosting gratis, AI enkel via vooraf betaald tegoed (zie §7)
+
+---
+
+## 1. Voor wie
+
+| | |
+|---|---|
+| Leest | ± 10+ boeken per jaar, meestal één tegelijk |
+| Genres | thriller, fantasy, roman, romantasy, spicy; **geen** non-fictie |
+| Talen | Nederlands en Engels |
+| Formaat | papier + e-reader (niet bijhouden) |
+| Bibliotheek | tientallen gelezen, tientallen ongelezen in de kast, tientallen op de wenslijst |
+| Favoriete auteurs | Colleen Hoover, Sarah J. Maas, Lucy Score, Ali Hazelwood, Rebecca Yarros (+ automatisch afgeleid uit haar kast) |
+| Series | ja (ACOTAR, Knockemout, …): volgorde tonen en ontbrekende delen melden |
+| Speciale edities | ja, maar één exemplaar per boek |
+| Geen nood aan | sociale functies, uitlenen, DNF-status, formaat, leesdata, quotes |
+
+## 2. Kernfuncties (versie 1)
+
+### 2.1 Boeken toevoegen
+1. **Foto van de cover** (hoofdmanier): foto nemen → AI leest titel en auteur → app zoekt het boek op → zij bevestigt.
+2. **Zoeken op titel of auteur**, met resultaten mét cover.
+3. **Barcode scannen** (ISBN), als extra.
+
+Elk boek krijgt automatisch: cover, auteur, samenvatting, genres, paginatal, serie en volgnummer.
+Zij kiest enkel de **status** en de **taal van haar exemplaar** (NL/EN). Ze kan ook aanduiden dat het een **speciale editie** is en daar een eigen foto van nemen.
+
+Voor de eerste keer vullen komt er een **snelle invoermodus**: meerdere covers na elkaar fotograferen of titels intypen, en alles in één keer bevestigen. Dit is handig om haar volledige kast en haar ratings uit Fable over te zetten.
+
+### 2.2 Statussen
+- **Owned**: heb ik, nog niet gelezen
+- **Reading**: bezig (meestal één, maar meerdere kan)
+- **Read**: gelezen, met rating
+- **Wishlist**: wil ik
+
+### 2.3 Rating en review
+- Sterren met **kwartstappen** (0,25 tot 5)
+- Optioneel een **korte review** (enkele zinnen). Die wordt ook gebruikt voor betere tips ("te traag", "love de banter").
+- Optioneel enkele tags (bv. *spicy*, *emotional*, *twist*): klein en niet verplicht
+
+### 2.4 Bibliotheek (lijstweergave, het hoofdscherm)
+- Tabbladen: Reading, Owned, Read, Wishlist
+- **Zoeken** op titel, auteur of serie
+- **Filters**: genre, taal, rating, serie, auteur
+- Coverraster in de stijl van Netflix, met rijen per genre of serie
+
+### 2.5 Series
+- Seriepagina met alle delen in volgorde: gelezen, in bezit, op de wenslijst of **ontbreekt**
+- Een melding als er een deel ontbreekt ("You're missing *A Court of Silver Flames*")
+- **Aangekondigde** delen verschijnen pas als ze officieel bestaan (met verschijningsdatum), op basis van Google Books en Open Library
+- Eén tik om een ontbrekend deel op de wenslijst te zetten
+
+### 2.6 Favoriete auteurs
+- Startlijst met de 5 auteurs hierboven, aangevuld met auteurs waarvan ze 3+ boeken heeft of die ze hoog scoort
+- De app toont nieuwe of aangekondigde boeken van die auteurs ("New from Ali Hazelwood – March 2027")
+
+### 2.7 "Reader profile"-vragenlijst
+De eerste keer dat ze de app opent, beantwoordt ze een korte, speelse vragenlijst van ± 2 minuten, met tikbare kaartjes:
+- favoriete tropes (enemies-to-lovers, found family, slow burn, grumpy/sunshine, …)
+- tropes die ze haat
+- gewenst spice-niveau per genre (🌶️ 0–5)
+- open of gesloten einde, standalone of serie, gewenste boeklengte
+- stemmingen waar ze vaak zin in heeft
+
+Ze kan de vragenlijst **altijd opnieuw doen** via Profile → "Retake quiz". Het profiel kan ze ook los aanpassen.
+
+### 2.8 Aanbevelingen ("What's next?")
+Met knoppen, eenvoudig en in 3 tikken:
+
+1. **Waar komt het boek vandaan?** `From my shelf` / `Something new to buy`
+2. **Genre** (optioneel): chips met haar genres + "Surprise me"
+3. **Mood** (optioneel): *Light & fun*, *Swoony*, *Spicy*, *Make me cry*, *Edge of my seat*, *Epic & immersive*, *Quick read*
+4. Knop: **"Find my next read"**
+
+Ze krijgt een **top 3**, elk boek met cover en 2–3 zinnen uitleg waarom het bij haar past ("Because you gave *Fourth Wing* 4.75★ and love found family…").
+Onder elk voorstel staan knoppen: `Add to wishlist`, `Start reading`, `Not for me`. Die laatste wordt onthouden. Onderaan staat een knop `Show me 3 others`.
+
+**Winkelmodus "Does this fit me?":** ze fotografeert een cover in de winkel en krijgt:
+- of ze het boek **al heeft** (dat werkt ook offline)
+- een **match-score** met korte uitleg
+- als het een serie is: welk deel ze zou moeten hebben
+
+Waar de AI rekening mee houdt:
+- haar ratings en reviews
+- haar vragenlijstprofiel
+- de genres en samenvattingen van haar boeken
+- haar "Not for me"-lijst
+- welke taal ze leest
+- de algemene reputatie van een boek
+
+Bij "From my shelf" kiest de AI enkel uit haar ongelezen boeken. Bij "Something new" stelt de AI nooit een boek voor dat ze al heeft of gelezen heeft.
+
+### 2.9 De boekenkast (geanimeerd, als extra scherm)
+- Een **geïllustreerde, licht geanimeerde kast**, geen foto
+- De ruggen staan naast elkaar, in de kleur van de cover en met de titel. Series staan samen.
+- **Decoratie**:
+  - een plantje dat licht wiegt
+  - een kaarsje dat flakkert
+  - een kat op de bovenste plank die af en toe met haar staart zwiept
+  - een lampje
+  - boekensteunen
+- Tikt ze op een plank of rug, dan schuift het boek eruit en gaat ze naar het coverraster (§2.4) van die plank of serie
+- Elke status kan een eigen plank of kast krijgen: "Currently reading" bovenaan, de wenslijst als een apart kastje of stapeltje
+
+## 3. Later (versie 2+)
+- Statistieken: boeken per jaar, genres, gemiddelde rating, een jaaroverzicht ("Your year in books")
+- Deelbare wenslijst (cadeau-ideeën voor jou en familie)
+- Meer decoratie om te ontgrendelen (seizoensdecoratie: kerst, herfst)
+- Accounts voor anderen
+
+## 4. Schermen
+
+| Scherm | Inhoud |
+|---|---|
+| **Home** | "Currently reading" groot met cover · knop *What's next?* · recent toegevoegd · melding ontbrekend seriedeel of nieuw boek van favoriete auteur |
+| **Library** | tabbladen per status, zoeken, filters, coverraster |
+| **Shelf** | geanimeerde boekenkast |
+| **Add** (+ knop, altijd zichtbaar) | Camera · Zoeken · Barcode |
+| **Book** | cover, info, serie, status, sterren, review |
+| **What's next?** | knoppenflow + top 3 |
+| **Profile** | vragenlijst opnieuw doen, favoriete auteurs, instellingen |
+
+Navigatie via een onderbalk: Home · Library · ➕ · Shelf · Profile.
+Op iPad en Mac wordt dat een zijbalk met een breder raster.
+
+## 5. Stijl
+
+**Gevoel:** modern en clean, met cosy details. Veel witruimte, zachte schaduwen, afgeronde hoeken en kleine illustraties.
+
+| Rol | Kleur |
+|---|---|
+| Achtergrond | crème `#F6EFE6` |
+| Kaarten | warm beige `#EDE3D6` / zand `#E4D3BF` |
+| Tekst | donker koffiebruin `#3B2A22` |
+| Secundaire tekst | `#7A6455` |
+| Accent | **bordeaux `#7A2E3A`** (knoppen, actieve tab) |
+| Sterren en details | oud goud `#C49A5A` |
+| Kast | warm hout `#8B5E3C` / `#A47148` |
+
+- **Lettertypes:** titels in een zachte serif (bv. *Fraunces*), tekst in een clean sans (bv. *Inter*)
+- **Kleine details:**
+  - een stoomwolkje boven een theekop bij het laden
+  - sterren die kort "fonkelen" als ze een rating geeft
+  - lege staten met een slapende kat ("No books here yet…")
+  - een klein confetti-blaadje als ze een boek uit heeft
+- Geen donkere modus
+
+## 6. Techniek (gekozen voor gratis en eenvoudig)
+
+| Onderdeel | Keuze | Waarom |
+|---|---|---|
+| App | **React + TypeScript + Vite, als PWA** | op het startscherm van iPhone, iPad en Mac; voelt als een app |
+| Styling/animatie | Tailwind CSS + Framer Motion + SVG voor de kast | strak, met vloeiende animaties |
+| Offline | IndexedDB (Dexie) + service worker | kast, lijsten en "heb ik dit al?" werken zonder bereik |
+| Backend | **Cloudflare Workers + D1-database + R2-opslag** | gratis tier, valt niet stil bij weinig gebruik, synchroniseert tussen toestellen |
+| Login | link via e-mail (zonder wachtwoord), verstuurd via Resend (gratis tier) | eenvoudig |
+| Boekdata | **Google Books API** + **Open Library** | gratis: covers, ISBN, series, verschijningsdata |
+| AI | **Claude API**, aangeroepen vanuit de Worker (de sleutel staat nooit in de app) | cover herkennen + aanbevelingen |
+| Hosting | Cloudflare Pages, met een eigen gratis `*.pages.dev`-adres | €0; een eigen domein kan later (± €10/jaar) |
+
+**Sync:** alles wordt eerst lokaal bewaard en daarna gesynchroniseerd. Ze kan dus zonder bereik een boek toevoegen, en het staat later ook op haar iPad.
+
+## 7. AI-kosten en hoe we die vastzetten
+
+Prijzen per aanroep, bij haar gebruik:
+
+| Taak | Model | Kost per keer (± ) |
+|---|---|---|
+| Cover herkennen | Claude Haiku 5.5 | < $0,001 |
+| Top 3 aanbevelingen | Claude Sonnet 5.5 | ± $0,03–0,05 |
+| (alternatief) Top 3 met het sterkste model | Claude Opus 5.5 | ± $0,08–0,12 |
+
+Bij ± 15 aanbevelingen en 30 covers per maand:
+- met Sonnet kost dat **± $6–9 per jaar**
+- met Opus **± $15–20 per jaar**
+
+Mijn vorige schatting (€2–5) was te laag voor Opus.
+
+**Zo kost het zeker niet meer dan afgesproken:**
+- De Anthropic API werkt met **vooraf betaald tegoed** (minimum $5). Zonder automatisch bijladen kan er nooit meer uitgegeven worden dan wat erop staat.
+- Daarnaast stellen we in de Anthropic Console een **maandlimiet** in.
+- De app zelf beperkt het aantal AI-vragen per dag. Zo kan een fout nooit het tegoed opsouperen.
+- Gaat het tegoed op, dan blijft alles werken, behalve de AI-tips en de coverherkenning. Zoeken op titel blijft gewoon werken.
+
+## 8. Fasering
+
+| Fase | Inhoud | Resultaat |
+|---|---|---|
+| **0. Opzet** | project, design-tokens, hosting, login | lege app online op haar startscherm |
+| **1. Bibliotheek** | zoeken en toevoegen, statussen, kwartsterren, review, lijsten met filters, offline | ze kan haar boeken invoeren |
+| **2. Cover-foto + snelle invoer** | camera → herkenning, invoer in bulk, barcode | haar volledige kast en Fable-scores overzetten |
+| **3. Series + auteurs** | seriepagina's, ontbrekende delen, aangekondigde boeken, favoriete auteurs | |
+| **4. Vragenlijst + aanbevelingen** | profielquiz, *What's next?*, winkelmodus | het hart van de app |
+| **5. Boekenkast** | geanimeerde kast met decoratie | de cosy kers op de taart |
+| **6. Afwerking** | micro-animaties, lege staten, testen op iPhone, iPad en Mac | |
+| Later | statistieken, deelbare wenslijst, seizoensdecoratie | |
+
+Na elke fase krijgt ze een link om te testen, zodat ze kan meedenken.
+
+## 9. Nog te beslissen
+- [ ] Naam van de app
+- [ ] Sonnet 5.5 (± $6–9/jaar, aangeraden) of Opus 5.5 (± $15–20/jaar) voor aanbevelingen
+- [ ] Wie maakt het Anthropic-account aan en laadt het tegoed op (eenmalig $5–10)
+- [ ] E-mailadres waarmee zij inlogt
