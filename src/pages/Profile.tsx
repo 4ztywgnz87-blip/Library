@@ -63,6 +63,8 @@ export default function Profile({ onLoggedOut }: { onLoggedOut: () => void }) {
           </Button>
         </Card>
 
+        <InviteCard />
+
         <div className="pt-4 text-center">
           <Button
             variant="ghost"
@@ -78,5 +80,65 @@ export default function Profile({ onLoggedOut }: { onLoggedOut: () => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function InviteCard() {
+  const [email, setEmail] = useState('');
+  const [link, setLink] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const create = async () => {
+    setError(null);
+    setLink(null);
+    const res = await fetch('/api/auth/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const json = (await res.json()) as { link?: string; error?: string };
+    if (json.link) setLink(json.link);
+    else setError(json.error ?? 'Something went wrong');
+  };
+
+  return (
+    <Card className="space-y-3">
+      <p className="text-xs tracking-wide text-mocha uppercase">Invite a tester</p>
+      <p className="text-sm text-cocoa">Create a one-time login link for another allowed reader. They get their own library.</p>
+      <div className="flex gap-2">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Their email"
+          className="min-w-0 flex-1 rounded-xl border border-sand bg-white px-3 py-2.5 text-[16px] outline-none focus:border-oat"
+        />
+        <Button variant="soft" onClick={create} disabled={!email}>
+          Create link
+        </Button>
+      </div>
+      {error && <p className="text-sm text-wine">{error}</p>}
+      {link && (
+        <div className="space-y-2">
+          <p className="text-xs text-cocoa">Valid for 7 days, works once. Send it via WhatsApp or mail:</p>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={async () => {
+                if (navigator.share) {
+                  await navigator.share({ title: 'Snug login', url: link }).catch(() => {});
+                } else {
+                  await navigator.clipboard.writeText(link);
+                  setCopied(true);
+                }
+              }}
+            >
+              {copied ? 'Copied ✓' : 'Share link'}
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }

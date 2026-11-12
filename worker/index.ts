@@ -116,6 +116,21 @@ app.use('/*', async (c, next) => {
   await next();
 });
 
+// A logged-in reader can create a login link for another allowed address
+// (useful when the mail service can only reach her inbox). Valid for 7 days, works once.
+app.post('/auth/invite', async (c) => {
+  const { email } = await c.req.json<{ email?: string }>();
+  const allowed = (c.env.ALLOWED_EMAIL || '').split(',').map(normEmail).filter(Boolean);
+  if (!email || !allowed.includes(normEmail(email))) {
+    return c.json({ error: 'This address is not on the list of allowed readers' }, 400);
+  }
+  const token = randomToken();
+  await c.env.DB.prepare('INSERT INTO login_tokens (token_hash, email, expires_at) VALUES (?, ?, ?)')
+    .bind(await sha256(token), normEmail(email), Date.now() + 7 * 86_400_000)
+    .run();
+  return c.json({ link: `${new URL(c.req.url).origin}/api/auth/verify?token=${token}` });
+});
+
 app.get('/auth/me', (c) => c.json({ email: c.get('email') }));
 
 app.post('/auth/logout', async (c) => {
