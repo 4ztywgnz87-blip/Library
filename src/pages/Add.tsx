@@ -12,6 +12,7 @@ import { BarcodeIcon, CameraIcon, CheckIcon, CloseIcon, SearchIcon } from '../co
 import { SleepyCat } from '../components/SleepyCat';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { EditionPicker } from '../components/EditionPicker';
+import { lookupSeries } from '../lib/seriesLookup';
 import { identifyCover } from '../lib/ai';
 import { shrinkPhoto } from '../lib/photo';
 import type { IdentifyResponse } from '../shared';
@@ -303,6 +304,7 @@ function AddSheet({
       startedAt: status === 'reading' ? now : undefined,
       finishedAt: status === 'read' && finished === 'this' ? now : undefined,
     });
+    if (!book.series) void lookupSeries(book); // fills in the series in the background
     navigate(status === 'read' ? `/book/${book.id}?rate=1` : `/book/${book.id}`, { replace: true });
   };
 

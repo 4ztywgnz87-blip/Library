@@ -1,6 +1,8 @@
 // Types shared by the app and the server for the AI features
 
 export interface ReaderProfile {
+  /** What Snug calls her */
+  name?: string;
   lovedTropes: string[];
   hatedTropes: string[];
   /** 0 (none) – 5 (very spicy) */

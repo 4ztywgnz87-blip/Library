@@ -10,18 +10,21 @@ import { SeriesCard } from './Series';
 import { groupSeries } from '../lib/series';
 import { useProfile } from '../lib/profile';
 
-function greeting() {
+/** Greeting + a little emoji that fits the time of day */
+function greeting(): [string, string] {
   const h = new Date().getHours();
-  if (h < 6) return 'Still up reading';
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 5) return ['Still up reading', '🌙'];
+  if (h < 12) return ['Good morning', '☕'];
+  if (h < 17) return ['Good afternoon', '🫖'];
+  if (h < 22) return ['Good evening', '🕯️'];
+  return ['Good night', '🌙'];
 }
 
 export default function Home() {
   const books = useBooks();
-  const name = useMeta<string>('readerName', '');
+  const oldName = useMeta<string>('readerName', '');
   const profile = useProfile();
+  const name = profile.name ?? oldName;
   if (!books) return null;
 
   const reading = books.filter((b) => b.status === 'reading');
@@ -38,8 +41,10 @@ export default function Home() {
   return (
     <div className="pt-safe mx-auto max-w-5xl px-4">
       <header className="pt-8 pb-6">
-        <p className="text-sm text-cocoa">{greeting()} ☕</p>
-        <h1 className="mt-1 text-4xl font-semibold">{name ? `Hi ${name}` : 'Your little library'}</h1>
+        <h1 className="text-4xl leading-tight font-semibold">
+          {greeting()[0]}
+          {name ? `, ${name}` : ''} <span className="inline-block">{greeting()[1]}</span>
+        </h1>
       </header>
 
       {books.length === 0 ? (

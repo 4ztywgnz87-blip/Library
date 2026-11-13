@@ -5,12 +5,15 @@ import { authorNews, followedAuthors, type AuthorNews } from '../lib/authors';
 import { bookKey } from '../lib/library';
 import { quickAdd } from '../lib/quickAdd';
 import { Cover } from './Cover';
+import { BookPreview, type PreviewBook } from './BookPreview';
+import { useHistoryModal } from '../lib/modal';
 
 /** "New from your authors": recent and upcoming books by the authors she follows */
 export function AuthorNewsSection({ books, favourites }: { books: Book[]; favourites: string[] }) {
   const [items, setItems] = useState<AuthorNews[] | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
+  const preview = useHistoryModal<PreviewBook>('book');
   const authors = followedAuthors(books, favourites).slice(0, 10);
   const authorsKey = authors.join('|');
 
@@ -40,6 +43,21 @@ export function AuthorNewsSection({ books, favourites }: { books: Book[]; favour
           const k = bookKey({ title: i.title, authors: [i.author] });
           return (
             <div key={k} className="w-28 shrink-0">
+              <button
+                className="block w-full text-left active:scale-[0.97]"
+                onClick={() =>
+                  preview.open({
+                    title: i.title,
+                    author: i.author,
+                    coverUrl: i.coverUrl,
+                    publishedDate: i.publishedDate,
+                    upcoming: i.upcoming,
+                    description: i.description,
+                    series: i.series,
+                    isbn13: i.isbn13,
+                  })
+                }
+              >
               <div className="relative">
                 <Cover book={{ title: i.title, authors: [i.author], coverUrl: i.coverUrl }} />
                 {i.upcoming && (
@@ -52,6 +70,7 @@ export function AuthorNewsSection({ books, favourites }: { books: Book[]; favour
               <p className="truncate text-[0.7rem] text-mocha">
                 {i.author} · {formatDate(i.publishedDate)}
               </p>
+              </button>
               <button
                 className="mt-1 text-xs font-medium text-wine disabled:text-sage"
                 disabled={added.has(k)}
@@ -71,6 +90,7 @@ export function AuthorNewsSection({ books, favourites }: { books: Book[]; favour
           );
         })}
       </div>
+      {preview.item && <BookPreview book={preview.item} onClose={preview.close} />}
     </section>
   );
 }

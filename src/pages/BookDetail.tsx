@@ -10,6 +10,7 @@ import { StarsDisplay, StarsInput, formatRating } from '../components/Stars';
 import { Button, Card, Chip, PageHeader, Segmented, Toggle } from '../components/ui';
 import { CameraIcon, ChevronIcon, TrashIcon } from '../components/Icons';
 import { EditionPicker } from '../components/EditionPicker';
+import { lookupSeries } from '../lib/seriesLookup';
 
 const TAG_SUGGESTIONS = ['spicy 🌶️', 'emotional 😭', 'plot twist 🤯', 'funny 😂', 'slow burn 🔥', 'cosy ☕', 'dark 🖤', 'page-turner'];
 
@@ -336,10 +337,29 @@ function SeriesCard({ book }: { book: Book }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(book.series?.name ?? '');
   const [num, setNum] = useState(book.series?.number?.toString() ?? '');
+  const [looking, setLooking] = useState(false);
+
+  // Fill in the series automatically the first time the book is opened
+  useEffect(() => {
+    if (book.series || book.seriesChecked) return;
+    setLooking(true);
+    lookupSeries(book).finally(() => setLooking(false));
+  }, [book.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setName(book.series?.name ?? '');
+    setNum(book.series?.number?.toString() ?? '');
+  }, [book.series?.name, book.series?.number]);
 
   const save = async () => {
     await updateBook(book.id, {
-      series: name.trim() ? { name: name.trim(), number: num ? Number(num) : undefined } : undefined,
+      series: name.trim()
+        ? {
+            name: name.trim(),
+            number: num ? Number(num) : undefined,
+            // keep the link to the full series list if only the number changed
+            key: name.trim() === book.series?.name ? book.series?.key : undefined,
+          }
+        : undefined,
     });
     setEditing(false);
   };
@@ -348,12 +368,18 @@ function SeriesCard({ book }: { book: Book }) {
     <Card>
       <div className="flex items-center justify-between">
         <p className="text-xs tracking-wide text-mocha uppercase">Series</p>
-        {!editing && (
-          <button className="text-sm text-wine" onClick={() => setEditing(true)}>
-            {book.series ? 'Edit' : 'Part of a series?'}
-          </button>
-        )}
+        {!editing &&
+          (looking ? (
+            <span className="text-xs text-mocha">Looking it up…</span>
+          ) : (
+            <button className="text-sm text-wine" onClick={() => setEditing(true)}>
+              {book.series ? 'Edit' : 'Part of a series?'}
+            </button>
+          ))}
       </div>
+      {!editing && !looking && !book.series && book.seriesChecked && (
+        <p className="mt-2 text-sm text-cocoa">Looks like a standalone.</p>
+      )}
       {!editing && book.series && (
         <Link to={seriesPath(book.series.name)} className="mt-2 flex items-center justify-between text-sm">
           <span>

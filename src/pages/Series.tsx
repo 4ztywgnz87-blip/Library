@@ -83,16 +83,32 @@ export function SeriesDetail() {
   const [mock, setMock] = useState(false);
   const [adding, setAdding] = useState<number | null>(null);
 
-  // Full list of the series (incl. announced books) from Snug's AI, when it's on
+  // Full list of the series: from Open Library (free) when we know the series there,
+  // otherwise from Snug's AI (which also knows announced books)
+  const seriesKey = group?.books.find((b) => b.series?.key)?.series?.key;
   useEffect(() => {
     if (!group) return;
-    seriesInfo(group.name, group.author)
-      .then((r) => {
+    let cancelled = false;
+    (async () => {
+      if (seriesKey) {
+        const res = await fetch(`/api/series-books?key=${seriesKey}`).catch(() => undefined);
+        const list = res?.ok ? ((await res.json()) as { books: SeriesBook[] }).books : [];
+        if (list.length && !cancelled) {
+          setKnown(list);
+          setMock(false);
+          return;
+        }
+      }
+      const r = await seriesInfo(group.name, group.author).catch(() => undefined);
+      if (r && !cancelled) {
         setKnown(r.books);
         setMock(r.mock);
-      })
-      .catch(() => {});
-  }, [group?.name, group?.author]); // eslint-disable-line react-hooks/exhaustive-deps
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [group?.name, group?.author, seriesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!books) return null;
   if (!group) {

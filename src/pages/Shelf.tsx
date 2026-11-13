@@ -1,15 +1,16 @@
-import { useMemo, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, type ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { shelfOrder } from '../lib/library';
+import { isLight, updateSpineColors } from '../lib/coverColor';
+import { hashColor } from '../components/Cover';
 import { STATUSES, type Book, type Status } from '../types';
-import { Bookend, Candle, FairyLights, Mug, Plant, ShelfCat } from '../components/ShelfDecor';
+import { Bookend, Candle, DreamCloud, FairyLights, Mug, Plant, ShelfCat } from '../components/ShelfDecor';
 
 const ROW = 140; // px per shelf row (spines + board)
 const BOARD = 12;
 
-const SPINE_COLORS = ['#7A2E3A', '#8B5E3C', '#5F6B52', '#A0644B', '#4E3B47', '#9C7A4C', '#3F4E5A', '#B08968', '#6D3B47', '#556B5E'];
 
 function hash(s: string) {
   let h = 0;
@@ -17,20 +18,14 @@ function hash(s: string) {
   return Math.abs(h);
 }
 
-/** Lighten/darken a hex colour a little, so series parts look related but not identical */
-function shade(hex: string, amount: number) {
-  const n = parseInt(hex.slice(1), 16);
-  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v + amount)));
-  return `rgb(${c(n >> 16)}, ${c((n >> 8) & 255)}, ${c(n & 255)})`;
-}
 
 function spineStyle(b: Book) {
   const pages = b.pageCount ?? 280 + (hash(b.title) % 240);
   const height = Math.round(Math.min(124, Math.max(92, 78 + pages / 12)));
   const width = Math.round(Math.min(40, Math.max(20, 14 + pages / 22)));
-  // A whole series shares one colour family
-  const base = SPINE_COLORS[hash(b.series?.name ?? b.title) % SPINE_COLORS.length];
-  const color = b.series ? shade(base, ((b.series.number ?? 1) - 1) * 9) : base;
+  // Same colour as the cover: taken from the cover image, or the colour of the drawn cover
+  const hasCover = !!(b.customCover || b.coverUrl);
+  const color = b.spineColor ?? (hasCover ? '#8b6f5a' : hashColor(b.title));
   return { height, width, color };
 }
 
@@ -38,7 +33,8 @@ function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean
   const navigate = useNavigate();
   const { height, width, color } = spineStyle(book);
   const style = hash(book.title + book.id) % 3; // three kinds of spine decoration
-  const gold = '#e3c288';
+  const light = isLight(color);
+  const gold = light ? '#8a6a3a' : '#e3c288';
   // The title runs along the spine. It is turned with a rotation (not vertical writing mode),
   // which Safari on iPhone renders reliably, also when the title has to be cut off.
   const textLength = height - 34; // room along the spine
@@ -92,13 +88,14 @@ function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean
     >
       {ends(true)}
       <span
-        className="font-soft pointer-events-none absolute top-1/2 left-1/2 flex items-center justify-center text-center leading-[1.05] font-semibold text-[#f6efe6]"
+        className="font-soft pointer-events-none absolute top-1/2 left-1/2 flex items-center justify-center text-center leading-[1.05] font-semibold"
         style={{
           width: textLength,
           height: width - 4,
           fontSize,
           transform: 'translate(-50%, -50%) rotate(90deg)',
-          textShadow: '0 1px 1px rgba(0,0,0,0.35)',
+          color: light ? '#3b2a22' : '#f6efe6',
+          textShadow: light ? 'none' : '0 1px 1px rgba(0,0,0,0.35)',
         }}
       >
         <span className={`overflow-hidden ${twoLines ? 'line-clamp-2' : 'line-clamp-1'}`}>{book.title}</span>
@@ -184,7 +181,14 @@ export default function Shelf() {
     return m;
   }, [books]);
 
+  // Give spines the colours of their covers (worked out once per cover, in the background)
+  const coverKey = (books ?? []).map((b) => b.customCover?.slice(0, 40) || b.coverUrl).join('|');
+  useEffect(() => {
+    void updateSpineColors();
+  }, [coverKey]);
+
   if (!books) return null;
+  const wishCount = byStatus.wishlist.length;
 
   const decor: Partial<Record<Status, ReactNode>> = {
     reading: <Bookend className="h-16" />,
@@ -197,9 +201,16 @@ export default function Shelf() {
       <div className="pt-safe h-4" />
       <div className="mx-auto max-w-4xl px-3 pb-10">
         {/* things on top of the bookcase: a plant and the cat (its tail hangs over the edge) */}
-        <div className="relative h-28">
+        <div className="relative h-44">
           <Plant className="absolute bottom-0 left-4 h-24" />
-          <ShelfCat className="absolute right-[10%] bottom-[-49px] z-20 h-[160px]" />
+          <Link
+            to="/wishlist"
+            aria-label={`Wishlist, ${wishCount} books`}
+            className="absolute top-0 right-[22%] z-20 block w-44 transition-transform active:scale-95"
+          >
+            <DreamCloud count={wishCount} className="w-full" />
+          </Link>
+          <ShelfCat className="absolute right-[6%] bottom-[-3px] z-20 h-[78px]" />
         </div>
 
         {/* crown: a little arched pediment on a layered cornice with dentils */}
@@ -255,7 +266,7 @@ export default function Shelf() {
             }}
           >
             <FairyLights className="pointer-events-none mb-1 h-7 w-full" />
-            {STATUSES.map((s, i) => (
+            {STATUSES.filter((s) => s.id !== 'wishlist').map((s, i) => (
               <ShelfSection
                 key={s.id}
                 status={s.id}

@@ -12,10 +12,20 @@ import Next from './pages/Next';
 import Shop from './pages/Shop';
 import Quiz from './pages/Quiz';
 import Stats from './pages/Stats';
+import Wishlist from './pages/Wishlist';
 import { startBackgroundSync } from './lib/sync';
+import { backfillSeries } from './lib/seriesLookup';
 
 export default function App() {
-  useEffect(() => startBackgroundSync(), []);
+  useEffect(() => {
+    const stop = startBackgroundSync();
+    // fill in series for older books in the background, once the app has settled
+    const t = setTimeout(() => void backfillSeries(), 4000);
+    return () => {
+      stop();
+      clearTimeout(t);
+    };
+  }, []);
 
   return (
     <BrowserRouter>
@@ -33,6 +43,7 @@ export default function App() {
           <Route path="shop" element={<Shop />} />
           <Route path="quiz" element={<Quiz />} />
           <Route path="stats" element={<Stats />} />
+          <Route path="wishlist" element={<Wishlist />} />
           <Route path="*" element={<Home />} />
         </Route>
       </Routes>

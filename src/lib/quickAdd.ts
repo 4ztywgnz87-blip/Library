@@ -1,6 +1,7 @@
 import type { Book, Lang, Status } from '../types';
 import { searchBooks } from './bookSearch';
 import { bookKey, findExisting, newId, normalize, saveBook } from './library';
+import { lookupSeries } from './seriesLookup';
 
 /**
  * Finds a book by title + author and adds it with one tap (e.g. a missing series part
@@ -30,7 +31,7 @@ export async function quickAdd(
     authors: [author],
     genres: [] as string[],
   };
-  return saveBook({
+  const saved = await saveBook({
     ...data,
     ...extra,
     id: newId(),
@@ -42,4 +43,6 @@ export async function quickAdd(
     updatedAt: now,
     series: extra.series ?? data.series,
   });
+  if (!saved.series) void lookupSeries(saved);
+  return saved;
 }

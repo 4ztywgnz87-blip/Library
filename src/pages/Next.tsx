@@ -12,6 +12,8 @@ import { GENRES } from '../types';
 import { Cover } from '../components/Cover';
 import { Button, Card, Chip, PageHeader } from '../components/ui';
 import { SparkleIcon } from '../components/Icons';
+import { BookPreview, type PreviewBook } from '../components/BookPreview';
+import { useHistoryModal } from '../lib/modal';
 
 type Source = RecommendRequest['source'];
 
@@ -192,6 +194,7 @@ function PickCard({
   const own = pick.bookId ? books?.find((b) => b.id === pick.bookId) : undefined;
   const [cover, setCover] = useState<string | undefined>();
   const [done, setDone] = useState(false);
+  const preview = useHistoryModal<PreviewBook>('book');
 
   // New books: borrow a cover from the book search
   useEffect(() => {
@@ -210,7 +213,14 @@ function PickCard({
     >
       <Card className="flex gap-4">
         <div className="w-24 shrink-0">
-          <Cover book={own ?? { title: pick.title, authors: [pick.author], coverUrl: cover }} />
+          <button
+            className="block w-full active:scale-[0.97]"
+            onClick={() =>
+              own ? navigate(`/book/${own.id}`) : preview.open({ title: pick.title, author: pick.author, coverUrl: cover })
+            }
+          >
+            <Cover book={own ?? { title: pick.title, authors: [pick.author], coverUrl: cover }} />
+          </button>
           <p className="mt-2 text-center font-soft text-sm text-mocha">#{rank + 1}</p>
         </div>
         <div className="min-w-0 flex-1">
@@ -247,6 +257,7 @@ function PickCard({
           </div>
         </div>
       </Card>
+      {preview.item && <BookPreview book={preview.item} onClose={preview.close} />}
     </motion.div>
   );
 }

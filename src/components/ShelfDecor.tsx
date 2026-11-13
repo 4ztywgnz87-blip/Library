@@ -150,20 +150,20 @@ export function Mug({ className = '' }: { className?: string }) {
 }
 
 /**
- * A tabby cat sitting on top of the bookcase, its tail hanging over the edge.
- * The tail swings by rotating around its base (smooth while scrolling), the head tilts a
- * little and the eyes blink in place. The top of the bookcase is at y = 104.
+ * A tabby cat lying on top of the bookcase. Only stable animations: the tail swings by
+ * rotating around its base, an ear twitches around its own base, and the eyes blink by
+ * flattening the eye shape itself. Nothing is scaled, so no part can shift out of place.
  */
 export function ShelfCat({ className = '' }: { className?: string }) {
   const id = useId();
   const fur = `url(#${id}fur)`;
+  const blink = { duration: 5, repeat: Infinity, times: [0, 0.47, 0.5, 0.53, 1] };
   return (
-    <svg viewBox="0 0 100 150" className={className} aria-hidden style={{ overflow: 'visible' }}>
+    <svg viewBox="0 0 160 84" className={className} aria-hidden style={{ overflow: 'visible' }}>
       <defs>
-        <linearGradient id={`${id}fur`} x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={`${id}fur`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#c99868" />
-          <stop offset="0.6" stopColor="#b07d50" />
-          <stop offset="1" stopColor="#946440" />
+          <stop offset="1" stopColor="#9a6a43" />
         </linearGradient>
         <radialGradient id={`${id}eye`} cx="0.5" cy="0.4" r="0.6">
           <stop offset="0" stopColor="#e3d27a" />
@@ -171,62 +171,54 @@ export function ShelfCat({ className = '' }: { className?: string }) {
         </radialGradient>
       </defs>
 
-      {/* tail, hanging over the front edge */}
+      {/* tail curling up behind the body */}
       <motion.g
-        style={{ transformOrigin: '66px 100px', transformBox: 'view-box', willChange: 'transform' }}
-        animate={{ rotate: [-10, 12, -10] }}
-        transition={{ duration: 3.6, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ transformOrigin: '118px 72px', transformBox: 'view-box', willChange: 'transform' }}
+        animate={{ rotate: [0, -14, 4, 0] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <path d="M66 100c10 6 13 18 8 30-2 5-1 10 3 13" stroke="#a87449" strokeWidth="8.5" strokeLinecap="round" fill="none" />
-        <path d="M72 116l5 2M75 126l5 1M74 135l5-1" stroke="#7d5232" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M76 140c1 2 2 3 4 4" stroke="#5f3d26" strokeWidth="8" strokeLinecap="round" fill="none" />
+        <path d="M118 72c16 1 26-6 28-20 1-6 4-9 8-9" stroke="#a87449" strokeWidth="8" strokeLinecap="round" fill="none" />
+        <path d="M134 68l3-5M142 60l4-3M146 50l5-1" stroke="#7d5232" strokeWidth="2.6" strokeLinecap="round" />
+        <path d="M151 43c2 0 4 0 5 1" stroke="#5f3d26" strokeWidth="8" strokeLinecap="round" fill="none" />
       </motion.g>
 
-      {/* body, sitting */}
-      <path d="M26 104c-6-22 2-44 24-46 22 2 30 24 24 46z" fill={fur} />
-      <path d="M62 66c4 8 5 18 3 26M68 74c2 6 2 12 1 18M33 70c-3 8-4 16-2 24" stroke="#86593a" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.55" />
-      {/* white chest */}
-      <path d="M41 62c-4 12-3 26 9 36 12-10 13-24 9-36-6 3-12 3-18 0z" fill="#f4e7d4" />
-      {/* front legs + paws */}
-      <rect x="37" y="84" width="9" height="20" rx="4.5" fill="#f4e7d4" />
-      <rect x="54" y="84" width="9" height="20" rx="4.5" fill="#f4e7d4" />
-      <ellipse cx="41.5" cy="103" rx="6" ry="3" fill="#f4e7d4" />
-      <ellipse cx="58.5" cy="103" rx="6" ry="3" fill="#f4e7d4" />
-      <path d="M39 103.5v-2M42 103.6v-2M56 103.5v-2M59 103.6v-2" stroke="#cdb79b" strokeWidth="0.8" strokeLinecap="round" />
+      {/* body, loafing */}
+      <path d="M48 80c-5-22 14-36 42-36 26 0 38 13 36 36z" fill={fur} />
+      <path d="M74 46c2 6 2 13 0 19M87 44c2 7 2 15 0 22M100 46c2 6 2 13 0 19M111 52c2 5 2 10 0 15" stroke="#86593a" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.55" />
+      {/* front paws */}
+      <ellipse cx="38" cy="79" rx="9.5" ry="4.5" fill="#f4e7d4" />
+      <ellipse cx="57" cy="80" rx="9.5" ry="4.5" fill="#f4e7d4" />
+      <path d="M34 80.5v-2M38 80.8v-2M53 81.5v-2M57 81.8v-2" stroke="#cdb79b" strokeWidth="0.8" strokeLinecap="round" />
 
-      {/* head, tilting slowly */}
+      {/* ears (the right one twitches now and then) */}
+      <path d="M27 36l1-18 13 10z" fill="#b07d50" />
+      <path d="M30 32l1-9 6 5z" fill="#e8b2a3" />
       <motion.g
-        style={{ transformOrigin: '50px 60px', transformBox: 'view-box' }}
-        animate={{ rotate: [0, 0, -7, -7, 0, 0] }}
-        transition={{ duration: 9, repeat: Infinity, times: [0, 0.35, 0.42, 0.62, 0.7, 1], ease: 'easeInOut' }}
+        style={{ transformOrigin: '60px 30px', transformBox: 'view-box' }}
+        animate={{ rotate: [0, 0, 12, 0, 0] }}
+        transition={{ duration: 7, repeat: Infinity, times: [0, 0.8, 0.83, 0.86, 1] }}
       >
-        <path d="M31 30l1-18 13 10z" fill="#b07d50" />
-        <path d="M69 30l-1-18-13 10z" fill="#b07d50" />
-        <path d="M34 26l1-9 6 5z" fill="#e8b2a3" />
-        <path d="M66 26l-1-9-6 5z" fill="#e8b2a3" />
-        <ellipse cx="50" cy="40" rx="21" ry="19" fill={fur} />
-        {/* cheek fluff */}
-        <path d="M30 44c-3 4-2 8 2 10M70 44c3 4 2 8-2 10" stroke="#c99868" strokeWidth="4" strokeLinecap="round" fill="none" />
-        {/* tabby "M" on the forehead */}
-        <path d="M43 26l3 6 4-6 4 6 3-6" stroke="#7d5232" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.7" />
-        <path d="M30 38h6M30 42h5M70 38h-6M70 42h-5" stroke="#7d5232" strokeWidth="1.8" strokeLinecap="round" opacity="0.55" />
-        {/* muzzle */}
-        <ellipse cx="50" cy="49" rx="10" ry="7" fill="#f4e7d4" />
-        <path d="M47.2 45.5h5.6l-2.8 3z" fill="#d98b84" />
-        <path d="M50 48.5v2.5M50 51c-1.6 1.8-3.6 1.8-4.6.2M50 51c1.6 1.8 3.6 1.8 4.6.2" stroke="#5c4033" strokeWidth="0.9" fill="none" strokeLinecap="round" />
-        <path d="M40 49l-13-2M40 52l-12 2M60 49l13-2M60 52l12 2" stroke="#fff" strokeOpacity="0.75" strokeWidth="0.7" strokeLinecap="round" />
-        {/* eyes: the whole eye closes in place */}
-        {[42, 58].map((cx) => {
-          const t = { duration: 5, repeat: Infinity, times: [0, 0.47, 0.5, 0.53, 1] };
-          return (
-            <g key={cx}>
-              <motion.ellipse cx={cx} cy="39" rx="4.3" initial={{ ry: 3.6 }} animate={{ ry: [3.6, 3.6, 0.35, 3.6, 3.6] }} transition={t} fill={`url(#${id}eye)`} />
-              <motion.ellipse cx={cx} cy="39" rx="1.2" initial={{ ry: 3 }} animate={{ ry: [3, 3, 0.25, 3, 3] }} transition={t} fill="#2b1d16" />
-              <motion.circle cx={cx + 1.4} cy="37.6" r="0.9" animate={{ opacity: [1, 1, 0, 1, 1] }} transition={t} fill="#fff" />
-            </g>
-          );
-        })}
+        <path d="M63 36l-1-18-13 10z" fill="#b07d50" />
+        <path d="M60 32l-1-9-6 5z" fill="#e8b2a3" />
       </motion.g>
+
+      {/* head */}
+      <ellipse cx="45" cy="50" rx="23" ry="20" fill={fur} />
+      <path d="M24 52c-3 4-2 8 2 10M66 52c3 4 2 8-2 10" stroke="#c99868" strokeWidth="4" strokeLinecap="round" fill="none" />
+      <path d="M38 35l3 6 4-6 4 6 3-6" stroke="#7d5232" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.7" />
+      <path d="M24 47h6M25 51h5M66 47h-6M65 51h-5" stroke="#7d5232" strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
+      <ellipse cx="45" cy="60" rx="11" ry="7.5" fill="#f4e7d4" />
+      <path d="M42.2 56.5h5.6l-2.8 3z" fill="#d98b84" />
+      <path d="M45 59.5v2.5M45 62c-1.6 1.8-3.6 1.8-4.6.2M45 62c1.6 1.8 3.6 1.8 4.6.2" stroke="#5c4033" strokeWidth="0.9" fill="none" strokeLinecap="round" />
+      <path d="M34 60l-14-2M34 63l-13 2M56 60l14-2M56 63l13 2" stroke="#fff" strokeOpacity="0.75" strokeWidth="0.7" strokeLinecap="round" />
+      {/* eyes */}
+      {[37, 53].map((cx) => (
+        <g key={cx}>
+          <motion.ellipse cx={cx} cy="50" rx="4.3" initial={{ ry: 3.6 }} animate={{ ry: [3.6, 3.6, 0.35, 3.6, 3.6] }} transition={blink} fill={`url(#${id}eye)`} />
+          <motion.ellipse cx={cx} cy="50" rx="1.2" initial={{ ry: 3 }} animate={{ ry: [3, 3, 0.25, 3, 3] }} transition={blink} fill="#2b1d16" />
+          <motion.circle cx={cx + 1.4} cy="48.6" r="0.9" animate={{ opacity: [1, 1, 0, 1, 1] }} transition={blink} fill="#fff" />
+        </g>
+      ))}
     </svg>
   );
 }
@@ -299,5 +291,68 @@ export function BookPile({ className = '' }: { className?: string }) {
       <rect x="66" y="12" width="5" height="8" fill="#f3ead9" />
       <rect x="12" y="15" width="24" height="2" fill="#e9c98f" opacity="0.8" />
     </svg>
+  );
+}
+
+/** A dreamy thought cloud (the cat dreams of the wishlist), floating gently */
+export function DreamCloud({ count, className = '' }: { count: number; className?: string }) {
+  const id = useId();
+  return (
+    <motion.svg
+      viewBox="0 0 170 120"
+      className={className}
+      aria-hidden
+      animate={{ y: [0, -4, 0] }}
+      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      <defs>
+        <linearGradient id={`${id}c`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fffaf3" />
+          <stop offset="1" stopColor="#f1e4d6" />
+        </linearGradient>
+        <filter id={`${id}s`} x="-20%" y="-20%" width="140%" height="160%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#7a5a45" floodOpacity="0.22" />
+        </filter>
+      </defs>
+      <g filter={`url(#${id}s)`}>
+        <path
+          d="M30 74c-16 0-24-16-14-27 4-5 10-6 15-5 2-14 18-22 31-16 7-12 26-14 36-3 12-6 29 0 31 15 14 1 21 17 12 27-4 5-10 7-16 6-3 10-15 15-25 10-8 9-24 10-33 2-11 7-28 4-33-9z"
+          fill={`url(#${id}c)`}
+        />
+        {/* little bubbles leading down to the cat */}
+        <circle cx="128" cy="92" r="6" fill={`url(#${id}c)`} />
+        <circle cx="140" cy="106" r="4" fill={`url(#${id}c)`} />
+        <circle cx="149" cy="116" r="2.6" fill={`url(#${id}c)`} />
+      </g>
+      {/* tiny books + text */}
+      <g transform="translate(26 38) scale(0.82)">
+        <rect x="0" y="6" width="7" height="22" rx="1" fill="#7a2e3a" />
+        <rect x="8" y="2" width="7" height="26" rx="1" fill="#c49a5a" />
+        <rect x="16" y="8" width="7" height="20" rx="1" fill="#5f6b52" transform="rotate(8 19 28)" />
+      </g>
+      <text x="102" y="53" textAnchor="middle" fontFamily="Fraunces Variable, serif" fontSize="16" fontWeight="600" fill="#7a2e3a">
+        Wishlist
+      </text>
+      <text x="102" y="67" textAnchor="middle" fontFamily="Inter Variable, sans-serif" fontSize="8.5" fill="#7a6455">
+        {count} {count === 1 ? 'book' : 'books'} to dream of
+      </text>
+      {[
+        [22, 30],
+        [150, 36],
+        [80, 18],
+      ].map(([x, y], i) => (
+        <motion.text
+          key={i}
+          x={x}
+          y={y}
+          fontSize="10"
+          fill="#c49a5a"
+          animate={{ opacity: [0.2, 1, 0.2] }}
+          transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.7 }}
+        >
+          ✦
+        </motion.text>
+      ))}
+    </motion.svg>
   );
 }

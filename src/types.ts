@@ -25,6 +25,8 @@ export type Genre = (typeof GENRES)[number];
 export interface SeriesInfo {
   name: string;
   number?: number;
+  /** Open Library series key, used to list the whole series */
+  key?: string;
 }
 
 export interface Book {
@@ -43,6 +45,11 @@ export interface Book {
   googleId?: string;
   olKey?: string;
   series?: SeriesInfo;
+  /** Series was looked up automatically (so we don't keep asking) */
+  seriesChecked?: boolean;
+  /** Spine colour taken from the cover, and which cover it came from */
+  spineColor?: string;
+  spineColorFrom?: string;
 
   status: Status;
   /** Language of her copy */

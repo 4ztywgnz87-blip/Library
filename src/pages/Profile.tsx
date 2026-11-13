@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, setMeta } from '../db';
+import { db } from '../db';
 import { useMeta } from '../lib/hooks';
 import { syncNow } from '../lib/sync';
-import { Button, Card } from '../components/ui';
+import { Card } from '../components/ui';
 import { FavouriteAuthorsCard } from '../components/FavouriteAuthors';
 import { Link } from 'react-router-dom';
-import { useProfile } from '../lib/profile';
+import { updateProfile, useProfile } from '../lib/profile';
 
 export default function Profile() {
-  const savedName = useMeta<string>('readerName', '');
-  const lastSync = useMeta<number>('lastSync', 0);
+  const oldName = useMeta<string>('readerName', '');
   const pending = useLiveQuery(() => db.books.where('dirty').equals(1).count(), []) ?? 0;
+  const profileForName = useProfile();
+  const savedName = profileForName.name ?? oldName;
   const [name, setName] = useState(savedName);
   const [syncing, setSyncing] = useState(false);
   const profile = useProfile();
@@ -29,7 +30,7 @@ export default function Profile() {
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onBlur={() => setMeta('readerName', name.trim())}
+            onBlur={() => updateProfile({ name: name.trim() })}
             placeholder="Your name"
             className="w-full rounded-xl border border-sand bg-white px-3 py-2.5 text-[16px] outline-none focus:border-oat"
           />
@@ -62,28 +63,23 @@ export default function Profile() {
           </Card>
         </Link>
 
-        <Card className="space-y-3">
-          <p className="text-xs tracking-wide text-mocha uppercase">Sync</p>
-          <p className="text-sm text-cocoa">
-            {pending > 0
-              ? `${pending} change${pending > 1 ? 's' : ''} waiting to sync`
-              : 'Everything is saved on all your devices.'}
-            {lastSync > 0 && (
-              <span className="block text-xs text-mocha">Last sync: {new Date(lastSync).toLocaleString()}</span>
-            )}
+        {/* Saving happens by itself; this only shows up if something is still waiting */}
+        {pending > 0 && (
+          <p className="text-center text-xs text-mocha">
+            {pending} change{pending > 1 ? 's' : ''} not saved online yet (no internet?){' '}
+            <button
+              className="text-wine underline"
+              disabled={syncing}
+              onClick={async () => {
+                setSyncing(true);
+                await syncNow();
+                setSyncing(false);
+              }}
+            >
+              {syncing ? 'saving…' : 'try again'}
+            </button>
           </p>
-          <Button
-            variant="soft"
-            disabled={syncing}
-            onClick={async () => {
-              setSyncing(true);
-              await syncNow();
-              setSyncing(false);
-            }}
-          >
-            {syncing ? 'Syncing…' : 'Sync now'}
-          </Button>
-        </Card>
+        )}
 
         <div className="pt-4 text-center">
           <p className="font-soft text-sm text-mocha">Snug · made with love 🤎</p>
