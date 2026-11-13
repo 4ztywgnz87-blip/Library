@@ -69,7 +69,7 @@ export default function Home() {
                 .
               </Card>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {reading.map((b) => (
                   <motion.div key={b.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                     <Link to={`/book/${b.id}`}>
@@ -157,7 +157,8 @@ export default function Home() {
                   All {series.length}
                 </Link>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              {/* grid-cols-1 = minmax(0, 1fr): long series names get "…" instead of stretching the card */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {seriesToShow.map((g) => (
                   <SeriesCard key={g.name} group={g} />
                 ))}

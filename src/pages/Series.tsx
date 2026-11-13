@@ -17,7 +17,7 @@ import { ChevronIcon } from '../components/Icons';
 /** Little row of covers with a progress line, used in lists */
 export function SeriesCard({ group }: { group: SeriesGroup }) {
   return (
-    <Link to={seriesPath(group.name)}>
+    <Link to={seriesPath(group.name)} className="block min-w-0">
       <Card className="flex items-center gap-4 transition-transform active:scale-[0.99]">
         {/* A little fanned stack of the first covers */}
         <div className="relative h-[4.5rem] w-16 shrink-0">

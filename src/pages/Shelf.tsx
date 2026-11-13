@@ -226,14 +226,13 @@ function ShelfSection({
             prev && (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? 'ml-1.5' : 'ml-[1px]';
           // Leaning books rest their top against the left neighbour (a book or the bookend) and
           // their foot slides a little to the right, so they get some room on that side.
-          // Who leans: sometimes the last book of the shelf, the book just before a decoration,
-          // or the first book after the bookend.
+          // Who leans: sometimes the last book of the shelf, or the book just before a decoration.
           const isLast = i === books.length - 1;
           const odd = hash(b.id) % 2 === 1;
           const lean =
             (isLast && !(showDecor && decorAt === books.length) && books.length > 2 && !odd) ||
-            (showDecor && i === decorAt - 1 && !odd) ||
-            (decorMid && i === decorAt && odd);
+            (showDecor && i === decorAt - 1 && !odd);
+          // (a book right next to the bookend always stands upright: that's what the bookend is for)
           const footRoom = lean && (!isLast || (showDecor && decorAt === books.length)) ? Math.ceil((row - BOARD) * 0.13) : 0;
           const spine = (
             <div
@@ -246,7 +245,6 @@ function ShelfSection({
                 scale={scale}
                 delay={startDelay + Math.min(i * 0.025, 0.6)}
                 lean={lean}
-                restHeight={decorMid && i === decorAt ? 64 * scale : undefined}
               />
             </div>
           );

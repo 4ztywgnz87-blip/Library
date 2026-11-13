@@ -25,14 +25,11 @@ export const BooksIcon = (p: P) => (
     <path d="m15.5 7.2 3.6-1 2.6 13.4-3.6 1z" />
   </svg>
 );
-/** A closed little cabinet: crown on top, two doors with knobs, small feet */
+/** A bookcase with books on its shelves, closed at the top */
 export const ShelfIcon = (p: P) => (
   <svg {...base(p)}>
-    <path d="M4 4.5h16" />
-    <rect x="5" y="6" width="14" height="13" rx="1" />
-    <path d="M12 6v13" />
-    <path d="M10 12.5h.01M14 12.5h.01" strokeWidth="2.4" />
-    <path d="M7 19v1.5M17 19v1.5" />
+    <path d="M4 4h16M4 4v16M20 4v16M3 20h18M4 12h16" />
+    <path d="M7.5 12V7.5M10 12V8.2M12.5 12V7.5M8 20v-5M10.5 20v-4.2M14.5 20l1.4-4.6" />
   </svg>
 );
 export const UserIcon = (p: P) => (
