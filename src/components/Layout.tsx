@@ -1,4 +1,7 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useRef } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
+import { TABS, useTabSwipe } from '../lib/swipe';
 import { BooksIcon, HomeIcon, PlusIcon, ShelfIcon, UserIcon } from './Icons';
 
 const items = [
@@ -11,11 +14,34 @@ const items = [
 
 export function Layout() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const hideNav = pathname.startsWith('/book/') || pathname === '/quiz';
+
+  // Slide direction between the main screens (swipe or tab tap): +1 = from the right
+  const tabIndex = TABS.indexOf(pathname);
+  const lastTab = useRef(tabIndex);
+  const dir = tabIndex >= 0 && lastTab.current >= 0 ? Math.sign(tabIndex - lastTab.current) : 0;
+  useEffect(() => {
+    if (tabIndex >= 0) lastTab.current = tabIndex;
+  }, [tabIndex]);
+
+  const onSwipe = useCallback((to: string) => navigate(to), [navigate]);
+  useTabSwipe(pathname, onSwipe);
   return (
     <div className="paper relative min-h-dvh md:pl-24">
       <main className={`relative z-10 ${hideNav ? '' : 'pb-28 md:pb-8'}`}>
-        <Outlet />
+        {tabIndex >= 0 ? (
+          <motion.div
+            key={pathname}
+            initial={dir ? { x: dir * 48, opacity: 0 } : false}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+          >
+            <Outlet />
+          </motion.div>
+        ) : (
+          <Outlet />
+        )}
       </main>
 
       {/* Phone: bottom bar · iPad/Mac: side rail */}
