@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "wrangler dev --port 8787",
-    "build": "tsc -b && vite build",
+    "build": "vite build && node scripts/embed-assets.mjs && tsc -b",
     "typecheck": "tsc -b",
     "db:migrate:local": "wrangler d1 migrations apply snug --local",
     "db:migrate:remote": "wrangler d1 migrations apply snug --remote",

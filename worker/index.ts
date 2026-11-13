@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type { SyncRecord } from '../src/types';
+import { ASSETS } from './assets.gen';
 
 export interface Env {
   DB: D1Database;
-  ASSETS: Fetcher;
   ALLOWED_EMAIL: string;
   RESEND_API_KEY?: string;
   MAIL_FROM?: string;
@@ -195,4 +195,40 @@ app.get('/ol', async (c) => {
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
 
-export default app;
+// ---------- the app itself ----------
+// The built app is embedded in this Worker (see scripts/embed-assets.mjs).
+
+const decoded = new Map<string, Uint8Array>();
+function asset(path: string) {
+  const a = ASSETS[path];
+  if (!a) return undefined;
+  let bytes = decoded.get(path);
+  if (!bytes) {
+    bytes = Uint8Array.from(atob(a.body), (ch) => ch.charCodeAt(0));
+    decoded.set(path, bytes);
+  }
+  return { type: a.type, bytes };
+}
+
+function serveStatic(req: Request): Response {
+  const { pathname } = new URL(req.url);
+  // Unknown paths are app routes (/library, /book/…): serve the app shell
+  const path = ASSETS[pathname] ? pathname : '/index.html';
+  const a = asset(path)!;
+  const immutable = path.startsWith('/assets/');
+  return new Response(a.bytes, {
+    headers: {
+      'Content-Type': a.type,
+      'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+    },
+  });
+}
+
+export default {
+  fetch(req: Request, env: Env, ctx: ExecutionContext) {
+    const { pathname } = new URL(req.url);
+    if (pathname.startsWith('/api/')) return app.fetch(req, env, ctx);
+    if (req.method !== 'GET' && req.method !== 'HEAD') return new Response('Method not allowed', { status: 405 });
+    return serveStatic(req);
+  },
+} satisfies ExportedHandler<Env>;

@@ -9,7 +9,10 @@ Built as a web app (PWA): open it in Safari on iPhone/iPad → Share → **Add t
 
 - React + TypeScript + Vite + Tailwind, `motion` for animations
 - Offline-first: everything is stored in the browser (IndexedDB via Dexie) and synced in the background
-- Cloudflare Worker (Hono) + D1 database for login and sync; serves the app too (one deploy)
+- Cloudflare Worker (Hono) + D1 database for login and sync; the built app is embedded in the Worker
+  (`scripts/embed-assets.mjs`), so everything deploys in one upload
+
+Live: https://snug.snugshelf.workers.dev
 - Book data: Google Books + Open Library (free)
 
 ## Run locally
@@ -27,12 +30,11 @@ Without `RESEND_API_KEY`, the login link is printed in the `dev:api` terminal.
 ## Deploy (free Cloudflare account)
 
 ```bash
-npx wrangler login
-npx wrangler d1 create snug                 # copy the database_id into wrangler.jsonc
-npm run db:migrate:remote
+npx wrangler login                          # or set CLOUDFLARE_API_TOKEN
+npm run db:migrate:remote                   # database + account are already in wrangler.jsonc
 npx wrangler secret put ALLOWED_EMAIL       # allowed emails, comma-separated; each gets their own library
 npx wrangler secret put RESEND_API_KEY      # see "Login emails" below
-npm run deploy                              # → https://snug.<your-subdomain>.workers.dev
+npm run deploy                              # → https://snug.snugshelf.workers.dev
 ```
 
 ### Login emails

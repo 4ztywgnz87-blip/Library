@@ -1,19 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "snug",
+  "account_id": "d096b8fe68a089fd16032a88c0fd849b",
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-01",
-  "assets": {
-    "directory": "./dist",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
-  },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "snug",
-      // Fill in after `npx wrangler d1 create snug` (see README)
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "7f6b8d21-94ba-41b3-ad18-b20f3c84d1cb",
       "migrations_dir": "migrations"
     }
   ],
