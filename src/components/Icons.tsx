@@ -65,6 +65,13 @@ export const CameraIcon = (p: P) => (
     <circle cx="12" cy="12.5" r="3.5" />
   </svg>
 );
+export const PhotosIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="4" y="5" width="16" height="14" rx="2" />
+    <circle cx="9" cy="10" r="1.6" />
+    <path d="M4.5 17l4.5-4.5 3.5 3.5 2.5-2.5 4.5 4.5" />
+  </svg>
+);
 export const SparkleIcon = (p: P) => (
   <svg {...base(p)}>
     <path d="M12 3.5c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5 3.9-.6 5.9-2.6 6.5-6.5z" />

@@ -12,7 +12,8 @@ import { STATUSES, type Book } from '../types';
 import { Cover } from '../components/Cover';
 import { StarsDisplay } from '../components/Stars';
 import { Button, Card, PageHeader } from '../components/ui';
-import { CameraIcon, SearchIcon } from '../components/Icons';
+import { CameraIcon, PhotosIcon, SearchIcon } from '../components/Icons';
+import { PhotoInput } from '../components/PhotoInput';
 
 const VERDICT: Record<FitResponse['verdict'], { label: string; color: string }> = {
   love: { label: "You'll love this 💕", color: '#7A2E3A' },
@@ -75,18 +76,29 @@ export default function Shop() {
     setState({ kind: 'working', text: 'Checking if it fits you…' });
     try {
       if (picked) {
-        const fit = await fitCheck({ title: picked.title, author: picked.authors[0] ?? author, description: picked.description, genres: picked.genres });
+        const fit = await fitCheck({
+          title: picked.title,
+          author: picked.authors[0] ?? author,
+          description: picked.description,
+          genres: picked.genres,
+        });
         return setState({ kind: 'fit', book: picked, fit });
       }
       const results = await searchBooks(`${title} ${author}`);
       const matches = author ? sameBook(results, title, author) : results;
-      const found = matches.find((r) => r.coverUrl) ?? matches[0] ?? {
-        source: 'google' as const,
-        title,
-        authors: [author],
-        genres: [],
-      };
-      const fit = await fitCheck({ title: found.title, author: found.authors[0] ?? author, description: found.description, genres: found.genres });
+      const found = matches.find((r) => r.coverUrl) ??
+        matches[0] ?? {
+          source: 'google' as const,
+          title,
+          authors: [author],
+          genres: [],
+        };
+      const fit = await fitCheck({
+        title: found.title,
+        author: found.authors[0] ?? author,
+        description: found.description,
+        genres: found.genres,
+      });
       setState({ kind: 'fit', book: found, fit });
     } catch (e) {
       setState({ kind: 'error', text: (e as Error).message });
@@ -97,7 +109,11 @@ export default function Shop() {
     setState({ kind: 'working', text: 'Reading the cover…' });
     try {
       const id = await identifyCover(await shrinkPhoto(file));
-      if (!id.title) return setState({ kind: 'error', text: "Snug couldn't read that cover. Try again, or type the title." });
+      if (!id.title)
+        return setState({
+          kind: 'error',
+          text: "Snug couldn't read that cover. Try again, or type the title.",
+        });
       await check(id.title, id.author ?? '');
     } catch (e) {
       setState({ kind: 'error', text: (e as Error).message });
@@ -108,22 +124,26 @@ export default function Shop() {
     <div>
       <PageHeader back title="In a bookshop?" />
       <div className="mx-auto max-w-xl px-4 pb-10">
-        <p className="text-cocoa">Snap the cover: Snug tells you if you already have it, and if it's your kind of book.</p>
+        <p className="text-cocoa">
+          Snap the cover: Snug tells you if you already have it, and if it's your kind of book.
+        </p>
 
-        <label className="mt-5 flex cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-card)] bg-wine px-4 py-5 text-base font-medium text-cream shadow-[var(--shadow-soft)] active:scale-[0.98]">
-          <CameraIcon width={24} height={24} /> Take a photo of the cover
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = '';
-              if (f) void fromPhoto(f);
-            }}
-          />
-        </label>
+        <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
+          <PhotoInput
+            camera
+            onFile={(f) => void fromPhoto(f)}
+            className="flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-wine px-4 py-5 text-base font-medium text-cream shadow-[var(--shadow-soft)] active:scale-[0.98]"
+          >
+            <CameraIcon width={24} height={24} /> Take a photo of the cover
+          </PhotoInput>
+          <PhotoInput
+            onFile={(f) => void fromPhoto(f)}
+            className="flex flex-col items-center justify-center rounded-[var(--radius-card)] border border-wine/25 bg-white px-4 text-[0.65rem] font-medium text-wine shadow-[var(--shadow-soft)] active:scale-[0.98]"
+          >
+            <PhotosIcon width={24} height={24} />
+            Photos
+          </PhotoInput>
+        </div>
 
         <div className="relative mt-4">
           <SearchIcon className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-mocha" />
@@ -152,7 +172,10 @@ export default function Shop() {
               <ul className="mt-3 divide-y divide-sand/70">
                 {notOwned.map((r) => (
                   <li key={(r.googleId ?? r.olKey ?? '') + r.title}>
-                    <button className="flex w-full gap-3 py-2.5 text-left" onClick={() => check(r.title, r.authors[0] ?? '', r)}>
+                    <button
+                      className="flex w-full gap-3 py-2.5 text-left"
+                      onClick={() => check(r.title, r.authors[0] ?? '', r)}
+                    >
                       <Cover book={r} className="w-11 shrink-0" rounded="rounded" />
                       <div className="min-w-0">
                         <p className="text-sm leading-snug font-medium">{r.title}</p>
@@ -266,7 +289,9 @@ function FitCard({ book, fit }: { book: SearchResult; fit: FitResponse }) {
           disabled={added}
           onClick={async () => {
             setAdded(true);
-            await quickAdd(book.title, book.authors[0] ?? '', 'wishlist', { coverUrl: book.coverUrl });
+            await quickAdd(book.title, book.authors[0] ?? '', 'wishlist', {
+              coverUrl: book.coverUrl,
+            });
           }}
         >
           {added ? 'On your wishlist ✓' : '+ Add to wishlist'}

@@ -8,7 +8,8 @@ import { useBooks } from '../lib/hooks';
 import { STATUSES, type Lang, type Status } from '../types';
 import { Cover } from '../components/Cover';
 import { Button, PageHeader, Segmented, Toggle } from '../components/ui';
-import { CameraIcon, CheckIcon, CloseIcon, SearchIcon } from '../components/Icons';
+import { CameraIcon, PhotosIcon, CheckIcon, CloseIcon, SearchIcon } from '../components/Icons';
+import { PhotoInput } from '../components/PhotoInput';
 import { SleepyCat } from '../components/SleepyCat';
 import { EditionPicker } from '../components/EditionPicker';
 import { lookupSeries } from '../lib/seriesLookup';
@@ -63,7 +64,6 @@ export default function Add() {
       setReading(false);
     }
   };
-
 
   const owned = useMemo(() => {
     const m = new Map<string, string>();
@@ -126,28 +126,23 @@ export default function Add() {
           )}
         </div>
 
-        {/* Main ways to add: photo of the cover, or the barcode */}
-        <div className="mt-3">
-          <label
-            className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-wine px-3 py-3.5 text-sm font-medium text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97] ${
-              reading ? 'opacity-60' : ''
-            }`}
+        {/* Main way to add: a photo of the cover, new or from the camera roll */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <PhotoInput
+            camera
+            disabled={reading}
+            onFile={(f) => void readCover(f)}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-wine px-3 py-3.5 text-sm font-medium text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97]"
           >
-            <CameraIcon width={20} height={20} /> Photo of cover
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              disabled={reading}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (file) void readCover(file);
-              }}
-            />
-          </label>
-
+            <CameraIcon width={20} height={20} /> Take a photo
+          </PhotoInput>
+          <PhotoInput
+            disabled={reading}
+            onFile={(f) => void readCover(f)}
+            className="flex items-center justify-center gap-2 rounded-2xl border border-wine/25 bg-white px-3 py-3.5 text-sm font-medium text-wine shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97]"
+          >
+            <PhotosIcon width={20} height={20} /> From photos
+          </PhotoInput>
         </div>
 
         {reading && <LoadingTea text="Reading the cover…" />}
@@ -162,7 +157,9 @@ export default function Add() {
               <>Snug couldn't read that cover. Try again in better light, or type the title.</>
             )}
             {recognised.mock && (
-              <span className="mt-1 block text-xs text-mocha">Test mode: the AI is off, so this is always the same example book.</span>
+              <span className="mt-1 block text-xs text-mocha">
+                Test mode: the AI is off, so this is always the same example book.
+              </span>
             )}
           </div>
         )}
@@ -176,7 +173,9 @@ export default function Add() {
           {query.trim().length < 2 && !reading && (
             <div className="flex flex-col items-center py-10 text-center text-sm text-cocoa">
               <SleepyCat className="w-32 opacity-90" />
-              <p className="mt-3">Take a photo of the cover, or search by title, author or ISBN.</p>
+              <p className="mt-3">
+                Take a photo of the cover, pick one from your photos, or search by title, author or ISBN.
+              </p>
             </div>
           )}
 
@@ -212,7 +211,6 @@ export default function Add() {
           </ul>
         </div>
       </div>
-
 
       <AnimatePresence>
         {picked && (
@@ -251,15 +249,7 @@ function LoadingTea({ text = 'Looking through the shelves…' }: { text?: string
   );
 }
 
-function AddSheet({
-  result,
-  existingId,
-  onClose,
-}: {
-  result: SearchResult;
-  existingId?: string;
-  onClose: () => void;
-}) {
+function AddSheet({ result, existingId, onClose }: { result: SearchResult; existingId?: string; onClose: () => void }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('owned');
   const [language, setLanguage] = useState<Lang>(result.language ?? 'en');
@@ -273,8 +263,7 @@ function AddSheet({
   const add = async () => {
     setSaving(true);
     const { source: _s, language: _l, ...data } = result;
-    const description =
-      data.description ?? (data.olKey ? await fetchOpenLibraryDescription(data.olKey) : undefined);
+    const description = data.description ?? (data.olKey ? await fetchOpenLibraryDescription(data.olKey) : undefined);
     const now = Date.now();
     const book = await saveBook({
       ...data,
@@ -313,7 +302,13 @@ function AddSheet({
         <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-sand md:hidden" />
         <div className="space-y-5 p-5">
           <div className="flex gap-4">
-            <Cover book={{ ...result, customCover: special ? editionCover : undefined }} className="w-20 shrink-0" />
+            <Cover
+              book={{
+                ...result,
+                customCover: special ? editionCover : undefined,
+              }}
+              className="w-20 shrink-0"
+            />
             <div className="min-w-0">
               <h2 className="text-xl leading-snug font-semibold">{result.title}</h2>
               <p className="text-sm text-cocoa">{result.authors.join(', ')}</p>
@@ -329,7 +324,10 @@ function AddSheet({
           {existingId && (
             <div className="rounded-2xl bg-blush px-4 py-3 text-sm text-wine">
               This one is already in your library.{' '}
-              <button className="font-medium underline" onClick={() => navigate(`/book/${existingId}`, { replace: true })}>
+              <button
+                className="font-medium underline"
+                onClick={() => navigate(`/book/${existingId}`, { replace: true })}
+              >
                 Open it
               </button>
             </div>
@@ -343,7 +341,9 @@ function AddSheet({
                   key={s.id}
                   onClick={() => setStatus(s.id)}
                   className={`rounded-2xl border px-3 py-3 text-sm transition-all ${
-                    status === s.id ? 'border-wine bg-white font-medium text-wine shadow-[var(--shadow-soft)]' : 'border-sand text-cocoa'
+                    status === s.id
+                      ? 'border-wine bg-white font-medium text-wine shadow-[var(--shadow-soft)]'
+                      : 'border-sand text-cocoa'
                   }`}
                 >
                   {s.label}

@@ -49,10 +49,24 @@ export function mapGenres(categories: string[]): string[] {
 // ---------- series ----------
 
 /** Finds "(Crescent City, #2)" or "Crescent City 2:" style series hints in a title */
-export function parseSeries(title: string, subtitle?: string): { title: string; series?: SeriesInfo } {
+export function parseSeries(rawTitle: string, subtitle?: string): { title: string; series?: SeriesInfo } {
+  // Shop labels are not part of the title: "(Prime Tie-In)", "(Deluxe Edition)", "[Special edition]"
+  const title =
+    rawTitle
+      .replace(
+        /\s*[([][^()[\]]*\b(tie-?in|edition|editie|uitgave|exclusive|signed|paperback|hardcover|illustrated|collector'?s?)\b[^()[\]]*[)\]]/gi,
+        '',
+      )
+      .trim() || rawTitle;
   const paren = title.match(/^(.*?)\s*\(([^()#]+?),?\s*#\s*(\d+(?:\.\d+)?)\)\s*$/);
-  if (paren) return { title: paren[1], series: { name: paren[2].trim(), number: Number(paren[3]) } };
-  const sub = subtitle?.match(/^(?:(?:book|deel|vol\.?|volume)\s*(\d+)\s*(?:of|in|van)\s*(?:the\s*)?)(.+?)(?:\s*series)?$/i);
+  if (paren)
+    return {
+      title: paren[1],
+      series: { name: paren[2].trim(), number: Number(paren[3]) },
+    };
+  const sub = subtitle?.match(
+    /^(?:(?:book|deel|vol\.?|volume)\s*(\d+)\s*(?:of|in|van)\s*(?:the\s*)?)(.+?)(?:\s*series)?$/i,
+  );
   if (sub) return { title, series: { name: sub[2].trim(), number: Number(sub[1]) } };
   const sub2 = subtitle?.match(/^(?:a\s+)?(.+?)\s+(?:novel|book|series)\s*(?:#|book\s*)?(\d+)?$/i);
   if (sub2 && sub2[2]) return { title, series: { name: sub2[1].trim(), number: Number(sub2[2]) } };
@@ -61,8 +75,10 @@ export function parseSeries(title: string, subtitle?: string): { title: string; 
 
 // ---------- language ----------
 
-const DUTCH = /\b(de|het|een|van|en|ik|je|jij|niet|wat|zijn|haar|hij|zij|wij|ons|voor|met|naar|uit|op|bij|als|maar|nooit|altijd|liefde|nacht|dag|meisje|huis|boek|deel)\b/gi;
-const ENGLISH = /\b(the|a|an|of|and|to|in|is|you|it|we|my|your|never|always|love|night|day|girl|house|book|with|from)\b/gi;
+const DUTCH =
+  /\b(de|het|een|van|en|ik|je|jij|niet|wat|zijn|haar|hij|zij|wij|ons|voor|met|naar|uit|op|bij|als|maar|nooit|altijd|liefde|nacht|dag|meisje|huis|boek|deel)\b/gi;
+const ENGLISH =
+  /\b(the|a|an|of|and|to|in|is|you|it|we|my|your|never|always|love|night|day|girl|house|book|with|from)\b/gi;
 
 /** Rough guess from the title: Dutch or English? */
 export function guessLang(text: string): Lang | undefined {
@@ -99,7 +115,10 @@ function googleCover(v: GoogleVolume): string | undefined {
 }
 
 function stripHtml(s?: string) {
-  return s?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return s
+    ?.replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Google Books, directly; if that's refused (rate limit), through Snug's own server, which caches */
@@ -127,7 +146,9 @@ async function searchGoogle(query: string, signal?: AbortSignal): Promise<Search
       const { title, series } = parseSeries(info.title!, info.subtitle);
       // the language of this edition, as the store lists it
       const lang =
-        info.language === 'nl' || info.language === 'en' ? info.language : guessLang(`${info.title} ${info.subtitle ?? ''}`);
+        info.language === 'nl' || info.language === 'en'
+          ? info.language
+          : guessLang(`${info.title} ${info.subtitle ?? ''}`);
       const r: SearchResult = {
         source: 'google' as const,
         title,
@@ -154,7 +175,9 @@ async function searchGoogle(query: string, signal?: AbortSignal): Promise<Search
 /** Open Library search, directly; if that's refused (busy / rate limit), through Snug's own server, which caches */
 export async function openLibrarySearch(params: URLSearchParams, signal?: AbortSignal): Promise<Response> {
   try {
-    const res = await fetch(`https://openlibrary.org/search.json?${params}`, { signal });
+    const res = await fetch(`https://openlibrary.org/search.json?${params}`, {
+      signal,
+    });
     if (res.ok) return res;
   } catch (e) {
     if (signal?.aborted) throw e;
@@ -163,7 +186,6 @@ export async function openLibrarySearch(params: URLSearchParams, signal?: AbortS
   if (!res.ok) throw new Error(`Open Library ${res.status}`);
   return res;
 }
-
 
 interface OLDoc {
   key: string;
@@ -212,7 +234,8 @@ async function searchOpenLibrary(query: string, signal?: AbortSignal): Promise<S
             ? 'nl'
             : langs.length === 1 && langs[0] === 'eng'
               ? 'en'
-              : (guessLang(`${d.title} ${d.subtitle ?? ''}`) ?? (langs.includes('eng') ? 'en' : langs.includes('dut') ? 'nl' : undefined)),
+              : (guessLang(`${d.title} ${d.subtitle ?? ''}`) ??
+                (langs.includes('eng') ? 'en' : langs.includes('dut') ? 'nl' : undefined)),
       };
       // how many readers have it on their shelves (log scale), plus a little for many editions
       popularity.set(r, Math.log10((d.readinglog_count ?? 0) + 1) * 10 + Math.min(5, (d.edition_count ?? 1) / 4));

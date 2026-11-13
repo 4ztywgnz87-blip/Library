@@ -1,5 +1,6 @@
 import type {
   AiStatus,
+  CoverCorners,
   FitResponse,
   IdentifyResponse,
   RecommendRequest,
@@ -24,6 +25,18 @@ export async function identifyCover(dataUrl: string) {
   const [meta, image] = dataUrl.split(',');
   const mediaType = meta.match(/data:(.*?);/)?.[1] ?? 'image/jpeg';
   return post<IdentifyResponse>('/api/ai/identify', { image, mediaType });
+}
+
+/** Where the book is in a photo (for cutting out her own cover) */
+export async function findCorners(dataUrl: string, width: number, height: number) {
+  const [meta, image] = dataUrl.split(',');
+  const mediaType = meta.match(/data:(.*?);/)?.[1] ?? 'image/jpeg';
+  return post<CoverCorners>('/api/ai/corners', {
+    image,
+    mediaType,
+    width,
+    height,
+  });
 }
 
 /** Tips use the library on the server, so make sure her latest changes are there first */

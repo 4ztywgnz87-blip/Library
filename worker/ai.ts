@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Book } from '../src/types';
 import type {
   FitResponse,
+  CoverCorners,
   IdentifyResponse,
   Pick,
   ReaderProfile,
@@ -34,7 +35,11 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export async function aiStatus(env: AiEnv) {
   const row = await env.DB.prepare('SELECT count FROM ai_usage WHERE day = ?').bind(today()).first<{ count: number }>();
-  return { mode: isLive(env) ? 'live' : 'mock', usedToday: row?.count ?? 0, limit: Number(env.AI_DAILY_LIMIT ?? 40) } as const;
+  return {
+    mode: isLive(env) ? 'live' : 'mock',
+    usedToday: row?.count ?? 0,
+    limit: Number(env.AI_DAILY_LIMIT ?? 40),
+  } as const;
 }
 
 /** Counts one paid AI call; refuses once today's limit is reached */
@@ -84,7 +89,13 @@ async function ask<T extends z.ZodType>(
 ): Promise<z.infer<T> | null> {
   await spend(env);
   // On Sonnet, a declined request is retried server-side on a suitable fallback model
-  const fallback = model === TIPS_MODEL ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {};
+  const fallback =
+    model === TIPS_MODEL
+      ? {
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default' as const,
+        }
+      : {};
   const response = await client(env).beta.messages.parse({
     model,
     max_tokens: 8000,
@@ -108,7 +119,12 @@ const IdentifySchema = z.object({
 export async function identifyCover(env: AiEnv, imageBase64: string, mediaType: string): Promise<IdentifyResponse> {
   if (!isLive(env)) {
     // Test mode: always "recognises" the same book, so the flow can be tried for free
-    return { title: 'Fourth Wing', author: 'Rebecca Yarros', isbn: null, mock: true };
+    return {
+      title: 'Fourth Wing',
+      author: 'Rebecca Yarros',
+      isbn: null,
+      mock: true,
+    };
   }
   const result = await ask(
     env,
@@ -118,13 +134,74 @@ export async function identifyCover(env: AiEnv, imageBase64: string, mediaType: 
     [
       {
         type: 'image',
-        source: { type: 'base64', media_type: mediaType as 'image/jpeg', data: imageBase64 },
+        source: {
+          type: 'base64',
+          media_type: mediaType as 'image/jpeg',
+          data: imageBase64,
+        },
       },
       { type: 'text', text: 'Which book is this?' },
     ],
     'low',
   );
-  return { title: result?.title ?? null, author: result?.author ?? null, isbn: result?.isbn ?? null, mock: false };
+  return {
+    title: result?.title ?? null,
+    author: result?.author ?? null,
+    isbn: result?.isbn ?? null,
+    mock: false,
+  };
+}
+
+// ---------- finding the book in a photo (for her own cover photo) ----------
+
+const Point = z.object({ x: z.number(), y: z.number() });
+const CornersSchema = z.object({
+  found: z.boolean(),
+  topLeft: Point,
+  topRight: Point,
+  bottomRight: Point,
+  bottomLeft: Point,
+});
+
+/** The four corners of the front cover, in pixels of the given image; null when no book is visible */
+export async function findCoverCorners(
+  env: AiEnv,
+  imageBase64: string,
+  mediaType: string,
+  width: number,
+  height: number,
+): Promise<CoverCorners> {
+  if (!isLive(env)) return { corners: null, mock: true };
+  const r = await ask(
+    env,
+    VISION_MODEL,
+    CornersSchema,
+    'You locate the front cover of a book in a photo, so it can be cut out precisely. Give the pixel coordinates of the four corners of the front cover itself (not the spine, not the hand holding it, not the background). If the book is tilted or seen at an angle, give the real corners, so the shape may be a skewed quadrilateral. Be as precise as you can: the corners are where the cover edges meet. If no book cover is visible, set found to false.',
+    [
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: mediaType as 'image/jpeg',
+          data: imageBase64,
+        },
+      },
+      {
+        type: 'text',
+        text: `The image is ${width} x ${height} pixels (x to the right, y down, origin top-left). Where are the four corners of the front cover?`,
+      },
+    ],
+    'low',
+  );
+  if (!r?.found) return { corners: null, mock: false };
+  const clamp = (p: { x: number; y: number }) => ({
+    x: Math.min(1, Math.max(0, p.x / width)),
+    y: Math.min(1, Math.max(0, p.y / height)),
+  });
+  return {
+    corners: [r.topLeft, r.topRight, r.bottomRight, r.bottomLeft].map(clamp),
+    mock: false,
+  };
 }
 
 // ---------- describing her library to Claude ----------
@@ -178,16 +255,15 @@ If a series is involved, make sure the pick is the right next book in reading or
 // ---------- "What's next?" ----------
 
 const PicksSchema = z.object({
-  picks: z
-    .array(
-      z.object({
-        title: z.string(),
-        author: z.string(),
-        why: z.string(),
-        seriesNote: z.string().nullable(),
-        score: z.number(),
-      }),
-    ),
+  picks: z.array(
+    z.object({
+      title: z.string(),
+      author: z.string(),
+      why: z.string(),
+      seriesNote: z.string().nullable(),
+      score: z.number(),
+    }),
+  ),
 });
 
 const clampScore = (n: number) => Math.round(Math.max(0, Math.min(100, n)));
@@ -214,7 +290,11 @@ export async function recommend(
   const unread = books.filter((b) => b.status === 'owned');
   if (req.source === 'shelf' && unread.length === 0) return { picks: [], mock: !isLive(env) };
 
-  if (!isLive(env)) return { picks: await inSeriesOrder(mockRecommend(req, books, profile), req.source, books), mock: true };
+  if (!isLive(env))
+    return {
+      picks: await inSeriesOrder(mockRecommend(req, books, profile), req.source, books),
+      mock: true,
+    };
 
   const wish = [
     req.source === 'shelf'
@@ -244,10 +324,18 @@ export async function recommend(
   const byKey = new Map(books.map((b) => [key(b.title, b.authors[0]), b]));
   const picks: Pick[] = (result?.picks ?? []).slice(0, 3).map((p) => {
     const own = byKey.get(key(p.title, p.author)) ?? books.find((b) => key(b.title) === key(p.title));
-    return { ...p, seriesNote: p.seriesNote ?? undefined, bookId: own?.id, score: clampScore(p.score) };
+    return {
+      ...p,
+      seriesNote: p.seriesNote ?? undefined,
+      bookId: own?.id,
+      score: clampScore(p.score),
+    };
   });
   const fitting = req.source === 'shelf' ? picks.filter((p) => p.bookId) : picks.filter((p) => !p.bookId);
-  return { picks: await inSeriesOrder(fitting, req.source, books), mock: false };
+  return {
+    picks: await inSeriesOrder(fitting, req.source, books),
+    mock: false,
+  };
 }
 
 // ---------- never skip ahead in a series ----------
@@ -362,7 +450,10 @@ export function mockRecommend(req: RecommendRequest, books: Book[], profile?: Re
           }))
       : (() => {
           const have = new Set(books.map((b) => key(b.title, b.authors[0])));
-          return MOCK_BUY_LIST.filter((m) => !have.has(key(m.title, m.author))).map((m) => ({ book: undefined, c: m as Candidate }));
+          return MOCK_BUY_LIST.filter((m) => !have.has(key(m.title, m.author))).map((m) => ({
+            book: undefined,
+            c: m as Candidate,
+          }));
         })();
 
   return candidates
@@ -392,7 +483,12 @@ const FitSchema = z.object({
 
 export async function fitCheck(
   env: AiEnv,
-  book: { title: string; author: string; description?: string; genres?: string[] },
+  book: {
+    title: string;
+    author: string;
+    description?: string;
+    genres?: string[];
+  },
   books: Book[],
   profile?: ReaderProfile,
 ): Promise<FitResponse> {
@@ -400,7 +496,17 @@ export async function fitCheck(
     // Test mode: the same taste engine as the tips, so scores mean the same everywhere
     const taste = learnTaste(books, profile);
     const traits = traitsIn(`${book.description ?? ''} ${(book.genres ?? []).join(' ')}`);
-    const { score, why } = scoreBook({ title: book.title, author: book.author, genres: book.genres ?? [], traits }, taste, books, {});
+    const { score, why } = scoreBook(
+      {
+        title: book.title,
+        author: book.author,
+        genres: book.genres ?? [],
+        traits,
+      },
+      taste,
+      books,
+      {},
+    );
     const verdict = score >= 85 ? 'love' : score >= 70 ? 'like' : score >= 55 ? 'maybe' : 'skip';
     return { verdict, score, why, seriesNote: null, mock: true };
   }
@@ -416,7 +522,14 @@ export async function fitCheck(
       'medium',
     ),
   );
-  if (!result) return { verdict: 'maybe', score: 50, why: "Snug couldn't judge this one.", seriesNote: null, mock: false };
+  if (!result)
+    return {
+      verdict: 'maybe',
+      score: 50,
+      why: "Snug couldn't judge this one.",
+      seriesNote: null,
+      mock: false,
+    };
   return { ...result, score: clampScore(result.score), mock: false };
 }
 

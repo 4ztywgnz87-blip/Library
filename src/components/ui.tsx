@@ -55,10 +55,20 @@ export function Segmented<T extends string>({
   );
 }
 
-export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode }) {
+export function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between gap-4 py-1">
-      <span className="text-sm text-ink">{label}</span>
+      <span className="flex-1 cursor-pointer text-sm text-ink" onClick={() => onChange(!checked)}>
+        {label}
+      </span>
       <button
         type="button"
         role="switch"
@@ -98,7 +108,11 @@ export function PageHeader({ title, back, right }: { title?: ReactNode; back?: b
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-[var(--radius-card)] bg-white/70 p-4 shadow-[var(--shadow-soft)] ${className}`}>{children}</div>;
+  return (
+    <div className={`rounded-[var(--radius-card)] bg-white/70 p-4 shadow-[var(--shadow-soft)] ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 export function Button({

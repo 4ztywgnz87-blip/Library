@@ -60,6 +60,12 @@ export interface RecommendResponse {
   mock: boolean;
 }
 
+/** Corners as fractions of the image (0–1), clockwise from top-left */
+export interface CoverCorners {
+  corners: { x: number; y: number }[] | null;
+  mock: boolean;
+}
+
 export interface IdentifyResponse {
   title: string | null;
   author: string | null;
