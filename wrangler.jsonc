@@ -14,7 +14,7 @@
   ],
   "vars": {
     // "mock" = free canned AI answers (testing), "live" = real Claude calls
-    "AI_MODE": "mock",
+    "AI_MODE": "live",
     // Max AI requests per day, protects the prepaid credit
     "AI_DAILY_LIMIT": "40"
   }

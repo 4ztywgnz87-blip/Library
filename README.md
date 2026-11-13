@@ -45,8 +45,8 @@ series lists (Claude Sonnet 5.5, with server-side refusal fallback). Code: `work
 
 `AI_MODE` in `wrangler.jsonc`:
 
-- `mock` (default): free, canned answers, for testing the screens and flow
-- `live`: real Claude calls; needs `npx wrangler secret put ANTHROPIC_API_KEY`, then `npm run deploy`
+- `mock`: free, canned answers, for testing the screens and flow
+- `live` (current): real Claude calls; needs `npx wrangler secret put ANTHROPIC_API_KEY`, then `npm run deploy`
 
 Answers are cached in D1 (`ai_cache`), so the same question twice only costs once.
 
