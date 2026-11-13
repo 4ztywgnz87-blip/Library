@@ -8,6 +8,9 @@ import BookDetail from './pages/BookDetail';
 import Shelf from './pages/Shelf';
 import Profile from './pages/Profile';
 import { SeriesDetail, SeriesList } from './pages/Series';
+import Next from './pages/Next';
+import Shop from './pages/Shop';
+import Quiz from './pages/Quiz';
 import { startBackgroundSync } from './lib/sync';
 
 export default function App() {
@@ -25,6 +28,9 @@ export default function App() {
           <Route path="series" element={<SeriesList />} />
           <Route path="series/:name" element={<SeriesDetail />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="next" element={<Next />} />
+          <Route path="shop" element={<Shop />} />
+          <Route path="quiz" element={<Quiz />} />
           <Route path="*" element={<Home />} />
         </Route>
       </Routes>

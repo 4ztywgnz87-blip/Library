@@ -87,17 +87,43 @@ export default function Home() {
             )}
           </section>
 
-          {/* What's next teaser (phase 4) */}
-          <section>
-            <div className="relative overflow-hidden rounded-[var(--radius-card)] bg-wine p-5 text-cream shadow-[var(--shadow-soft)]">
+          {/* What's next */}
+          <section className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+            <Link
+              to="/next"
+              className="relative block overflow-hidden rounded-[var(--radius-card)] bg-wine p-5 text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.99]"
+            >
               <SparkleIcon className="absolute -top-2 -right-2 h-24 w-24 opacity-15" />
               <h2 className="text-2xl">What's next?</h2>
               <p className="mt-1 max-w-sm text-sm opacity-85">
-                Soon you'll get three handpicked tips, from your own shelf or for your next bookshop visit.
+                Three handpicked tips, from your own shelf or for your next bookshop visit.
               </p>
-              <span className="mt-3 inline-block rounded-full bg-cream/15 px-3 py-1 text-xs">Coming soon</span>
-            </div>
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-cream/15 px-3 py-1 text-sm">
+                Find my next read <ChevronIcon width={16} height={16} />
+              </span>
+            </Link>
+            <Link to="/shop">
+              <Card className="flex h-full items-center gap-3 sm:flex-col sm:items-start sm:justify-center">
+                <span className="text-3xl">🛍️</span>
+                <div>
+                  <p className="font-soft text-lg leading-tight font-semibold">In a bookshop?</p>
+                  <p className="text-xs text-cocoa">Do I have it? Will I like it?</p>
+                </div>
+              </Card>
+            </Link>
           </section>
+
+          {!profile.completedAt && (
+            <Link to="/quiz" className="block">
+              <Card className="flex items-center gap-3 bg-blush/60">
+                <span className="text-2xl">💌</span>
+                <p className="flex-1 text-sm text-wine">
+                  <span className="font-medium">Take the 2-minute reader quiz</span> so Snug's tips really fit you.
+                </p>
+                <ChevronIcon className="text-wine" width={18} height={18} />
+              </Card>
+            </Link>
+          )}
 
           {/* Little stats */}
           <section className="grid grid-cols-3 gap-3">

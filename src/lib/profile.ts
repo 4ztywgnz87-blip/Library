@@ -16,11 +16,16 @@ export const EMPTY_PROFILE: ReaderProfile = {
   updatedAt: 0,
 };
 
-export function useProfile(): ReaderProfile {
-  return (
-    useLiveQuery(async () => ({ ...EMPTY_PROFILE, ...((await db.meta.get('profile'))?.value as ReaderProfile | undefined) }), []) ??
-    EMPTY_PROFILE
+/** Her profile, or undefined while it is still loading */
+export function useProfileLoaded(): ReaderProfile | undefined {
+  return useLiveQuery(
+    async () => ({ ...EMPTY_PROFILE, ...((await db.meta.get('profile'))?.value as ReaderProfile | undefined) }),
+    [],
   );
+}
+
+export function useProfile(): ReaderProfile {
+  return useProfileLoaded() ?? EMPTY_PROFILE;
 }
 
 export async function updateProfile(patch: Partial<ReaderProfile>) {

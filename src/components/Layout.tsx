@@ -11,7 +11,7 @@ const items = [
 
 export function Layout() {
   const { pathname } = useLocation();
-  const hideNav = pathname.startsWith('/book/');
+  const hideNav = pathname.startsWith('/book/') || pathname === '/quiz';
   return (
     <div className="paper relative min-h-dvh md:pl-24">
       <main className={`relative z-10 ${hideNav ? '' : 'pb-28 md:pb-8'}`}>

@@ -258,6 +258,12 @@ function mockRecommend(req: RecommendRequest, books: Book[], profile?: ReaderPro
         if (favs.has((b.authors[0] ?? '').toLowerCase())) score += 1;
         if (loved.some((l) => l.series && b.series && l.series.name === b.series.name)) score += 2;
         if (loved.some((l) => l.authors[0] === b.authors[0])) score += 1;
+        // Don't jump ahead in a series: the part before this one should be read
+        const n = b.series?.number;
+        if (b.series && n && n > 1) {
+          const prev = books.find((x) => x.series?.name === b.series!.name && x.series?.number === n - 1);
+          if (prev?.status !== 'read') score -= 5;
+        }
         return { b, score };
       })
       .sort((a, b) => b.score - a.score)

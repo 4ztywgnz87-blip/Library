@@ -5,6 +5,8 @@ import { useMeta } from '../lib/hooks';
 import { syncNow } from '../lib/sync';
 import { Button, Card, PageHeader } from '../components/ui';
 import { FavouriteAuthorsCard } from '../components/FavouriteAuthors';
+import { Link } from 'react-router-dom';
+import { useProfile } from '../lib/profile';
 
 export default function Profile() {
   const savedName = useMeta<string>('readerName', '');
@@ -12,6 +14,7 @@ export default function Profile() {
   const pending = useLiveQuery(() => db.books.where('dirty').equals(1).count(), []) ?? 0;
   const [name, setName] = useState(savedName);
   const [syncing, setSyncing] = useState(false);
+  const profile = useProfile();
   useEffect(() => setName(savedName), [savedName]);
 
   return (
@@ -34,13 +37,20 @@ export default function Profile() {
 
         <FavouriteAuthorsCard />
 
-        <Card className="opacity-70">
-          <p className="font-soft text-lg">Reader quiz</p>
-          <p className="mt-1 text-sm text-cocoa">
-            Favourite tropes, spice level, moods… so the tips really fit you. Coming soon, and you'll be able to
-            retake it whenever your taste changes.
-          </p>
-        </Card>
+        <Link to="/quiz" className="block">
+          <Card className="flex items-center gap-3">
+            <span className="text-2xl">💌</span>
+            <div className="flex-1">
+              <p className="font-soft text-lg">Reader quiz</p>
+              <p className="text-sm text-cocoa">
+                {profile.completedAt
+                  ? `Done on ${new Date(profile.completedAt).toLocaleDateString('en-GB')}. Taste changed? Retake it.`
+                  : 'Favourite tropes, spice level, moods… so the tips really fit you.'}
+              </p>
+            </div>
+            <span className="text-sm font-medium text-wine">{profile.completedAt ? 'Retake' : 'Start'}</span>
+          </Card>
+        </Link>
 
         <Card className="space-y-3">
           <p className="text-xs tracking-wide text-mocha uppercase">Sync</p>
