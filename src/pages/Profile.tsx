@@ -88,6 +88,12 @@ function InviteCard() {
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { email?: string } | null) => j?.email && setEmail((e) => e || j.email!))
+      .catch(() => {});
+  }, []);
 
   const create = async () => {
     setError(null);
@@ -104,8 +110,8 @@ function InviteCard() {
 
   return (
     <Card className="space-y-3">
-      <p className="text-xs tracking-wide text-mocha uppercase">Invite a tester</p>
-      <p className="text-sm text-cocoa">Create a one-time login link for another allowed reader. They get their own library.</p>
+      <p className="text-xs tracking-wide text-mocha uppercase">Login link</p>
+      <p className="text-sm text-cocoa">Log in on another device (iPad, laptop) or invite a tester. Every email address has its own library.</p>
       <div className="flex gap-2">
         <input
           type="email"

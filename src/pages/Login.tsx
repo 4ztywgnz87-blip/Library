@@ -7,6 +7,7 @@ import { SleepyCat } from '../components/SleepyCat';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [noMail, setNoMail] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const expired = new URLSearchParams(location.search).get('error');
@@ -24,10 +25,22 @@ export default function Login() {
 
         {sent ? (
           <div className="mt-10 rounded-[var(--radius-card)] bg-white/70 p-6 shadow-[var(--shadow-soft)]">
-            <p className="font-soft text-xl">Check your inbox ✉️</p>
-            <p className="mt-2 text-sm text-cocoa">
-              If that address belongs to this library, a login link is on its way. Open it on this device.
-            </p>
+            {noMail ? (
+              <>
+                <p className="font-soft text-xl">Use a login link 🔑</p>
+                <p className="mt-2 text-sm text-cocoa">
+                  Snug doesn't send emails yet. On a device where you're already logged in, go to{' '}
+                  <span className="font-medium">Me → Login link</span> and open that link here.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-soft text-xl">Check your inbox ✉️</p>
+                <p className="mt-2 text-sm text-cocoa">
+                  If that address belongs to this library, a login link is on its way. Open it on this device.
+                </p>
+              </>
+            )}
             <button className="mt-4 text-sm text-wine underline" onClick={() => setSent(false)}>
               Use another address
             </button>
@@ -40,7 +53,8 @@ export default function Login() {
               setBusy(true);
               setError(null);
               try {
-                await requestLoginLink(email);
+                const { mailEnabled } = await requestLoginLink(email);
+                setNoMail(!mailEnabled);
                 setSent(true);
               } catch (err) {
                 setError((err as Error).message);

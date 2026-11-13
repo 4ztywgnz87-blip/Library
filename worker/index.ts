@@ -74,7 +74,7 @@ app.post('/auth/request', async (c) => {
     const origin = c.req.header('origin') || new URL(c.req.url).origin;
     await sendLoginMail(c.env, normEmail(email), `${origin}/api/auth/verify?token=${token}`);
   }
-  return c.json({ ok: true });
+  return c.json({ ok: true, mail: !!c.env.RESEND_API_KEY });
 });
 
 app.get('/auth/verify', async (c) => {

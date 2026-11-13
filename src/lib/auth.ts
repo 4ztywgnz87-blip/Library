@@ -28,6 +28,8 @@ export async function requestLoginLink(email: string) {
     body: JSON.stringify({ email }),
   });
   if (!res.ok) throw new Error('Could not send the link');
+  const json = (await res.json()) as { mail?: boolean };
+  return { mailEnabled: json.mail !== false };
 }
 
 export async function logout() {
