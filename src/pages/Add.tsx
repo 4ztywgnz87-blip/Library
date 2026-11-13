@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
@@ -7,9 +7,13 @@ import { bookKey, newId, saveBook } from '../lib/library';
 import { useBooks } from '../lib/hooks';
 import { STATUSES, type Lang, type Status } from '../types';
 import { Cover } from '../components/Cover';
-import { Button, Chip, PageHeader, Segmented, Toggle } from '../components/ui';
+import { Button, PageHeader, Segmented, Toggle } from '../components/ui';
 import { BarcodeIcon, CameraIcon, CheckIcon, CloseIcon, SearchIcon } from '../components/Icons';
 import { SleepyCat } from '../components/SleepyCat';
+import { BarcodeScanner } from '../components/BarcodeScanner';
+import { identifyCover } from '../lib/ai';
+import { shrinkPhoto } from '../lib/photo';
+import type { IdentifyResponse } from '../shared';
 
 export default function Add() {
   const [query, setQuery] = useState('');
@@ -19,6 +23,31 @@ export default function Add() {
   const [picked, setPicked] = useState<SearchResult | null>(null);
   const books = useBooks();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [recognised, setRecognised] = useState<IdentifyResponse | null>(null);
+
+  const readCover = async (file: File) => {
+    setReading(true);
+    setRecognised(null);
+    setError(null);
+    try {
+      const result = await identifyCover(await shrinkPhoto(file));
+      setRecognised(result);
+      if (result.isbn) setQuery(result.isbn);
+      else if (result.title) setQuery([result.title, result.author].filter(Boolean).join(' '));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setReading(false);
+    }
+  };
+
+  const onBarcode = useCallback((isbn: string) => {
+    setScanning(false);
+    setRecognised(null);
+    setQuery(isbn);
+  }, []);
 
   const owned = useMemo(() => {
     const m = new Map<string, string>();
@@ -63,7 +92,6 @@ export default function Add() {
           <SearchIcon className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-mocha" />
           <input
             ref={inputRef}
-            autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Title, author or ISBN"
@@ -82,25 +110,62 @@ export default function Add() {
           )}
         </div>
 
-        <div className="mt-3 flex gap-2">
-          <Chip className="flex items-center gap-1.5 opacity-60">
-            <CameraIcon width={16} height={16} /> Cover photo · soon
-          </Chip>
-          <Chip className="flex items-center gap-1.5 opacity-60">
-            <BarcodeIcon width={16} height={16} /> Barcode · soon
-          </Chip>
+        {/* Main ways to add: photo of the cover, or the barcode */}
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <label
+            className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-wine px-3 py-3.5 text-sm font-medium text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97] ${
+              reading ? 'opacity-60' : ''
+            }`}
+          >
+            <CameraIcon width={20} height={20} /> Photo of cover
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              disabled={reading}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) void readCover(file);
+              }}
+            />
+          </label>
+          <button
+            onClick={() => setScanning(true)}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-white/80 px-3 py-3.5 text-sm font-medium text-ink shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97]"
+          >
+            <BarcodeIcon width={20} height={20} /> Scan barcode
+          </button>
         </div>
 
+        {reading && <LoadingTea text="Reading the cover…" />}
+        {recognised && (
+          <div className="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm text-cocoa">
+            {recognised.title ? (
+              <>
+                Looks like <span className="font-medium text-ink">{recognised.title}</span>
+                {recognised.author && <> by {recognised.author}</>}. Pick the right edition below.
+              </>
+            ) : (
+              <>Snug couldn't read that cover. Try again in better light, or type the title.</>
+            )}
+            {recognised.mock && (
+              <span className="mt-1 block text-xs text-mocha">Test mode: the AI is off, so this is always the same example book.</span>
+            )}
+          </div>
+        )}
+
         <div className="mt-5">
-          {loading && results.length === 0 && <LoadingTea />}
+          {loading && results.length === 0 && !reading && <LoadingTea />}
           {error && <p className="py-8 text-center text-sm text-cocoa">{error}</p>}
           {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
             <p className="py-8 text-center text-sm text-cocoa">No books found. Try the author's name too?</p>
           )}
-          {query.trim().length < 2 && (
+          {query.trim().length < 2 && !reading && (
             <div className="flex flex-col items-center py-10 text-center text-sm text-cocoa">
               <SleepyCat className="w-32 opacity-90" />
-              <p className="mt-3">Search for a book to add it to your library.</p>
+              <p className="mt-3">Take a photo of the cover, scan the barcode, or search by title.</p>
             </div>
           )}
 
@@ -137,6 +202,8 @@ export default function Add() {
         </div>
       </div>
 
+      {scanning && <BarcodeScanner onResult={onBarcode} onClose={() => setScanning(false)} />}
+
       <AnimatePresence>
         {picked && (
           <AddSheet
@@ -150,7 +217,7 @@ export default function Add() {
   );
 }
 
-function LoadingTea() {
+function LoadingTea({ text = 'Looking through the shelves…' }: { text?: string }) {
   return (
     <div className="flex flex-col items-center py-10 text-sm text-cocoa">
       <svg viewBox="0 0 64 64" className="h-16 w-16">
@@ -169,7 +236,7 @@ function LoadingTea() {
         <path d="M12 30h40v8a16 16 0 0 1-16 16h-8a16 16 0 0 1-16-16z" fill="#7A2E3A" />
         <path d="M52 34h3a5 5 0 0 1 0 10h-4" stroke="#7A2E3A" strokeWidth="3" fill="none" />
       </svg>
-      <p className="mt-2">Looking through the shelves…</p>
+      <p className="mt-2">{text}</p>
     </div>
   );
 }

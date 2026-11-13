@@ -1,5 +1,7 @@
-import { Hono } from 'hono';
-import type { SyncRecord } from '../src/types';
+import { Hono, type Context } from 'hono';
+import type { Book, SyncRecord } from '../src/types';
+import type { ReaderProfile, RecommendRequest } from '../src/shared';
+import { AiLimitError, aiStatus, fitCheck, identifyCover, recommend, seriesInfo } from './ai';
 import { ASSETS } from './assets.gen';
 
 export interface Env {
@@ -65,6 +67,58 @@ app.get('/ol', async (c) => {
   const json = (await res.json()) as { description?: string | { value: string } };
   const d = json.description;
   return c.json({ description: typeof d === 'string' ? d : d?.value });
+});
+
+// ---------- AI ----------
+
+async function loadLibrary(env: Env) {
+  const { results } = await env.DB.prepare('SELECT kind, data FROM records WHERE owner = ? AND deleted = 0')
+    .bind(OWNER)
+    .all<{ kind: string; data: string }>();
+  const books = results.filter((r) => r.kind === 'book').map((r) => JSON.parse(r.data) as Book);
+  const profileRow = results.find((r) => r.kind === 'profile');
+  return { books, profile: profileRow ? (JSON.parse(profileRow.data) as ReaderProfile) : undefined };
+}
+
+async function aiRoute<T>(c: Context<{ Bindings: Env }>, run: () => Promise<T>) {
+  try {
+    return c.json(await run());
+  } catch (err) {
+    if (err instanceof AiLimitError) return c.json({ error: err.message }, 429);
+    console.error('AI error', err);
+    return c.json({ error: "Snug's AI couldn't answer right now. Please try again in a moment." }, 502);
+  }
+}
+
+app.get('/ai/status', async (c) => c.json(await aiStatus(c.env)));
+
+app.post('/ai/identify', async (c) => {
+  const { image, mediaType = 'image/jpeg' } = await c.req.json<{ image?: string; mediaType?: string }>();
+  if (!image || image.length > 4_000_000) return c.json({ error: 'Photo missing or too large' }, 400);
+  return aiRoute(c, () => identifyCover(c.env, image, mediaType));
+});
+
+app.post('/ai/recommend', async (c) => {
+  const req = await c.req.json<RecommendRequest>();
+  return aiRoute(c, async () => {
+    const { books, profile } = await loadLibrary(c.env);
+    return recommend(c.env, req, books, profile);
+  });
+});
+
+app.post('/ai/fit', async (c) => {
+  const book = await c.req.json<{ title?: string; author?: string; description?: string }>();
+  if (!book.title || !book.author) return c.json({ error: 'Title and author required' }, 400);
+  return aiRoute(c, async () => {
+    const { books, profile } = await loadLibrary(c.env);
+    return fitCheck(c.env, { title: book.title!, author: book.author!, description: book.description }, books, profile);
+  });
+});
+
+app.post('/ai/series', async (c) => {
+  const { name, author } = await c.req.json<{ name?: string; author?: string }>();
+  if (!name) return c.json({ error: 'Series name required' }, 400);
+  return aiRoute(c, () => seriesInfo(c.env, name, author ?? ''));
 });
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404));

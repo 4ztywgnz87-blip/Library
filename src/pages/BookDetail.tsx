@@ -8,19 +8,9 @@ import { Cover } from '../components/Cover';
 import { StarsInput } from '../components/Stars';
 import { Button, Card, Chip, PageHeader, Segmented, Toggle } from '../components/ui';
 import { CameraIcon, TrashIcon } from '../components/Icons';
+import { shrinkPhoto } from '../lib/photo';
 
 const TAG_SUGGESTIONS = ['spicy 🌶️', 'emotional 😭', 'plot twist 🤯', 'funny 😂', 'slow burn 🔥', 'cosy ☕', 'dark 🖤', 'page-turner'];
-
-/** Shrinks a photo so it stays light to store and sync */
-async function photoToDataUrl(file: File, max = 700): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.82);
-}
 
 export default function BookDetail() {
   const { id } = useParams();
@@ -174,7 +164,7 @@ export default function BookDetail() {
                     className="hidden"
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
-                      if (file) await set({ customCover: await photoToDataUrl(file) });
+                      if (file) await set({ customCover: await shrinkPhoto(file, 700) });
                     }}
                   />
                 </label>
