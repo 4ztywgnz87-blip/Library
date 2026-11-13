@@ -36,7 +36,11 @@ export default function Home() {
   const recent = [...books].sort((a, b) => b.addedAt - a.addedAt).slice(0, 12);
   // Series worth a nudge: something missing, or the next part is waiting on the shelf
   const series = groupSeries(books);
-  const seriesToShow = series.filter((g) => g.missing.length > 0 || g.next).slice(0, 3);
+  // Series she's busy with (or still has parts of to read), the ones she's furthest in first
+  const seriesToShow = series
+    .filter((g) => g.read < g.books.length + g.missing.length)
+    .sort((a, b) => b.read / (b.books.length + b.missing.length) - a.read / (a.books.length + a.missing.length))
+    .slice(0, 3);
 
   return (
     <div className="pt-safe mx-auto max-w-5xl px-4">

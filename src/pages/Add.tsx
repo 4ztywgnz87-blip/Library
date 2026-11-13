@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
@@ -8,9 +8,8 @@ import { useBooks } from '../lib/hooks';
 import { STATUSES, type Lang, type Status } from '../types';
 import { Cover } from '../components/Cover';
 import { Button, PageHeader, Segmented, Toggle } from '../components/ui';
-import { BarcodeIcon, CameraIcon, CheckIcon, CloseIcon, SearchIcon } from '../components/Icons';
+import { CameraIcon, CheckIcon, CloseIcon, SearchIcon } from '../components/Icons';
 import { SleepyCat } from '../components/SleepyCat';
-import { BarcodeScanner } from '../components/BarcodeScanner';
 import { EditionPicker } from '../components/EditionPicker';
 import { lookupSeries } from '../lib/seriesLookup';
 import { identifyCover } from '../lib/ai';
@@ -30,15 +29,13 @@ export default function Add() {
   // The scanner and the add-sheet get their own history entry (?m=…), so swiping back on the
   // iPhone closes them instead of leaving the Add screen
   const modal = params.get('m');
-  const scanning = modal === 'scan';
-  const openModal = (m: 'scan' | 'add') =>
+  const openModal = (m: 'add') =>
     setParams((p) => {
       const next = new URLSearchParams(p);
       next.set('m', m);
       return next;
     });
   const closeModal = () => navigate(-1);
-  const setScanning = (open: boolean) => (open ? openModal('scan') : closeModal());
   const setPicked = (r: SearchResult | null) => {
     if (r) {
       setPickedState(r);
@@ -67,11 +64,6 @@ export default function Add() {
     }
   };
 
-  const onBarcode = useCallback((isbn: string) => {
-    navigate(-1);
-    setRecognised(null);
-    setQuery(isbn);
-  }, []);
 
   const owned = useMemo(() => {
     const m = new Map<string, string>();
@@ -135,7 +127,7 @@ export default function Add() {
         </div>
 
         {/* Main ways to add: photo of the cover, or the barcode */}
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-3">
           <label
             className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-wine px-3 py-3.5 text-sm font-medium text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97] ${
               reading ? 'opacity-60' : ''
@@ -155,12 +147,7 @@ export default function Add() {
               }}
             />
           </label>
-          <button
-            onClick={() => setScanning(true)}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-white/80 px-3 py-3.5 text-sm font-medium text-ink shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97]"
-          >
-            <BarcodeIcon width={20} height={20} /> Scan barcode
-          </button>
+
         </div>
 
         {reading && <LoadingTea text="Reading the cover…" />}
@@ -226,7 +213,6 @@ export default function Add() {
         </div>
       </div>
 
-      {scanning && <BarcodeScanner onResult={onBarcode} onClose={() => setScanning(false)} />}
 
       <AnimatePresence>
         {picked && (

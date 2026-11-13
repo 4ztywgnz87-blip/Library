@@ -25,10 +25,14 @@ export const BooksIcon = (p: P) => (
     <path d="m15.5 7.2 3.6-1 2.6 13.4-3.6 1z" />
   </svg>
 );
+/** A closed little cabinet: crown on top, two doors with knobs, small feet */
 export const ShelfIcon = (p: P) => (
   <svg {...base(p)}>
-    <path d="M3 20h18M3 12h18M4 4v16M20 4v16" />
-    <path d="M7 12V7M9.5 12V8M13 20v-5M15.5 20v-4" />
+    <path d="M4 4.5h16" />
+    <rect x="5" y="6" width="14" height="13" rx="1" />
+    <path d="M12 6v13" />
+    <path d="M10 12.5h.01M14 12.5h.01" strokeWidth="2.4" />
+    <path d="M7 19v1.5M17 19v1.5" />
   </svg>
 );
 export const UserIcon = (p: P) => (
@@ -62,11 +66,6 @@ export const CameraIcon = (p: P) => (
   <svg {...base(p)}>
     <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" />
     <circle cx="12" cy="12.5" r="3.5" />
-  </svg>
-);
-export const BarcodeIcon = (p: P) => (
-  <svg {...base(p)}>
-    <path d="M4 6v12M7 6v12M10.5 6v12M13 6v12M16.5 6v12M20 6v12" />
   </svg>
 );
 export const SparkleIcon = (p: P) => (

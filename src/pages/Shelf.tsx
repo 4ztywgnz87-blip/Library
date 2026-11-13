@@ -30,7 +30,20 @@ function spineStyle(b: Book) {
   return { height, width, color };
 }
 
-function Spine({ book, delay, lean, scale = 1 }: { book: Book; delay: number; lean: boolean; scale?: number }) {
+function Spine({
+  book,
+  delay,
+  lean,
+  scale = 1,
+  restHeight,
+}: {
+  book: Book;
+  delay: number;
+  lean: boolean;
+  scale?: number;
+  /** Leaning against something lower than the book (the bookend): its height in px */
+  restHeight?: number;
+}) {
   const navigate = useNavigate();
   const natural = spineStyle(book);
   const color = natural.color;
@@ -84,7 +97,9 @@ function Spine({ book, delay, lean, scale = 1 }: { book: Book; delay: number; le
         height,
         width,
         // a leaning book rests its top against its neighbour; its foot slides out a little
-        transformOrigin: lean ? 'top left' : 'bottom center',
+        // pivot where the book touches what it leans on: the top of its neighbour book, or the
+        // top edge of a (lower) bookend
+        transformOrigin: !lean ? 'bottom center' : restHeight ? `0 ${Math.max(0, height - restHeight)}px` : 'top left',
         // rounded spine: light from the left, shadow on the right, and a fine cloth texture
         backgroundImage:
           'linear-gradient(90deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.18) 16%, rgba(255,255,255,0.05) 38%, rgba(0,0,0,0.06) 70%, rgba(0,0,0,0.38) 100%), repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 3px)',
@@ -172,7 +187,7 @@ function ShelfSection({
       style={{ height: row, paddingBottom: BOARD, width: (decorMid ? 72 + 30 : 72) * scale }}
     >
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom left' }}>{decor}</div>
-      {decorMid && <Bookend className="shrink-0" style={{ height: 64 * scale, width: 26 * scale }} />}
+      {decorMid && <Bookend className="shrink-0" style={{ height: 64 * scale, width: (64 * 24 * scale) / 84 }} />}
     </div>
   );
 
@@ -209,20 +224,29 @@ function ShelfSection({
           const prev = books[i - 1];
           const newGroup =
             prev && (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? 'ml-1.5' : 'ml-[1px]';
+          // Leaning books rest their top against the left neighbour (a book or the bookend) and
+          // their foot slides a little to the right, so they get some room on that side.
+          // Who leans: sometimes the last book of the shelf, the book just before a decoration,
+          // or the first book after the bookend.
+          const isLast = i === books.length - 1;
+          const odd = hash(b.id) % 2 === 1;
+          const lean =
+            (isLast && !(showDecor && decorAt === books.length) && books.length > 2 && !odd) ||
+            (showDecor && i === decorAt - 1 && !odd) ||
+            (decorMid && i === decorAt && odd);
+          const footRoom = lean && (!isLast || (showDecor && decorAt === books.length)) ? Math.ceil((row - BOARD) * 0.13) : 0;
           const spine = (
-            <div key={b.id} className={`flex items-end ${i === 0 || i === decorAt ? '' : newGroup}`} style={{ height: row, paddingBottom: BOARD }}>
+            <div
+              key={b.id}
+              className={`flex items-end ${i === 0 || i === decorAt ? '' : newGroup}`}
+              style={{ height: row, paddingBottom: BOARD, marginRight: footRoom }}
+            >
               <Spine
                 book={b}
                 scale={scale}
                 delay={startDelay + Math.min(i * 0.025, 0.6)}
-                // like a real bookcase, the last book sometimes leans over
-                // (never right before a decoration, so it can't slide under it)
-                lean={
-                  i === books.length - 1 &&
-                  !(showDecor && decorAt === books.length) &&
-                  books.length > 2 &&
-                  hash(b.id) % 2 === 0
-                }
+                lean={lean}
+                restHeight={decorMid && i === decorAt ? 64 * scale : undefined}
               />
             </div>
           );
