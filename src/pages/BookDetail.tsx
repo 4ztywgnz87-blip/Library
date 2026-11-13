@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { seriesPath } from '../lib/series';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBook } from '../lib/hooks';
 import { deleteBook, updateBook } from '../lib/library';
@@ -7,7 +8,7 @@ import { GENRES, STATUSES, type Book, type Status } from '../types';
 import { Cover } from '../components/Cover';
 import { StarsInput } from '../components/Stars';
 import { Button, Card, Chip, PageHeader, Segmented, Toggle } from '../components/ui';
-import { CameraIcon, TrashIcon } from '../components/Icons';
+import { CameraIcon, ChevronIcon, TrashIcon } from '../components/Icons';
 import { shrinkPhoto } from '../lib/photo';
 
 const TAG_SUGGESTIONS = ['spicy 🌶️', 'emotional 😭', 'plot twist 🤯', 'funny 😂', 'slow burn 🔥', 'cosy ☕', 'dark 🖤', 'page-turner'];
@@ -284,10 +285,15 @@ function SeriesCard({ book }: { book: Book }) {
         )}
       </div>
       {!editing && book.series && (
-        <p className="mt-2 text-sm">
-          {book.series.name}
-          {book.series.number ? ` · book ${book.series.number}` : ''}
-        </p>
+        <Link to={seriesPath(book.series.name)} className="mt-2 flex items-center justify-between text-sm">
+          <span>
+            {book.series.name}
+            {book.series.number ? ` · book ${book.series.number}` : ''}
+          </span>
+          <span className="flex items-center text-wine">
+            View series <ChevronIcon width={16} height={16} />
+          </span>
+        </Link>
       )}
       {editing && (
         <div className="mt-3 space-y-3">

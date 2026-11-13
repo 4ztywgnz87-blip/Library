@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { searchBooks, fetchOpenLibraryDescription, type SearchResult } from '../lib/bookSearch';
 import { bookKey, newId, saveBook } from '../lib/library';
@@ -16,7 +16,8 @@ import { shrinkPhoto } from '../lib/photo';
 import type { IdentifyResponse } from '../shared';
 
 export default function Add() {
-  const [query, setQuery] = useState('');
+  const [params] = useSearchParams();
+  const [query, setQuery] = useState(params.get('q') ?? '');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

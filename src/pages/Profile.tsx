@@ -4,6 +4,7 @@ import { db, setMeta } from '../db';
 import { useMeta } from '../lib/hooks';
 import { syncNow } from '../lib/sync';
 import { Button, Card, PageHeader } from '../components/ui';
+import { FavouriteAuthorsCard } from '../components/FavouriteAuthors';
 
 export default function Profile() {
   const savedName = useMeta<string>('readerName', '');
@@ -30,6 +31,8 @@ export default function Profile() {
             className="w-full rounded-xl border border-sand bg-white px-3 py-2.5 text-[16px] outline-none focus:border-oat"
           />
         </Card>
+
+        <FavouriteAuthorsCard />
 
         <Card className="opacity-70">
           <p className="font-soft text-lg">Reader quiz</p>

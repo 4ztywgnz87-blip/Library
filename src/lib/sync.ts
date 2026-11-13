@@ -1,5 +1,6 @@
 import { db, getMeta, setMeta, type LocalBook } from '../db';
 import type { Book, SyncRecord } from '../types';
+import type { ReaderProfile } from '../shared';
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let running: Promise<void> | undefined;
@@ -24,6 +25,12 @@ export async function syncNow(): Promise<void> {
         updatedAt: book.updatedAt,
         deleted: !!book.deleted,
       }));
+      // Her reader profile (quiz, favourite authors) travels as one record
+      const profile = await getMeta<ReaderProfile | null>('profile', null);
+      const profileDirty = await getMeta<boolean>('profileDirty', false);
+      if (profile && profileDirty) {
+        changes.push({ kind: 'profile', id: 'me', data: profile, updatedAt: profile.updatedAt, deleted: false });
+      }
 
       const res = await fetch('/api/sync', {
         method: 'POST',
@@ -39,7 +46,16 @@ export async function syncNow(): Promise<void> {
           const cur = await db.books.get(b.id);
           if (cur && cur.updatedAt === b.updatedAt) await db.books.update(b.id, { dirty: 0 });
         }
+        if (profileDirty) {
+          const cur = await getMeta<ReaderProfile | null>('profile', null);
+          if (cur && profile && cur.updatedAt === profile.updatedAt) await setMeta('profileDirty', false);
+        }
         for (const r of records) {
+          if (r.kind === 'profile') {
+            const cur = await getMeta<ReaderProfile | null>('profile', null);
+            if (!cur || cur.updatedAt < r.updatedAt) await setMeta('profile', r.data);
+            continue;
+          }
           if (r.kind !== 'book') continue;
           const cur = await db.books.get(r.id);
           if (cur && cur.updatedAt > r.updatedAt) continue; // local is newer

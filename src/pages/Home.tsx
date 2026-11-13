@@ -5,6 +5,10 @@ import { Cover } from '../components/Cover';
 import { Card } from '../components/ui';
 import { SparkleIcon, ChevronIcon } from '../components/Icons';
 import { EmptyState } from '../components/SleepyCat';
+import { AuthorNewsSection } from '../components/AuthorNews';
+import { SeriesCard } from './Series';
+import { groupSeries } from '../lib/series';
+import { useProfile } from '../lib/profile';
 
 function greeting() {
   const h = new Date().getHours();
@@ -17,6 +21,7 @@ function greeting() {
 export default function Home() {
   const books = useBooks();
   const name = useMeta<string>('readerName', '');
+  const profile = useProfile();
   if (!books) return null;
 
   const reading = books.filter((b) => b.status === 'reading');
@@ -26,6 +31,9 @@ export default function Home() {
   ).length;
   const unread = books.filter((b) => b.status === 'owned').length;
   const recent = [...books].sort((a, b) => b.addedAt - a.addedAt).slice(0, 12);
+  // Series worth a nudge: something missing, or the next part is waiting on the shelf
+  const series = groupSeries(books);
+  const seriesToShow = series.filter((g) => g.missing.length > 0 || g.next).slice(0, 3);
 
   return (
     <div className="pt-safe mx-auto max-w-5xl px-4">
@@ -104,6 +112,25 @@ export default function Home() {
               </Card>
             ))}
           </section>
+
+          {/* Series */}
+          {seriesToShow.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-baseline justify-between">
+                <h2 className="text-xl">Your series</h2>
+                <Link to="/series" className="text-sm text-wine">
+                  All {series.length}
+                </Link>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {seriesToShow.map((g) => (
+                  <SeriesCard key={g.name} group={g} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          <AuthorNewsSection books={books} favourites={profile.favouriteAuthors} />
 
           {/* Recently added */}
           <section>
