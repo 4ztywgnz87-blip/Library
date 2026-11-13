@@ -9,7 +9,8 @@ type Step = 'email' | 'code' | 'nomail';
 export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
-  const [step, setStep] = useState<Step>('email');
+  // Without a mail service, Snug is opened with a personal link instead
+  const [step, setStep] = useState<Step>(import.meta.env.VITE_EMAIL_LOGIN === '1' ? 'email' : 'nomail');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const expired = new URLSearchParams(location.search).get('error');
@@ -126,14 +127,14 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
 
         {step === 'nomail' && (
           <div className="mt-10 rounded-[var(--radius-card)] bg-white/70 p-6 shadow-[var(--shadow-soft)]">
-            <p className="font-soft text-xl">Use a login link 🔑</p>
+            <p className="font-soft text-xl">Open your Snug link 🔑</p>
             <p className="mt-2 text-sm text-cocoa">
-              Snug can't send emails yet. On a device where you're already logged in, go to{' '}
-              <span className="font-medium">Me → Login link</span> and open that link here.
+              {expired
+                ? 'That link was already used or has expired.'
+                : 'Snug opens with your personal link.'}{' '}
+              On a device where Snug is already open, go to <span className="font-medium">Me → Login link</span> to
+              make a new one, and open it here.
             </p>
-            <button className="mt-4 text-sm text-wine underline" onClick={() => setStep('email')}>
-              Back
-            </button>
           </div>
         )}
       </motion.div>
