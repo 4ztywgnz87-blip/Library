@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
-import { groupSeries, seriesEntries, seriesPath, type SeriesGroup } from '../lib/series';
+import { groupSeries, seriesEntries, seriesPath, upcomingParts, type SeriesGroup } from '../lib/series';
+import { authorNews, type AuthorNews } from '../lib/authors';
+import { titleStart } from '../lib/seriesLookup';
 import { normalize } from '../lib/library';
 import { seriesInfo } from '../lib/ai';
 import { quickAdd } from '../lib/quickAdd';
@@ -83,6 +85,12 @@ export function SeriesDetail() {
   const [mock, setMock] = useState(false);
   const [adding, setAdding] = useState<number | null>(null);
 
+  // Announced books by the author, to add upcoming parts ("Coming …") that aren't listed yet
+  const [news, setNews] = useState<AuthorNews[]>([]);
+  useEffect(() => {
+    if (group?.author) authorNews(group.author).then(setNews).catch(() => {});
+  }, [group?.author]);
+
   // Full list of the series: from Open Library (free) when we know the series there,
   // otherwise from Snug's AI (which also knows announced books)
   const seriesKey = group?.books.find((b) => b.series?.key)?.series?.key;
@@ -90,8 +98,21 @@ export function SeriesDetail() {
     if (!group) return;
     let cancelled = false;
     (async () => {
-      if (seriesKey) {
-        const res = await fetch(`/api/series-books?key=${seriesKey}`).catch(() => undefined);
+      // no link to Open Library's series yet: look it up via one of her books
+      let key = seriesKey;
+      for (const b of key ? [] : group.books.slice(0, 3)) {
+        const params = new URLSearchParams({ title: b.title, author: b.authors[0] ?? '' });
+        type Found = { key?: string; name?: string };
+        const found: Found = await fetch(`/api/book-series?${params}`)
+          .then((r) => (r.ok ? (r.json() as Promise<Found>) : {}))
+          .catch(() => ({}));
+        if (found.key && found.name && normalize(found.name) === normalize(group.name)) {
+          key = found.key;
+          break;
+        }
+      }
+      if (key) {
+        const res = await fetch(`/api/series-books?key=${key}`).catch(() => undefined);
         const list = res?.ok ? ((await res.json()) as { books: SeriesBook[] }).books : [];
         if (list.length && !cancelled) {
           setKnown(list);
@@ -120,7 +141,7 @@ export function SeriesDetail() {
     );
   }
 
-  const entries = seriesEntries(group, known);
+  const entries = seriesEntries(group, [...known, ...upcomingParts(group, known, news, titleStart)]);
 
   return (
     <div>
@@ -169,7 +190,7 @@ export function SeriesDetail() {
                     <p className="leading-snug font-medium text-cocoa">{e.title ?? `Book ${e.number}`}</p>
                     <p className="text-xs text-wine">
                       {e.announced
-                        ? `Announced${e.releaseDate ? ` · ${formatRelease(e.releaseDate)}` : ''}`
+                        ? `Coming soon${e.releaseDate ? ` · ${formatRelease(e.releaseDate)}` : ''}`
                         : 'Not in your library'}
                     </p>
                   </div>
@@ -209,6 +230,7 @@ export function SeriesDetail() {
 }
 
 function formatRelease(d: string) {
+  if (/^\d{4}$/.test(d)) return d; // only the year is known
   const t = Date.parse(d.length === 7 ? `${d}-01` : d);
   if (Number.isNaN(t)) return d;
   return new Date(t).toLocaleDateString('en-GB', d.length === 7 ? { month: 'long', year: 'numeric' } : { day: 'numeric', month: 'long', year: 'numeric' });

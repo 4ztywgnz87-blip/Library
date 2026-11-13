@@ -3,7 +3,7 @@ import type { Book, SeriesInfo } from '../types';
 import { normalize, updateBook } from './library';
 
 /** First words of a title, e.g. "a court of" for "A Court of Mist and Fury" */
-const titleStart = (t: string, words = 3) => normalize(t).split(' ').slice(0, words).join(' ');
+export const titleStart = (t: string, words = 3) => normalize(t).split(' ').slice(0, words).join(' ');
 
 /**
  * Brand-new books often have no series data online yet. If the same author has a series in her

@@ -135,7 +135,7 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
     author,
     sort: 'new',
     limit: '30',
-    fields: 'title,subtitle,author_name,first_publish_year,cover_i,subject,language',
+    fields: 'title,subtitle,author_name,first_publish_year,publish_date,cover_i,subject,language',
   });
   const res = await fetch(`https://openlibrary.org/search.json?${params}`);
   if (!res.ok) throw new Error('ol');
@@ -148,9 +148,19 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
       cover_i?: number;
       subject?: string[];
       language?: string[];
+      publish_date?: string[];
     }[];
   };
   const year = new Date().getFullYear();
+  // an exact date when Open Library has one in that year (e.g. "January 12, 2027" or "2027-01-12")
+  const exactDate = (dates: string[] | undefined, y: number) => {
+    for (const d of dates ?? []) {
+      if (!/[a-z]/i.test(d) && !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue; // skip ambiguous 01/12/2027
+      const t = Date.parse(d);
+      if (!Number.isNaN(t) && new Date(t).getFullYear() === y) return new Date(t).toISOString().slice(0, 10);
+    }
+    return String(y);
+  };
   return json.docs
     .filter(
       (d) =>
@@ -167,8 +177,8 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
         author,
         series,
         coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : undefined,
-        publishedDate: String(d.first_publish_year),
-        upcoming: d.first_publish_year! > year,
+        publishedDate: exactDate(d.publish_date, d.first_publish_year!),
+        upcoming: d.first_publish_year! > year || Date.parse(exactDate(d.publish_date, d.first_publish_year!)) > Date.now(),
         genres: mapGenres(d.subject?.slice(0, 20) ?? []),
       };
     });
@@ -176,7 +186,7 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
 
 /** New and upcoming books by an author, from both sources combined (cached for a day) */
 export async function authorNews(author: string): Promise<AuthorNews[]> {
-  const cacheKey = `authorNews4:${author.toLowerCase()}`; // v4: stricter filters, both sources
+  const cacheKey = `authorNews5:${author.toLowerCase()}`; // v5: exact dates where known
   const cached = await getMeta<{ at: number; items: AuthorNews[] } | null>(cacheKey, null);
   if (cached && Date.now() - cached.at < DAY) return cached.items;
 
