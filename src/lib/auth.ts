@@ -44,6 +44,19 @@ export async function verifyCode(email: string, code: string) {
   await setMeta('loggedIn', true);
 }
 
+/** Log in with a pasted Snug link (or just its token) */
+export async function loginWithLink(input: string) {
+  const token = input.trim().match(/token=([\w-]+)/)?.[1] ?? input.trim();
+  const res = await fetch('/api/auth/link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  const json = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(json.error ?? 'Something went wrong');
+  await setMeta('loggedIn', true);
+}
+
 export async function logout() {
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   // Each reader has their own library: clear this device's copy so the next person starts clean

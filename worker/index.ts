@@ -160,9 +160,25 @@ app.get('/auth/verify', async (c) => {
   return c.redirect('/');
 });
 
+// Same as opening the link, but pasted inside the app (iPhone home-screen apps can't open links themselves)
+app.post('/auth/link', async (c) => {
+  const { token } = await c.req.json<{ token?: string }>();
+  if (!token) return c.json({ error: 'No link' }, 400);
+  const hash = await sha256(token);
+  const row = await c.env.DB.prepare('SELECT email, expires_at, used FROM login_tokens WHERE token_hash = ?')
+    .bind(hash)
+    .first<{ email: string; expires_at: number; used: number }>();
+  if (!row || row.used || row.expires_at < Date.now()) {
+    return c.json({ error: 'This link was already used or has expired.' }, 400);
+  }
+  await c.env.DB.prepare('UPDATE login_tokens SET used = 1 WHERE token_hash = ?').bind(hash).run();
+  await startSession(c, row.email);
+  return c.json({ ok: true });
+});
+
 // Everything below requires a session
 app.use('/*', async (c, next) => {
-  if (['/api/auth/request', '/api/auth/verify', '/api/auth/code'].includes(c.req.path)) return next();
+  if (['/api/auth/request', '/api/auth/verify', '/api/auth/code', '/api/auth/link'].includes(c.req.path)) return next();
   const sid = getCookie(c, SESSION_COOKIE);
   if (!sid) return c.json({ error: 'Not logged in' }, 401);
   const row = await c.env.DB.prepare('SELECT email, expires_at FROM sessions WHERE id_hash = ?')

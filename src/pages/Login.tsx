@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { requestLoginLink, verifyCode } from '../lib/auth';
+import { loginWithLink, requestLoginLink, verifyCode } from '../lib/auth';
 import { Button } from '../components/ui';
 import { SleepyCat } from '../components/SleepyCat';
 
@@ -9,6 +9,7 @@ type Step = 'email' | 'code' | 'nomail';
 export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
+  const [link, setLink] = useState('');
   // Without a mail service, Snug is opened with a personal link instead
   const [step, setStep] = useState<Step>(import.meta.env.VITE_EMAIL_LOGIN === '1' ? 'email' : 'nomail');
   const [busy, setBusy] = useState(false);
@@ -126,16 +127,41 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
         )}
 
         {step === 'nomail' && (
-          <div className="mt-10 rounded-[var(--radius-card)] bg-white/70 p-6 shadow-[var(--shadow-soft)]">
-            <p className="font-soft text-xl">Open your Snug link 🔑</p>
-            <p className="mt-2 text-sm text-cocoa">
-              {expired
-                ? 'That link was already used or has expired.'
-                : 'Snug opens with your personal link.'}{' '}
-              On a device where Snug is already open, go to <span className="font-medium">Me → Login link</span> to
-              make a new one, and open it here.
+          <form
+            className="mt-10 space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setError(null);
+              try {
+                await loginWithLink(link);
+                onLoggedIn();
+              } catch (err) {
+                setError((err as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <p className="font-soft text-xl">Paste your Snug link 🔑</p>
+            {expired && <p className="text-sm text-wine">That link was already used or has expired.</p>}
+            <input
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://snug…/api/auth/verify?token=…"
+              autoCapitalize="off"
+              autoCorrect="off"
+              className={inputClass}
+            />
+            <Button type="submit" disabled={busy || !link.trim()} className="w-full py-3.5">
+              {busy ? 'Opening…' : 'Open my library'}
+            </Button>
+            {error && <p className="text-sm text-wine">{error}</p>}
+            <p className="pt-2 text-xs text-cocoa">
+              Need a new link? On a device where Snug is already open, go to{' '}
+              <span className="font-medium">Me → Login link</span>.
             </p>
-          </div>
+          </form>
         )}
       </motion.div>
     </div>
