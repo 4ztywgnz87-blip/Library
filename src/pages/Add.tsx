@@ -16,15 +16,36 @@ import { shrinkPhoto } from '../lib/photo';
 import type { IdentifyResponse } from '../shared';
 
 export default function Add() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const [query, setQuery] = useState(params.get('q') ?? '');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [picked, setPicked] = useState<SearchResult | null>(null);
+  const [picked, setPickedState] = useState<SearchResult | null>(null);
   const books = useBooks();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [scanning, setScanning] = useState(false);
+  // The scanner and the add-sheet get their own history entry (?m=…), so swiping back on the
+  // iPhone closes them instead of leaving the Add screen
+  const modal = params.get('m');
+  const scanning = modal === 'scan';
+  const openModal = (m: 'scan' | 'add') =>
+    setParams((p) => {
+      const next = new URLSearchParams(p);
+      next.set('m', m);
+      return next;
+    });
+  const closeModal = () => navigate(-1);
+  const setScanning = (open: boolean) => (open ? openModal('scan') : closeModal());
+  const setPicked = (r: SearchResult | null) => {
+    if (r) {
+      setPickedState(r);
+      openModal('add');
+    } else closeModal();
+  };
+  useEffect(() => {
+    if (modal !== 'add') setPickedState(null);
+  }, [modal]);
   const [reading, setReading] = useState(false);
   const [recognised, setRecognised] = useState<IdentifyResponse | null>(null);
 
@@ -45,7 +66,7 @@ export default function Add() {
   };
 
   const onBarcode = useCallback((isbn: string) => {
-    setScanning(false);
+    navigate(-1);
     setRecognised(null);
     setQuery(isbn);
   }, []);
@@ -255,6 +276,8 @@ function AddSheet({
   const [status, setStatus] = useState<Status>('owned');
   const [language, setLanguage] = useState<Lang>(result.language ?? 'en');
   const [special, setSpecial] = useState(false);
+  // Most books added as "read" were finished a while ago; only "this year" counts in this year's stats
+  const [finished, setFinished] = useState<'this' | 'earlier'>('earlier');
   const [saving, setSaving] = useState(false);
 
   const add = async () => {
@@ -274,7 +297,7 @@ function AddSheet({
       addedAt: now,
       updatedAt: now,
       startedAt: status === 'reading' ? now : undefined,
-      finishedAt: status === 'read' ? now : undefined,
+      finishedAt: status === 'read' && finished === 'this' ? now : undefined,
     });
     navigate(status === 'read' ? `/book/${book.id}?rate=1` : `/book/${book.id}`, { replace: true });
   };
@@ -314,7 +337,7 @@ function AddSheet({
           {existingId && (
             <div className="rounded-2xl bg-blush px-4 py-3 text-sm text-wine">
               This one is already in your library.{' '}
-              <button className="font-medium underline" onClick={() => navigate(`/book/${existingId}`)}>
+              <button className="font-medium underline" onClick={() => navigate(`/book/${existingId}`, { replace: true })}>
                 Open it
               </button>
             </div>
@@ -348,6 +371,20 @@ function AddSheet({
               ]}
             />
           </div>
+
+          {status === 'read' && (
+            <div>
+              <p className="mb-2 text-xs tracking-wide text-mocha uppercase">Finished</p>
+              <Segmented
+                value={finished}
+                onChange={setFinished}
+                options={[
+                  { id: 'this', label: `In ${new Date().getFullYear()}` },
+                  { id: 'earlier', label: 'Earlier' },
+                ]}
+              />
+            </div>
+          )}
 
           {status !== 'wishlist' && <Toggle checked={special} onChange={setSpecial} label="✦ Special edition" />}
 

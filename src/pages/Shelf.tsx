@@ -4,8 +4,7 @@ import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { shelfOrder } from '../lib/library';
 import { STATUSES, type Book, type Status } from '../types';
-import { PageHeader } from '../components/ui';
-import { Bookend, Candle, FairyLights, Mug, Plant, ShelfCat } from '../components/ShelfDecor';
+import { BookPile, Bookend, Candle, FairyLights, Mug, Plant, ShelfCat } from '../components/ShelfDecor';
 
 const ROW = 140; // px per shelf row (spines + board)
 const BOARD = 12;
@@ -38,10 +37,30 @@ function spineStyle(b: Book) {
 function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean }) {
   const navigate = useNavigate();
   const { height, width, color } = spineStyle(book);
+  const style = hash(book.title + book.id) % 3; // three kinds of spine design
   // Fit the title on the spine: wider spines get two lines, long titles a smaller font
   const twoLines = width >= 30 && book.title.length > 14;
   const charsPerLine = twoLines ? Math.ceil(book.title.length / 2) : book.title.length;
-  const fontSize = Math.max(7.5, Math.min(11, (height - 34) / (charsPerLine * 0.58)));
+  const fontSize = Math.max(7.5, Math.min(11, (height - 40) / (charsPerLine * 0.58)));
+  const gold = '#e3c288';
+  const band = <span className="block h-[2px] w-[78%] rounded-full" style={{ background: gold, opacity: 0.8 }} />;
+  const rib = <span className="block h-[4px] w-full bg-black/25 shadow-[0_1px_0_rgba(255,255,255,0.15)]" />;
+  const ends = (
+    <>
+      {style === 0 && (
+        <>
+          {band}
+          {band}
+        </>
+      )}
+      {style === 2 && (
+        <>
+          {rib}
+          {rib}
+        </>
+      )}
+    </>
+  );
   return (
     <motion.button
       title={`${book.title} · ${book.authors[0] ?? ''}`}
@@ -52,21 +71,41 @@ function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean
       whileHover={{ y: -8 }}
       whileTap={{ y: -16, scale: 1.04 }}
       onClick={() => setTimeout(() => navigate(`/book/${book.id}`), 160)}
-      className="relative flex shrink-0 flex-col items-center justify-between overflow-hidden rounded-t-[3px] rounded-b-[1px] py-2 shadow-[inset_-3px_0_4px_rgba(0,0,0,0.25),inset_2px_0_2px_rgba(255,255,255,0.12)]"
-      style={{ height, width, background: color, transformOrigin: 'bottom left' }}
+      className="relative flex shrink-0 flex-col items-center justify-between overflow-hidden rounded-t-[3px] rounded-b-[1px] py-1.5 shadow-[1px_0_0_rgba(0,0,0,0.35)]"
+      style={{
+        height,
+        width,
+        transformOrigin: 'bottom left',
+        // rounded spine: light from the left, shadow on the right, and a fine cloth texture
+        backgroundImage:
+          'linear-gradient(90deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.18) 16%, rgba(255,255,255,0.05) 38%, rgba(0,0,0,0.06) 70%, rgba(0,0,0,0.38) 100%), repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 3px)',
+        backgroundColor: color,
+      }}
     >
-      <span className="h-[3px] w-[70%] rounded-full bg-[#e9c98f]/70" />
+      <span className="flex w-full flex-col items-center gap-[2px]">{ends}</span>
       <span
-        className={`font-soft max-h-[80%] overflow-hidden px-[2px] leading-[1.05] font-semibold text-[#f6efe6] [writing-mode:vertical-rl] ${
+        className={`font-soft overflow-hidden leading-[1.05] font-semibold [writing-mode:vertical-rl] ${
           twoLines ? 'line-clamp-2' : 'line-clamp-1'
-        }`}
-        style={{ fontSize }}
+        } ${style === 1 ? 'rounded-[2px] px-[2px] py-1.5' : 'px-[2px]'}`}
+        style={{
+          fontSize,
+          maxHeight: '74%',
+          color: style === 1 ? '#3b2a22' : '#f6efe6',
+          background: style === 1 ? '#efe2c8' : undefined,
+          boxShadow: style === 1 ? `0 0 0 1.5px ${gold}` : undefined,
+          textShadow: style === 1 ? undefined : '0 1px 1px rgba(0,0,0,0.35)',
+        }}
       >
         {book.title}
       </span>
-      <span className="flex flex-col items-center gap-[3px]">
-        {book.rating !== undefined && book.rating >= 4.5 && <span className="text-[8px] leading-none text-[#e9c98f]">★</span>}
-        <span className="h-[3px] w-[70%] rounded-full bg-[#e9c98f]/70" />
+      <span className="flex w-full flex-col items-center gap-[2px]">
+        {book.rating !== undefined && book.rating >= 4.5 && (
+          <span className="text-[8px] leading-none" style={{ color: gold }}>
+            ★
+          </span>
+        )}
+        {ends}
+        {style === 1 && <span className="block h-[5px] w-[5px] rotate-45" style={{ background: gold, opacity: 0.85 }} />}
       </span>
     </motion.button>
   );
@@ -87,19 +126,25 @@ function ShelfSection({
 }) {
   const navigate = useNavigate();
   return (
-    <section className="mb-2">
+    // the shelf above casts a soft shadow onto the back panel, starting right under its board
+    <section className="pt-2" style={{ backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.32), transparent 18px)' }}>
       <button
         onClick={() => navigate(`/library?tab=${status}`)}
-        className="mx-auto mb-2 flex items-center gap-2 rounded-md bg-gradient-to-b from-[#d9b77c] to-[#b8925a] px-3 py-0.5 font-soft text-xs font-semibold text-[#3b2a22] shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
+        className="relative mx-auto mb-2 flex items-center gap-2 rounded-[4px] bg-gradient-to-b from-[#e2c48a] via-[#c9a465] to-[#a9824b] px-5 py-[3px] font-soft text-xs font-semibold text-[#3b2a22] shadow-[0_1px_2px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.45)]"
       >
+        <span className="absolute top-1/2 left-1.5 h-1 w-1 -translate-y-1/2 rounded-full bg-[#7d5f35]" />
         {label} <span className="opacity-60">{books.length}</span>
+        <span className="absolute top-1/2 right-1.5 h-1 w-1 -translate-y-1/2 rounded-full bg-[#7d5f35]" />
       </button>
       <div
         className="flex flex-wrap content-start items-end px-2"
         style={{
           minHeight: ROW,
-          // a wooden board under every row
-          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 ${ROW - BOARD}px, #a47148 ${ROW - BOARD}px ${ROW - BOARD + 3}px, #8b5e3c ${ROW - BOARD + 3}px ${ROW}px)`,
+          // a wooden board under every row: the shadow it casts on the back panel, the soft
+          // shadow under the books, the lit top surface and the front edge
+          backgroundImage: `linear-gradient(to bottom, transparent 0, transparent ${ROW - BOARD - 8}px, rgba(0,0,0,0.28) ${ROW - BOARD}px, #c99466 ${ROW - BOARD}px, #b8835a ${ROW - BOARD + 4}px, #966440 ${ROW - BOARD + 4}px, #7a4e31 ${ROW}px)`,
+          backgroundSize: `100% ${ROW}px`,
+          backgroundRepeat: 'repeat-y',
         }}
       >
         {books.length === 0 && !decor && (
@@ -146,26 +191,45 @@ export default function Shelf() {
 
   const decor: Record<Status, ReactNode> = {
     reading: <Bookend className="h-16" />,
-    owned: <Plant className="h-20" />,
-    read: <Mug className="h-14" />,
+    owned: <Plant className="h-24" />,
+    read: <Mug className="h-20" />,
     wishlist: <Candle className="h-20" />,
   };
 
   return (
     <div>
-      <PageHeader title="My shelf" />
+      <div className="pt-safe h-4" />
       <div className="mx-auto max-w-4xl px-3 pb-10">
         {/* things on top of the bookcase */}
-        <div className="relative flex h-20 items-end justify-between px-6">
-          <Plant className="h-20" />
-          <ShelfCat className="absolute bottom-[-6px] left-1/2 h-16 -translate-x-1/2" />
-          <Candle className="h-16" />
+        <div className="relative flex h-24 items-end justify-between px-5">
+          <Plant className="h-24" />
+          <ShelfCat className="absolute bottom-[-4px] left-1/2 h-20 -translate-x-1/2" />
+          <div className="relative flex items-end">
+            <BookPile className="w-20" />
+            <Candle className="absolute bottom-[38px] left-1/2 h-14 -translate-x-1/2" />
+          </div>
         </div>
 
+        {/* crown moulding */}
+        <div className="relative z-10 -mx-1.5 h-4 rounded-t-lg bg-gradient-to-b from-[#b98257] to-[#8b5e3c] shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_3px_rgba(0,0,0,0.3)]" />
         {/* the bookcase */}
-        <div className="rounded-xl bg-gradient-to-b from-[#9a6a45] to-[#7d5236] p-3 shadow-[0_18px_40px_-18px_rgba(59,42,34,0.7)]">
-          <div className="relative overflow-hidden rounded-md bg-[#4a3226] pt-2 shadow-[inset_0_8px_18px_rgba(0,0,0,0.45)] [background-image:repeating-linear-gradient(90deg,rgba(255,255,255,0.025)_0_2px,transparent_2px_9px)]">
-            <FairyLights className="pointer-events-none mb-1 h-6 w-full" />
+        <div
+          className="px-3 pt-2 pb-3 shadow-[0_22px_40px_-18px_rgba(59,42,34,0.75)]"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(97deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 9px, rgba(255,255,255,0.03) 9px 11px, transparent 11px 17px), linear-gradient(90deg, #8d6040, #a7754d 50%, #8d6040)',
+          }}
+        >
+          <div
+            className="relative overflow-hidden rounded-[3px] pt-1 shadow-[inset_0_10px_22px_rgba(0,0,0,0.5),inset_6px_0_12px_rgba(0,0,0,0.3),inset_-6px_0_12px_rgba(0,0,0,0.3)]"
+            style={{
+              // back panel: vertical planks, warmly lit by the fairy lights
+              backgroundImage:
+                'radial-gradient(ellipse 80% 22% at 50% 0%, rgba(255,196,120,0.22), transparent), repeating-linear-gradient(90deg, rgba(0,0,0,0) 0 54px, rgba(0,0,0,0.35) 54px 56px), repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 7px)',
+              backgroundColor: '#4d3427',
+            }}
+          >
+            <FairyLights className="pointer-events-none mb-1 h-7 w-full" />
             {STATUSES.map((s, i) => (
               <ShelfSection
                 key={s.id}
@@ -178,10 +242,11 @@ export default function Shelf() {
             ))}
           </div>
         </div>
-        {/* feet */}
-        <div className="flex justify-between px-4">
-          <div className="h-3 w-8 rounded-b-md bg-[#6b4630]" />
-          <div className="h-3 w-8 rounded-b-md bg-[#6b4630]" />
+        {/* plinth + feet */}
+        <div className="-mx-1 h-4 rounded-b-md bg-gradient-to-b from-[#8b5e3c] to-[#6b4630] shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]" />
+        <div className="flex justify-between px-5">
+          <div className="h-2.5 w-10 rounded-b-md bg-[#5a3a28]" />
+          <div className="h-2.5 w-10 rounded-b-md bg-[#5a3a28]" />
         </div>
 
         <p className="mt-5 text-center text-xs text-mocha">Tap a spine to open the book · tap a label to see that list</p>

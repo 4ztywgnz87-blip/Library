@@ -69,6 +69,39 @@ app.get('/ol', async (c) => {
   return c.json({ description: typeof d === 'string' ? d : d?.value });
 });
 
+// Covers of all editions of a book (for special editions), from Open Library
+app.get('/editions', async (c) => {
+  const title = c.req.query('title') ?? '';
+  const author = c.req.query('author') ?? '';
+  if (!title) return c.json({ covers: [] });
+  const ua = { 'User-Agent': 'Snug personal library app' };
+  const search = await fetch(
+    `https://openlibrary.org/search.json?${new URLSearchParams({ title, author, limit: '3', fields: 'key' })}`,
+    { headers: ua, cf: { cacheTtl: 86_400, cacheEverything: true } },
+  );
+  if (!search.ok) return c.json({ covers: [] });
+  const works = ((await search.json()) as { docs: { key: string }[] }).docs.map((d) => d.key).slice(0, 2);
+  const covers: { id: number; label: string }[] = [];
+  for (const work of works) {
+    const res = await fetch(`https://openlibrary.org${work}/editions.json?limit=150`, {
+      headers: ua,
+      cf: { cacheTtl: 86_400, cacheEverything: true },
+    });
+    if (!res.ok) continue;
+    const json = (await res.json()) as {
+      entries: { covers?: number[]; publishers?: string[]; publish_date?: string }[];
+    };
+    for (const e of json.entries) {
+      for (const id of e.covers ?? []) {
+        if (id > 0 && !covers.some((x) => x.id === id)) {
+          covers.push({ id, label: [e.publishers?.[0], e.publish_date].filter(Boolean).join(' · ') });
+        }
+      }
+    }
+  }
+  return c.json({ covers: covers.slice(0, 80) });
+});
+
 // ---------- AI ----------
 
 async function loadLibrary(env: Env) {

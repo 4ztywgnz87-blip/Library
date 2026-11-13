@@ -93,7 +93,7 @@ export default function Stats() {
   const books = useBooks();
   const read = useMemo(() => (books ?? []).filter((b) => b.status === 'read'), [books]);
   const years = useMemo(() => {
-    const ys = new Set(read.map((b) => new Date(b.finishedAt ?? b.updatedAt).getFullYear()));
+    const ys = new Set(read.filter((b) => b.finishedAt).map((b) => new Date(b.finishedAt!).getFullYear()));
     ys.add(new Date().getFullYear());
     return [...ys].sort((a, b) => b - a);
   }, [read]);
@@ -101,9 +101,9 @@ export default function Stats() {
 
   if (!books) return null;
 
-  const inYear = year === 'all' ? read : read.filter((b) => new Date(b.finishedAt ?? b.updatedAt).getFullYear() === year);
+  const inYear = year === 'all' ? read : read.filter((b) => b.finishedAt && new Date(b.finishedAt).getFullYear() === year);
   const months = Array.from({ length: 12 }, (_, m) =>
-    inYear.filter((b) => new Date(b.finishedAt ?? b.updatedAt).getMonth() === m).length,
+    inYear.filter((b) => b.finishedAt && new Date(b.finishedAt).getMonth() === m).length,
   );
   const pages = inYear.reduce((s, b) => s + (b.pageCount ?? 0), 0);
   const rated = inYear.filter((b) => b.rating !== undefined);

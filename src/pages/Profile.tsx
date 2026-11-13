@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, setMeta } from '../db';
 import { useMeta } from '../lib/hooks';
 import { syncNow } from '../lib/sync';
-import { Button, Card, PageHeader } from '../components/ui';
+import { Button, Card } from '../components/ui';
 import { FavouriteAuthorsCard } from '../components/FavouriteAuthors';
 import { Link } from 'react-router-dom';
 import { useProfile } from '../lib/profile';
@@ -19,7 +19,7 @@ export default function Profile() {
 
   return (
     <div>
-      <PageHeader title="Me" />
+      <div className="pt-safe h-5" />
       <div className="mx-auto max-w-xl space-y-4 px-4">
         <Card>
           <label className="mb-2 block text-xs tracking-wide text-mocha uppercase" htmlFor="name">

@@ -6,10 +6,10 @@ import { useBook } from '../lib/hooks';
 import { deleteBook, updateBook } from '../lib/library';
 import { GENRES, STATUSES, type Book, type Status } from '../types';
 import { Cover } from '../components/Cover';
-import { StarsInput } from '../components/Stars';
+import { StarsDisplay, StarsInput, formatRating } from '../components/Stars';
 import { Button, Card, Chip, PageHeader, Segmented, Toggle } from '../components/ui';
 import { CameraIcon, ChevronIcon, TrashIcon } from '../components/Icons';
-import { shrinkPhoto } from '../lib/photo';
+import { EditionPicker } from '../components/EditionPicker';
 
 const TAG_SUGGESTIONS = ['spicy 🌶️', 'emotional 😭', 'plot twist 🤯', 'funny 😂', 'slow burn 🔥', 'cosy ☕', 'dark 🖤', 'page-turner'];
 
@@ -19,6 +19,7 @@ export default function BookDetail() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [celebrate, setCelebrate] = useState(0);
+  const [pickingEdition, setPickingEdition] = useState(false);
   const ratingRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -114,30 +115,7 @@ export default function BookDetail() {
           {/* Rating & review */}
           {book.status === 'read' && (
             <div ref={ratingRef}>
-              <Card className="space-y-4">
-                <div className="flex flex-col items-center pt-1">
-                  <p className="mb-3 font-soft text-lg">How did you like it?</p>
-                  <StarsInput value={book.rating} onChange={(rating) => set({ rating })} />
-                </div>
-                <ReviewBox book={book} />
-                <div>
-                  <p className="mb-2 text-xs tracking-wide text-mocha uppercase">Tags (optional)</p>
-                  <div className="flex flex-wrap gap-2">
-                    {TAG_SUGGESTIONS.map((t) => {
-                      const on = book.tags.includes(t);
-                      return (
-                        <Chip
-                          key={t}
-                          active={on}
-                          onClick={() => set({ tags: on ? book.tags.filter((x) => x !== t) : [...book.tags, t] })}
-                        >
-                          {t}
-                        </Chip>
-                      );
-                    })}
-                  </div>
-                </div>
-              </Card>
+              <RatingCard book={book} />
             </div>
           )}
 
@@ -154,24 +132,17 @@ export default function BookDetail() {
             />
             <Toggle checked={book.specialEdition} onChange={(specialEdition) => set({ specialEdition })} label="✦ Special edition" />
             {book.specialEdition && (
-              <div className="flex items-center gap-3">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-linen px-4 py-2.5 text-sm text-ink hover:bg-sand">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => setPickingEdition(true)}
+                  className="inline-flex items-center gap-2 rounded-full bg-linen px-4 py-2.5 text-sm text-ink hover:bg-sand"
+                >
                   <CameraIcon width={18} height={18} />
-                  {book.customCover ? 'Change photo' : 'Add a photo of my edition'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) await set({ customCover: await shrinkPhoto(file, 700) });
-                    }}
-                  />
-                </label>
+                  {book.customCover ? 'Change edition cover' : 'Choose my edition’s cover'}
+                </button>
                 {book.customCover && (
                   <button className="text-xs text-cocoa underline" onClick={() => set({ customCover: undefined })}>
-                    use store cover
+                    use standard cover
                   </button>
                 )}
               </div>
@@ -224,41 +195,140 @@ export default function BookDetail() {
         </div>
       </div>
 
+      {pickingEdition && (
+        <EditionPicker
+          book={book}
+          onClose={() => setPickingEdition(false)}
+          onPick={async (cover) => {
+            setPickingEdition(false);
+            await set({ customCover: cover });
+          }}
+        />
+      )}
+
       <AnimatePresence>{celebrate > 0 && <Petals key={celebrate} onDone={() => setCelebrate(0)} />}</AnimatePresence>
     </div>
   );
 }
 
-function ReviewBox({ book }: { book: Book }) {
-  const [text, setText] = useState(book.review ?? '');
-  const [saved, setSaved] = useState(false);
-  useEffect(() => setText(book.review ?? ''), [book.id]); // eslint-disable-line react-hooks/exhaustive-deps
+/** Year she finished a book in; undefined = "earlier / don't remember" */
+const finishedYear = (b: Book) => (b.finishedAt ? new Date(b.finishedAt).getFullYear() : undefined);
 
-  // Autosave a moment after she stops typing
-  useEffect(() => {
-    if (text === (book.review ?? '')) return;
-    const t = setTimeout(async () => {
-      await updateBook(book.id, { review: text.trim() || undefined });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1500);
-    }, 800);
-    return () => clearTimeout(t);
-  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
+/**
+ * Rating, review and tags. Once saved they are shown read-only, and "Edit" unlocks them,
+ * so nothing changes by accident.
+ */
+function RatingCard({ book }: { book: Book }) {
+  const [editing, setEditing] = useState(book.rating === undefined);
+  const [rating, setRating] = useState(book.rating);
+  const [review, setReview] = useState(book.review ?? '');
+  const [tags, setTags] = useState(book.tags);
+  const [year, setYear] = useState(finishedYear(book));
+  const now = new Date().getFullYear();
+
+  const startEdit = () => {
+    setRating(book.rating);
+    setReview(book.review ?? '');
+    setTags(book.tags);
+    setYear(finishedYear(book));
+    setEditing(true);
+  };
+
+  const save = async () => {
+    // Keep the exact date if the year didn't change; otherwise mid-year of the chosen year
+    const finishedAt =
+      year === undefined ? undefined : year === finishedYear(book) ? book.finishedAt : year === now ? Date.now() : Date.UTC(year, 6, 1);
+    await updateBook(book.id, { rating, review: review.trim() || undefined, tags, finishedAt });
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <Card className="space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs tracking-wide text-mocha uppercase">My rating</p>
+            {book.rating !== undefined ? (
+              <div className="mt-1 flex items-center gap-2">
+                <StarsDisplay value={book.rating} size={24} />
+                <span className="font-soft text-lg font-semibold">{formatRating(book.rating)}</span>
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-cocoa">Not rated yet</p>
+            )}
+          </div>
+          <Button variant="soft" className="px-4 py-2 text-xs" onClick={startEdit}>
+            Edit
+          </Button>
+        </div>
+        {book.review && <p className="font-soft text-[15px] leading-relaxed text-ink/90 italic">“{book.review}”</p>}
+        {book.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {book.tags.map((t) => (
+              <span key={t} className="rounded-full bg-linen px-2.5 py-1 text-xs text-cocoa">
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-mocha">{finishedYear(book) ? `Finished in ${finishedYear(book)}` : 'Finished a while ago'}</p>
+      </Card>
+    );
+  }
 
   return (
-    <div>
-      <div className="mb-2 flex items-baseline justify-between">
-        <p className="text-xs tracking-wide text-mocha uppercase">A few words</p>
-        {saved && <span className="text-xs text-sage">saved ✓</span>}
+    <Card className="space-y-5">
+      <div className="flex flex-col items-center pt-1">
+        <p className="mb-3 font-soft text-lg">How did you like it?</p>
+        <StarsInput value={rating} onChange={setRating} />
       </div>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={3}
-        placeholder="What did you love? What bugged you? (helps with better tips later)"
-        className="w-full resize-none rounded-2xl border border-sand bg-white/80 p-3 text-[16px] outline-none placeholder:text-mocha focus:border-oat"
-      />
-    </div>
+      <div>
+        <p className="mb-2 text-xs tracking-wide text-mocha uppercase">A few words</p>
+        <textarea
+          value={review}
+          onChange={(e) => setReview(e.target.value)}
+          rows={3}
+          placeholder="What did you love? What bugged you? (helps with better tips later)"
+          className="w-full resize-none rounded-2xl border border-sand bg-white/80 p-3 text-[16px] outline-none placeholder:text-mocha focus:border-oat"
+        />
+      </div>
+      <div>
+        <p className="mb-2 text-xs tracking-wide text-mocha uppercase">Tags (optional)</p>
+        <div className="flex flex-wrap gap-2">
+          {TAG_SUGGESTIONS.map((t) => {
+            const on = tags.includes(t);
+            return (
+              <Chip key={t} active={on} onClick={() => setTags(on ? tags.filter((x) => x !== t) : [...tags, t])}>
+                {t}
+              </Chip>
+            );
+          })}
+        </div>
+      </div>
+      <div>
+        <p className="mb-2 text-xs tracking-wide text-mocha uppercase">Finished in</p>
+        <div className="flex flex-wrap gap-2">
+          {[now, now - 1, now - 2].map((y) => (
+            <Chip key={y} active={year === y} onClick={() => setYear(y)}>
+              {y}
+            </Chip>
+          ))}
+          <Chip active={year === undefined || year < now - 2} onClick={() => setYear(undefined)}>
+            Earlier
+          </Chip>
+        </div>
+      </div>
+      <div className="flex gap-3">
+        {book.rating !== undefined && (
+          <Button variant="soft" className="flex-1" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+        )}
+        <Button className="flex-[2]" onClick={save} disabled={rating === undefined}>
+          Save
+        </Button>
+      </div>
+    </Card>
   );
 }
 

@@ -5,7 +5,7 @@ import { useBooks } from '../lib/hooks';
 import { STATUSES, type Book, type Status } from '../types';
 import { Cover } from '../components/Cover';
 import { StarsDisplay } from '../components/Stars';
-import { Chip, PageHeader } from '../components/ui';
+import { Chip } from '../components/ui';
 import { FilterIcon, SearchIcon, CloseIcon } from '../components/Icons';
 import { EmptyState } from '../components/SleepyCat';
 import { normalize, shelfOrder } from '../lib/library';
@@ -75,22 +75,11 @@ export default function Library() {
 
   return (
     <div>
-      <PageHeader
-        title="Library"
-        right={
-          <button
-            onClick={() => setShowFilters((s) => !s)}
-            className={`relative rounded-full p-2 ${showFilters ? 'bg-linen text-wine' : 'text-cocoa'}`}
-            aria-label="Filters"
-          >
-            <FilterIcon />
-            {filtersActive && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-wine" />}
-          </button>
-        }
-      />
-      <div className="mx-auto max-w-5xl px-4">
-        {/* Search */}
-        <div className="relative mb-3">
+      <div className="pt-safe" />
+      <div className="mx-auto max-w-5xl px-4 pt-4">
+        {/* Search + filters */}
+        <div className="mb-3 flex items-center gap-2">
+        <div className="relative flex-1">
           <SearchIcon className="absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-mocha" />
           <input
             value={query}
@@ -103,6 +92,17 @@ export default function Library() {
               <CloseIcon width={18} height={18} />
             </button>
           )}
+        </div>
+          <button
+            onClick={() => setShowFilters((f) => !f)}
+            className={`relative shrink-0 rounded-full border p-3 ${
+              showFilters ? 'border-wine bg-white text-wine' : 'border-sand bg-white/70 text-cocoa'
+            }`}
+            aria-label="Filters"
+          >
+            <FilterIcon width={20} height={20} />
+            {filtersActive && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-wine" />}
+          </button>
         </div>
 
         {/* Status tabs */}
