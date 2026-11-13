@@ -113,6 +113,19 @@ app.use('/*', async (c, next) => {
     .first<{ email: string; expires_at: number }>();
   if (!row || row.expires_at < Date.now()) return c.json({ error: 'Not logged in' }, 401);
   c.set('email', row.email);
+
+  // Sliding session: using the app keeps you logged in (renewed at most once a week)
+  const fullExpiry = Date.now() + SESSION_DAYS * 86_400_000;
+  if (fullExpiry - row.expires_at > 7 * 86_400_000) {
+    await c.env.DB.prepare('UPDATE sessions SET expires_at = ? WHERE id_hash = ?').bind(fullExpiry, await sha256(sid)).run();
+    setCookie(c, SESSION_COOKIE, sid, {
+      httpOnly: true,
+      secure: new URL(c.req.url).protocol === 'https:',
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: SESSION_DAYS * 86_400,
+    });
+  }
   await next();
 });
 
