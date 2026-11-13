@@ -111,7 +111,7 @@ export function Candle({ className = '' }: { className?: string }) {
 export function Mug({ className = '' }: { className?: string }) {
   const id = useId();
   return (
-    <svg viewBox="0 0 80 100" className={className} aria-hidden>
+    <svg viewBox="0 0 80 94" className={className} aria-hidden>
       <defs>
         <linearGradient id={`${id}mug`} x1="0" x2="1">
           <stop offset="0" stopColor="#6a2632" />
@@ -142,7 +142,9 @@ export function Mug({ className = '' }: { className?: string }) {
       <rect x="6" y="72" width="66" height="10" rx="1.5" fill="#5f6b52" />
       <rect x="6" y="73" width="3" height="8" fill="#e9c98f" opacity="0.7" />
       <rect x="64" y="73.5" width="6" height="7" fill="#f3ead9" />
-      <rect x="10" y="82" width="62" height="12" rx="1.5" fill="#4e3b47" />
+      <ellipse cx="41" cy="93.5" rx="34" ry="1.6" fill="#000" opacity="0.35" />
+      <rect x="10" y="82" width="62" height="12" rx="1.5" fill="#a0644b" />
+      <rect x="10" y="82" width="62" height="2" rx="1" fill="#fff" opacity="0.15" />
       <rect x="14" y="85" width="34" height="2" fill="#e9c98f" opacity="0.7" />
       <rect x="66" y="83.5" width="5" height="9" fill="#f3ead9" />
     </svg>
@@ -150,75 +152,56 @@ export function Mug({ className = '' }: { className?: string }) {
 }
 
 /**
- * A tabby cat lying on top of the bookcase. Only stable animations: the tail swings by
- * rotating around its base, an ear twitches around its own base, and the eyes blink by
- * flattening the eye shape itself. Nothing is scaled, so no part can shift out of place.
+ * The tabby cat lounging on top of the bookcase. The tail keeps its shape and swings by
+ * rotating around where it joins the body (morphing its shape made it flicker on iPhone);
+ * the eyes blink by flattening the eye itself, so nothing shifts out of place.
  */
 export function ShelfCat({ className = '' }: { className?: string }) {
   const id = useId();
-  const fur = `url(#${id}fur)`;
-  const blink = { duration: 5, repeat: Infinity, times: [0, 0.47, 0.5, 0.53, 1] };
+  const blinkT = { duration: 4.5, repeat: Infinity, times: [0, 0.46, 0.5, 0.54, 1] };
   return (
-    <svg viewBox="0 0 160 84" className={className} aria-hidden style={{ overflow: 'visible' }}>
+    <svg viewBox="0 0 150 80" className={className} aria-hidden style={{ overflow: 'visible' }}>
       <defs>
         <linearGradient id={`${id}fur`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#c99868" />
+          <stop offset="0" stopColor="#c08a5c" />
           <stop offset="1" stopColor="#9a6a43" />
         </linearGradient>
-        <radialGradient id={`${id}eye`} cx="0.5" cy="0.4" r="0.6">
-          <stop offset="0" stopColor="#e3d27a" />
-          <stop offset="1" stopColor="#a8a04a" />
-        </radialGradient>
       </defs>
-
-      {/* tail curling up behind the body */}
+      {/* tail */}
       <motion.g
-        style={{ transformOrigin: '118px 72px', transformBox: 'view-box', willChange: 'transform' }}
-        animate={{ rotate: [0, -14, 4, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ transformOrigin: '112px 66px', transformBox: 'view-box', willChange: 'transform' }}
+        animate={{ rotate: [0, 16, 0] }}
+        transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <path d="M118 72c16 1 26-6 28-20 1-6 4-9 8-9" stroke="#a87449" strokeWidth="8" strokeLinecap="round" fill="none" />
-        <path d="M134 68l3-5M142 60l4-3M146 50l5-1" stroke="#7d5232" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M151 43c2 0 4 0 5 1" stroke="#5f3d26" strokeWidth="8" strokeLinecap="round" fill="none" />
+        <path d="M112 66c18 2 28-6 30-20" stroke="#a87449" strokeWidth="8" strokeLinecap="round" fill="none" />
       </motion.g>
-
-      {/* body, loafing */}
-      <path d="M48 80c-5-22 14-36 42-36 26 0 38 13 36 36z" fill={fur} />
-      <path d="M74 46c2 6 2 13 0 19M87 44c2 7 2 15 0 22M100 46c2 6 2 13 0 19M111 52c2 5 2 10 0 15" stroke="#86593a" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.55" />
+      {/* body */}
+      <path d="M44 74c-4-20 14-34 40-34 24 0 36 12 34 34z" fill={`url(#${id}fur)`} />
+      {/* stripes */}
+      <path d="M70 42c2 6 2 12 0 18M82 40c2 7 2 14 0 21M94 42c2 6 2 12 0 18M104 48c2 5 2 10 0 14" stroke="#8a5a36" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.6" />
       {/* front paws */}
-      <ellipse cx="38" cy="79" rx="9.5" ry="4.5" fill="#f4e7d4" />
-      <ellipse cx="57" cy="80" rx="9.5" ry="4.5" fill="#f4e7d4" />
-      <path d="M34 80.5v-2M38 80.8v-2M53 81.5v-2M57 81.8v-2" stroke="#cdb79b" strokeWidth="0.8" strokeLinecap="round" />
-
-      {/* ears (the right one twitches now and then) */}
-      <path d="M27 36l1-18 13 10z" fill="#b07d50" />
-      <path d="M30 32l1-9 6 5z" fill="#e8b2a3" />
-      <motion.g
-        style={{ transformOrigin: '60px 30px', transformBox: 'view-box' }}
-        animate={{ rotate: [0, 0, 12, 0, 0] }}
-        transition={{ duration: 7, repeat: Infinity, times: [0, 0.8, 0.83, 0.86, 1] }}
-      >
-        <path d="M63 36l-1-18-13 10z" fill="#b07d50" />
-        <path d="M60 32l-1-9-6 5z" fill="#e8b2a3" />
-      </motion.g>
-
+      <ellipse cx="34" cy="74" rx="9" ry="4.5" fill="#f2e3cf" />
+      <ellipse cx="52" cy="75" rx="9" ry="4.5" fill="#f2e3cf" />
       {/* head */}
-      <ellipse cx="45" cy="50" rx="23" ry="20" fill={fur} />
-      <path d="M24 52c-3 4-2 8 2 10M66 52c3 4 2 8-2 10" stroke="#c99868" strokeWidth="4" strokeLinecap="round" fill="none" />
-      <path d="M38 35l3 6 4-6 4 6 3-6" stroke="#7d5232" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.7" />
-      <path d="M24 47h6M25 51h5M66 47h-6M65 51h-5" stroke="#7d5232" strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
-      <ellipse cx="45" cy="60" rx="11" ry="7.5" fill="#f4e7d4" />
-      <path d="M42.2 56.5h5.6l-2.8 3z" fill="#d98b84" />
-      <path d="M45 59.5v2.5M45 62c-1.6 1.8-3.6 1.8-4.6.2M45 62c1.6 1.8 3.6 1.8 4.6.2" stroke="#5c4033" strokeWidth="0.9" fill="none" strokeLinecap="round" />
-      <path d="M34 60l-14-2M34 63l-13 2M56 60l14-2M56 63l13 2" stroke="#fff" strokeOpacity="0.75" strokeWidth="0.7" strokeLinecap="round" />
+      <path d="M22 34l2-17 12 10z" fill="#a87449" />
+      <path d="M54 27l12-10 2 17z" fill="#a87449" />
+      <path d="M25.5 29l1.2-8 6 5z" fill="#e7b9a8" />
+      <path d="M57 26l6-5 1.2 8z" fill="#e7b9a8" />
+      <ellipse cx="45" cy="47" rx="25" ry="21" fill={`url(#${id}fur)`} />
+      <path d="M40 27c2 3 2 6 0 9M46 26c1 3 1 6 0 9M52 27c-1 3-1 6 0 9" stroke="#8a5a36" strokeWidth="2.2" strokeLinecap="round" fill="none" opacity="0.6" />
+      {/* muzzle + chest */}
+      <ellipse cx="45" cy="57" rx="12" ry="9" fill="#f2e3cf" />
+      <path d="M42 53.5h6l-3 3z" fill="#d98b84" />
+      <path d="M45 56.5v2.5M45 59c-2 2-4 2-5 0M45 59c2 2 4 2 5 0" stroke="#5c4033" strokeWidth="1" fill="none" strokeLinecap="round" />
       {/* eyes */}
-      {[37, 53].map((cx) => (
+      {[35, 55].map((cx) => (
         <g key={cx}>
-          <motion.ellipse cx={cx} cy="50" rx="4.3" initial={{ ry: 3.6 }} animate={{ ry: [3.6, 3.6, 0.35, 3.6, 3.6] }} transition={blink} fill={`url(#${id}eye)`} />
-          <motion.ellipse cx={cx} cy="50" rx="1.2" initial={{ ry: 3 }} animate={{ ry: [3, 3, 0.25, 3, 3] }} transition={blink} fill="#2b1d16" />
-          <motion.circle cx={cx + 1.4} cy="48.6" r="0.9" animate={{ opacity: [1, 1, 0, 1, 1] }} transition={blink} fill="#fff" />
+          <motion.ellipse cx={cx} cy="45" rx="4.2" initial={{ ry: 3.4 }} animate={{ ry: [3.4, 3.4, 0.35, 3.4, 3.4] }} transition={blinkT} fill="#e9d38a" />
+          <motion.ellipse cx={cx} cy="45" rx="1.4" initial={{ ry: 3 }} animate={{ ry: [3, 3, 0.25, 3, 3] }} transition={blinkT} fill="#2b1d16" />
         </g>
       ))}
+      {/* whiskers */}
+      <path d="M33 57l-14-2M33 60l-13 2M57 57l14-2M57 60l13 2" stroke="#fff" strokeOpacity="0.7" strokeWidth="0.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -324,17 +307,11 @@ export function DreamCloud({ count, className = '' }: { count: number; className
         <circle cx="140" cy="106" r="4" fill={`url(#${id}c)`} />
         <circle cx="149" cy="116" r="2.6" fill={`url(#${id}c)`} />
       </g>
-      {/* tiny books + text */}
-      <g transform="translate(26 38) scale(0.82)">
-        <rect x="0" y="6" width="7" height="22" rx="1" fill="#7a2e3a" />
-        <rect x="8" y="2" width="7" height="26" rx="1" fill="#c49a5a" />
-        <rect x="16" y="8" width="7" height="20" rx="1" fill="#5f6b52" transform="rotate(8 19 28)" />
-      </g>
-      <text x="102" y="53" textAnchor="middle" fontFamily="Fraunces Variable, serif" fontSize="16" fontWeight="600" fill="#7a2e3a">
-        Wishlist
+      <text x="80" y="47" textAnchor="middle" fontFamily="Inter Variable, sans-serif" fontSize="8.5" letterSpacing="1.2" fill="#a08a78">
+        WISHLIST
       </text>
-      <text x="102" y="67" textAnchor="middle" fontFamily="Inter Variable, sans-serif" fontSize="8.5" fill="#7a6455">
-        {count} {count === 1 ? 'book' : 'books'} to dream of
+      <text x="80" y="64" textAnchor="middle" fontFamily="Fraunces Variable, serif" fontSize="14.5" fontWeight="600" fill="#7a2e3a">
+        {count === 0 ? 'Dreaming of books' : `Dreaming of ${count} ${count === 1 ? 'book' : 'books'}`}
       </text>
       {[
         [22, 30],
@@ -354,5 +331,57 @@ export function DreamCloud({ count, className = '' }: { count: number; className
         </motion.text>
       ))}
     </motion.svg>
+  );
+}
+
+/**
+ * A trailing pothos in a pot on top of the bookcase; its vines hang down over the front
+ * edge and sway gently. The top of the bookcase is at y = 80.
+ */
+export function HangingPlant({ className = '' }: { className?: string }) {
+  const id = useId();
+  // heart-shaped leaf at (x, y), turned by `r` degrees
+  const leaf = (x: number, y: number, r: number, s = 1, shade = 0) => (
+    <g transform={`translate(${x} ${y}) rotate(${r}) scale(${s})`}>
+      <path d="M0 0c-6-2-9-8-6-12 2-3 5-2 6 0 1-2 4-3 6 0 3 4 0 10-6 12z" fill={['#6f8f5c', '#85a56f', '#5f7d4f'][shade]} />
+      <path d="M0 0v-10" stroke="#4f6a42" strokeWidth="0.7" opacity="0.6" />
+    </g>
+  );
+  const vine = (d: string, leaves: [number, number, number, number?, number?][], delay: number, originX: number) => (
+    <motion.g
+      style={{ transformOrigin: `${originX}px 46px`, transformBox: 'view-box', willChange: 'transform' }}
+      animate={{ rotate: [-2.5, 2.5, -2.5] }}
+      transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay }}
+    >
+      <path d={d} stroke="#5f7d4f" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      {leaves.map(([x, y, r, s, sh], i) => (
+        <g key={i}>{leaf(x, y, r, s, sh)}</g>
+      ))}
+    </motion.g>
+  );
+  return (
+    <svg viewBox="0 0 90 160" className={className} aria-hidden style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={`${id}pot`} x1="0" x2="1">
+          <stop offset="0" stopColor="#b8654a" />
+          <stop offset="0.45" stopColor="#d4876a" />
+          <stop offset="1" stopColor="#9c5039" />
+        </linearGradient>
+      </defs>
+      {/* vines behind the pot, hanging over the front edge */}
+      {vine('M30 46c-8 20-6 44-12 70-3 14-2 26 2 36', [[24, 66, 160, 1, 0], [20, 86, 200, 1.1, 2], [17, 106, 150, 1, 1], [16, 124, 210, 0.9, 0], [19, 142, 170, 0.8, 2]], 0, 30)}
+      {vine('M44 46c4 22 2 40 6 62 2 10 0 18-2 24', [[46, 70, 200, 1, 1], [49, 90, 160, 1.1, 0], [50, 110, 210, 0.9, 2], [48, 128, 170, 0.8, 1]], 0.8, 44)}
+      {vine('M58 46c8 14 12 28 12 44', [[64, 62, 210, 1, 2], [69, 78, 160, 0.9, 0], [70, 92, 200, 0.8, 1]], 1.6, 58)}
+      {/* pot */}
+      <path d="M22 50h46l-5 30H27z" fill={`url(#${id}pot)`} />
+      <rect x="18" y="44" width="54" height="9" rx="2.5" fill="#d08a6c" />
+      <path d="M28 56c1 7 2 14 3 21" stroke="#fff" strokeOpacity="0.18" strokeWidth="3" strokeLinecap="round" />
+      {/* leaves on top of the pot */}
+      {leaf(30, 44, -20, 1.1, 1)}
+      {leaf(40, 42, 5, 1.2, 0)}
+      {leaf(50, 43, 25, 1.1, 2)}
+      {leaf(60, 45, 45, 1, 1)}
+      {leaf(24, 46, -45, 1, 0)}
+    </svg>
   );
 }

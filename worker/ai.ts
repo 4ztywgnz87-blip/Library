@@ -12,6 +12,7 @@ import type {
   SeriesResponse,
 } from '../src/shared';
 import { MOCK_BUY_LIST } from './mockBooks';
+import { findBookSeries, seriesParts, type FoundSeries } from './series';
 
 export interface AiEnv {
   DB: D1Database;
@@ -210,7 +211,7 @@ export async function recommend(
   const unread = books.filter((b) => b.status === 'owned');
   if (req.source === 'shelf' && unread.length === 0) return { picks: [], mock: !isLive(env) };
 
-  if (!isLive(env)) return { picks: mockRecommend(req, books, profile), mock: true };
+  if (!isLive(env)) return { picks: await inSeriesOrder(mockRecommend(req, books, profile), req.source, books), mock: true };
 
   const wish = [
     req.source === 'shelf'
@@ -240,7 +241,84 @@ export async function recommend(
     const own = byKey.get(key(p.title, p.author)) ?? books.find((b) => key(b.title) === key(p.title));
     return { ...p, seriesNote: p.seriesNote ?? undefined, bookId: own?.id };
   });
-  return { picks: req.source === 'shelf' ? picks.filter((p) => p.bookId) : picks.filter((p) => !p.bookId), mock: false };
+  const fitting = req.source === 'shelf' ? picks.filter((p) => p.bookId) : picks.filter((p) => !p.bookId);
+  return { picks: await inSeriesOrder(fitting, req.source, books), mock: false };
+}
+
+// ---------- never skip ahead in a series ----------
+
+const sameSeries = (a: { name: string; key?: string }, b: { name: string; key?: string }) =>
+  (a.key && b.key ? a.key === b.key : false) || key(a.name) === key(b.name);
+
+/**
+ * Makes sure a tip is never part 2 of a series she hasn't started:
+ * - from her shelf: swap to the first part she hasn't read, if she owns it (otherwise drop the tip)
+ * - to buy: swap to the first part she doesn't have yet
+ * Series come from her library or from Open Library.
+ */
+async function inSeriesOrder(picks: Pick[], source: RecommendRequest['source'], books: Book[]): Promise<Pick[]> {
+  const out: Pick[] = [];
+  for (const pick of picks) {
+    const own = pick.bookId ? books.find((b) => b.id === pick.bookId) : undefined;
+    let series: { name: string; number?: number; key?: string } | undefined = own?.series;
+    if (!series?.number) {
+      const found = await findBookSeries(pick.title, pick.author).catch(() => ({}) as FoundSeries);
+      if (found.name && found.number) series = { name: found.name, number: found.number, key: found.key };
+    }
+    const n = series?.number;
+    if (!series || !n || n <= 1) {
+      out.push(pick);
+      continue;
+    }
+    const parts = books.filter((b) => b.series && sameSeries(b.series, series!));
+    const partNo = (k: number) => parts.find((b) => b.series?.number === k);
+
+    if (source === 'shelf') {
+      // first earlier part she hasn't read
+      let k = 1;
+      while (k < n && partNo(k)?.status === 'read') k++;
+      if (k === n) {
+        out.push(pick);
+        continue;
+      }
+      const earlier = partNo(k);
+      if (earlier && (earlier.status === 'owned' || earlier.status === 'reading')) {
+        out.push({
+          title: earlier.title,
+          author: earlier.authors[0] ?? pick.author,
+          bookId: earlier.id,
+          why: `Start with book ${k} of ${series.name} first, it's waiting on your shelf. ${pick.why}`,
+          seriesNote: `${series.name} #${k}`,
+        });
+      }
+      continue; // she doesn't own the earlier part: not a shelf tip
+    }
+
+    // to buy: the first part she doesn't have yet
+    const has = (k: number) => {
+      const b = partNo(k);
+      return !!b && b.status !== 'wishlist';
+    };
+    let k = 1;
+    while (k < n && has(k)) k++;
+    if (k === n) {
+      out.push(pick);
+      continue;
+    }
+    const list = series.key ? await seriesParts(series.key).catch(() => []) : [];
+    const first = list.find((p) => p.number === k);
+    if (first) {
+      out.push({
+        title: first.title,
+        author: pick.author,
+        why: `It's book ${k} of ${series.name}, so start here! ${pick.why}`,
+        seriesNote: `${series.name} #${k}`,
+      });
+    }
+  }
+  // no doubles after swapping
+  const seen = new Set<string>();
+  return out.filter((p) => (seen.has(key(p.title)) ? false : (seen.add(key(p.title)), true)));
 }
 
 function mockRecommend(req: RecommendRequest, books: Book[], profile?: ReaderProfile): Pick[] {

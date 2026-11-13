@@ -3,6 +3,7 @@ import type { Book, SyncRecord } from '../src/types';
 import type { ReaderProfile, RecommendRequest } from '../src/shared';
 import { AiLimitError, aiStatus, fitCheck, identifyCover, recommend, seriesInfo } from './ai';
 import { ASSETS } from './assets.gen';
+import { findBookSeries, seriesParts } from './series';
 
 export interface Env {
   DB: D1Database;
@@ -116,70 +117,11 @@ app.get('/editions', async (c) => {
 
 // ---------- series (free, from Open Library) ----------
 
-const OL_HEADERS = { 'User-Agent': 'Snug personal library app' };
-const olFetch = (path: string) =>
-  fetch(`https://openlibrary.org${path}`, { headers: OL_HEADERS, cf: { cacheTtl: 86_400, cacheEverything: true } });
-
-interface OLWork {
-  title?: string;
-  first_publish_date?: string;
-  series?: { series: { key: string }; position?: string }[];
-}
-
 /** Which series a book belongs to, and its number in it */
-app.get('/book-series', async (c) => {
-  const title = c.req.query('title') ?? '';
-  const author = c.req.query('author') ?? '';
-  if (!title) return c.json({});
-  const res = await olFetch(
-    `/search.json?${new URLSearchParams({ title, author, limit: '3', fields: 'key,title,series_key,series_name' })}`,
-  );
-  if (!res.ok) return c.json({});
-  const docs = ((await res.json()) as { docs: { key: string; series_key?: string[]; series_name?: string[] }[] }).docs;
-  const doc = docs.find((d) => d.series_key?.length);
-  if (!doc) return c.json({});
-  const key = doc.series_key![0];
-  const name = doc.series_name?.[0];
-  const work = await olFetch(`${doc.key}.json`);
-  const position = work.ok
-    ? ((await work.json()) as OLWork).series?.find((s) => s.series.key.endsWith(key))?.position
-    : undefined;
-  const number = position && /^\d+(\.\d+)?$/.test(position) ? Number(position) : undefined;
-  return c.json({ name, number, key });
-});
+app.get('/book-series', async (c) => c.json(await findBookSeries(c.req.query('title') ?? '', c.req.query('author') ?? '')));
 
 /** All books of a series in reading order */
-app.get('/series-books', async (c) => {
-  const key = c.req.query('key') ?? '';
-  if (!/^OL\d+L$/.test(key)) return c.json({ books: [] });
-  const res = await olFetch(`/series/${key}/seeds.json`);
-  if (!res.ok) return c.json({ books: [] });
-  const seeds = ((await res.json()) as { entries: { url: string; type: string; title: string }[] }).entries
-    .filter((e) => e.type === 'work' && !/\/|box ?set|collection|\d books/i.test(e.title))
-    .slice(0, 30);
-  const works = await Promise.all(
-    seeds.map(async (s) => {
-      const w = await olFetch(`${s.url}.json`);
-      if (!w.ok) return undefined;
-      const work = (await w.json()) as OLWork;
-      const pos = work.series?.find((x) => x.series.key.endsWith(key))?.position;
-      const number = pos && /^\d+(\.\d+)?$/.test(pos) ? Number(pos) : undefined;
-      if (number === undefined || number % 1 !== 0) return undefined; // skip novellas like 3.5
-      const released = work.first_publish_date ?? null;
-      return {
-        number,
-        title: work.title ?? s.title,
-        status: released && Date.parse(released) > Date.now() ? 'announced' : 'published',
-        releaseDate: released,
-      };
-    }),
-  );
-  const seen = new Set<number>();
-  const books = works
-    .filter((w): w is NonNullable<typeof w> => !!w && !seen.has(w.number) && (seen.add(w.number), true))
-    .sort((a, b) => a.number - b.number);
-  return c.json({ books });
-});
+app.get('/series-books', async (c) => c.json({ books: await seriesParts(c.req.query('key') ?? '') }));
 
 // ---------- cover images (same-origin copy, so the app can read their colours) ----------
 

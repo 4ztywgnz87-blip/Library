@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { useProfile, updateProfile } from '../lib/profile';
 import { recommend } from '../lib/ai';
-import { searchBooks } from '../lib/bookSearch';
+import { sameBook, searchBooks } from '../lib/bookSearch';
 import { updateBook } from '../lib/library';
 import { quickAdd } from '../lib/quickAdd';
 import { MOODS, type Pick, type RecommendRequest } from '../shared';
@@ -200,7 +200,7 @@ function PickCard({
   useEffect(() => {
     if (own) return;
     searchBooks(`${pick.title} ${pick.author}`)
-      .then((r) => setCover(r.find((x) => x.coverUrl)?.coverUrl))
+      .then((r) => setCover(sameBook(r, pick.title, pick.author).find((x) => x.coverUrl)?.coverUrl))
       .catch(() => {});
   }, [own, pick.title, pick.author]);
 

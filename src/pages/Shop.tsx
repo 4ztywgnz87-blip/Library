@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { fitCheck, identifyCover } from '../lib/ai';
 import { shrinkPhoto } from '../lib/photo';
-import { searchBooks, type SearchResult } from '../lib/bookSearch';
+import { sameBook, searchBooks, type SearchResult } from '../lib/bookSearch';
 import { bookKey, normalize } from '../lib/library';
 import { quickAdd } from '../lib/quickAdd';
 import type { FitResponse } from '../shared';
@@ -45,7 +45,9 @@ export default function Shop() {
     if (own) return setState({ kind: 'owned', book: own });
     setState({ kind: 'working', text: 'Checking if it fits you…' });
     try {
-      const found = (await searchBooks(`${title} ${author}`)).find((r) => r.coverUrl) ?? {
+      const results = await searchBooks(`${title} ${author}`);
+      const matches = author ? sameBook(results, title, author) : results;
+      const found = matches.find((r) => r.coverUrl) ?? matches[0] ?? {
         source: 'google' as const,
         title,
         authors: [author],

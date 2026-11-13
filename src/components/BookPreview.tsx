@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { searchBooks } from '../lib/bookSearch';
-import { findExisting } from '../lib/library';
+import { bookKey, findExisting, normalize } from '../lib/library';
 import { quickAdd } from '../lib/quickAdd';
 import type { Book } from '../types';
 import { Cover } from './Cover';
@@ -43,7 +43,15 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
     // Fill in the blurb (and a cover) from the book search
     searchBooks(`${book.title} ${book.author}`)
       .then((r) => {
-        const match = r.find((x) => x.description) ?? r[0];
+        // Only trust results that are really this book (same title and author)
+        const surname = normalize(book.author).split(' ').pop() ?? '';
+        const same = r.filter(
+          (x) =>
+            (bookKey(x) === bookKey({ title: book.title, authors: [book.author] }) ||
+              normalize(x.title).startsWith(normalize(book.title))) &&
+            normalize(x.authors.join(' ')).includes(surname),
+        );
+        const match = same.find((x) => x.description) ?? same[0];
         if (match)
           setDetails((d) => ({
             ...d,

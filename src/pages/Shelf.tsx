@@ -6,7 +6,7 @@ import { shelfOrder } from '../lib/library';
 import { isLight, updateSpineColors } from '../lib/coverColor';
 import { hashColor } from '../components/Cover';
 import { STATUSES, type Book, type Status } from '../types';
-import { Bookend, Candle, DreamCloud, FairyLights, Mug, Plant, ShelfCat } from '../components/ShelfDecor';
+import { Bookend, Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
 
 const ROW = 140; // px per shelf row (spines + board)
 const BOARD = 12;
@@ -191,9 +191,9 @@ export default function Shelf() {
   const wishCount = byStatus.wishlist.length;
 
   const decor: Partial<Record<Status, ReactNode>> = {
-    reading: <Bookend className="h-16" />,
-    owned: <Candle className="h-20" />,
-    read: <Mug className="h-20" />,
+    reading: <Bookend className="h-16 w-[26px]" />,
+    owned: <Candle className="h-20 w-12" />,
+    read: <Mug className="h-20 w-[68px]" />,
   };
 
   return (
@@ -202,7 +202,8 @@ export default function Shelf() {
       <div className="mx-auto max-w-4xl px-3 pb-10">
         {/* things on top of the bookcase: a plant and the cat (its tail hangs over the edge) */}
         <div className="relative h-44">
-          <Plant className="absolute bottom-0 left-4 h-24" />
+          {/* pot stands on top, vines hang over the front edge of the cornice */}
+          <HangingPlant className="absolute bottom-[-95px] left-2 z-20 h-[190px] w-[107px]" />
           <Link
             to="/wishlist"
             aria-label={`Wishlist, ${wishCount} books`}

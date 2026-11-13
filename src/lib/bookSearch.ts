@@ -1,5 +1,5 @@
 import type { Book, Lang, SeriesInfo } from '../types';
-import { bookKey } from './library';
+import { bookKey, normalize } from './library';
 
 /** A search hit, not yet in her library */
 export type SearchResult = Omit<
@@ -206,4 +206,15 @@ export async function searchBooks(query: string, signal?: AbortSignal): Promise<
   const score = (r: SearchResult) =>
     (r.coverUrl ? 0 : 1) + (JUNK.test(`${r.title} ${r.subtitle ?? ''}`) ? 2 : 0);
   return [...merged.values()].sort((a, b) => score(a) - score(b));
+}
+
+/** From search results, the ones that are really this book (same title and author) */
+export function sameBook(results: SearchResult[], title: string, author: string) {
+  const surname = normalize(author).split(' ').pop() ?? '';
+  const want = bookKey({ title, authors: [author] });
+  return results.filter(
+    (r) =>
+      (bookKey(r) === want || normalize(r.title).startsWith(normalize(title))) &&
+      (!surname || normalize(r.authors.join(' ')).includes(surname)),
+  );
 }
