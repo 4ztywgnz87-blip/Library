@@ -11,7 +11,7 @@ import { Button, Card, Chip, PageHeader, Segmented, Toggle } from '../components
 import { CameraIcon, ChevronIcon, TrashIcon } from '../components/Icons';
 import { EditionPicker } from '../components/EditionPicker';
 import { ConfirmSheet } from '../components/ConfirmSheet';
-import { lookupSeries } from '../lib/seriesLookup';
+import { lookupSeries, setGenreForSeries } from '../lib/seriesLookup';
 
 const TAG_SUGGESTIONS = ['spicy 🌶️', 'emotional 😭', 'plot twist 🤯', 'funny 😂', 'slow burn 🔥', 'cosy ☕', 'dark 🖤', 'page-turner'];
 
@@ -151,7 +151,9 @@ export default function BookDetail() {
 
           {/* Genres */}
           <Card>
-            <p className="mb-3 text-xs tracking-wide text-mocha uppercase">Genres</p>
+            <p className="mb-3 text-xs tracking-wide text-mocha uppercase">
+              Genres{book.series && <span className="normal-case tracking-normal"> · for the whole series</span>}
+            </p>
             <div className="flex flex-wrap gap-2">
               {[...new Set([...GENRES, ...book.genres])].map((g) => {
                 const on = book.genres.includes(g);
@@ -159,7 +161,7 @@ export default function BookDetail() {
                   <Chip
                     key={g}
                     active={on}
-                    onClick={() => set({ genres: on ? book.genres.filter((x) => x !== g) : [...book.genres, g] })}
+                    onClick={() => setGenreForSeries(book, g, !on)}
                   >
                     {g}
                   </Chip>

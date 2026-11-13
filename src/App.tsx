@@ -14,13 +14,13 @@ import Quiz from './pages/Quiz';
 import Stats from './pages/Stats';
 import Wishlist from './pages/Wishlist';
 import { startBackgroundSync } from './lib/sync';
-import { backfillSeries } from './lib/seriesLookup';
+import { backfillSeries, harmonizeSeriesGenres } from './lib/seriesLookup';
 
 export default function App() {
   useEffect(() => {
     const stop = startBackgroundSync();
     // fill in series for older books in the background, once the app has settled
-    const t = setTimeout(() => void backfillSeries(), 4000);
+    const t = setTimeout(() => void backfillSeries().then(harmonizeSeriesGenres), 4000);
     return () => {
       stop();
       clearTimeout(t);

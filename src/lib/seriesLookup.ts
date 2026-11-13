@@ -78,6 +78,7 @@ export async function lookupSeries(
       if (genres.length) patch.genres = genres;
     }
     await updateBook(book.id, patch);
+    if (patch.series ?? current.series) await harmonizeSeriesGenres();
     return patch.series ?? current.series;
   } catch {
     return undefined;
@@ -102,5 +103,35 @@ export async function backfillSeries(max = 25) {
     for (const b of todo) await lookupSeries(b);
   } finally {
     running = false;
+  }
+}
+
+/** Same series, same genres: every part gets the genres the other parts have (only adds) */
+export async function harmonizeSeriesGenres() {
+  const books = await db.books.filter((b) => !b.deleted && !!b.series).toArray();
+  const groups = new Map<string, Book[]>();
+  for (const b of books) {
+    const k = normalize(b.series!.name);
+    groups.set(k, [...(groups.get(k) ?? []), b]);
+  }
+  for (const parts of groups.values()) {
+    if (parts.length < 2) continue;
+    const all = [...new Set(parts.flatMap((b) => b.genres))];
+    for (const b of parts) {
+      const missing = all.filter((g) => !b.genres.includes(g));
+      if (missing.length) await updateBook(b.id, { genres: [...b.genres, ...missing] });
+    }
+  }
+}
+
+/** Turns a genre on or off for a book and, when it's part of a series, for the whole series */
+export async function setGenreForSeries(book: Book, genre: string, on: boolean) {
+  const parts = book.series
+    ? await db.books.filter((b) => !b.deleted && !!b.series && normalize(b.series.name) === normalize(book.series!.name)).toArray()
+    : [book];
+  for (const b of parts) {
+    const has = b.genres.includes(genre);
+    if (on && !has) await updateBook(b.id, { genres: [...b.genres, genre] });
+    if (!on && has) await updateBook(b.id, { genres: b.genres.filter((g) => g !== genre) });
   }
 }

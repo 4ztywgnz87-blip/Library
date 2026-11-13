@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
@@ -10,6 +10,7 @@ import { Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '..
 
 const ROW = 140; // px per shelf row (spines + board)
 const BOARD = 12;
+const MIN_SCALE = 0.72; // books never get smaller than this before a new row is added
 
 
 function hash(s: string) {
@@ -29,9 +30,12 @@ function spineStyle(b: Book) {
   return { height, width, color };
 }
 
-function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean }) {
+function Spine({ book, delay, lean, scale = 1 }: { book: Book; delay: number; lean: boolean; scale?: number }) {
   const navigate = useNavigate();
-  const { height, width, color } = spineStyle(book);
+  const natural = spineStyle(book);
+  const color = natural.color;
+  const height = Math.round(natural.height * scale);
+  const width = Math.round(natural.width * scale);
   const style = hash(book.title + book.id) % 3; // three kinds of spine decoration
   const light = isLight(color);
   const gold = light ? '#8a6a3a' : '#e3c288';
@@ -127,6 +131,35 @@ function ShelfSection({
   startDelay: number;
 }) {
   const navigate = useNavigate();
+
+  // Books first get smaller (down to MIN_SCALE) to stay on one row; only then a new row is added
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [available, setAvailable] = useState(0);
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setAvailable(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const booksWidth = books.reduce((sum, b, i) => {
+    const prev = books[i - 1];
+    const gap = !prev ? 0 : (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? 6 : 1;
+    return sum + spineStyle(b).width + gap;
+  }, 0);
+  const DECOR = 84;
+  const room = Math.max(1, available - 2);
+  // shrink just enough for books (+ decoration) to fit on one row, but not below MIN_SCALE
+  const scale = !available
+    ? 1
+    : booksWidth + (decor ? DECOR : 0) <= room
+      ? 1
+      : Math.max(MIN_SCALE, Math.min(1, room / (booksWidth + (decor ? DECOR : 0)), room / booksWidth));
+  const row = Math.round((ROW - BOARD) * scale) + BOARD;
+  // the decoration only stands where there's room on the last row; it never gets a row of its own
+  const lastRowUsed = (booksWidth * scale) % room;
+  const showDecor = !!decor && (books.length === 0 || lastRowUsed + DECOR * scale <= room);
+
   return (
     // the shelf above casts a soft shadow onto the back panel, starting right under its board
     <section className="pt-2" style={{ backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.32), transparent 18px)' }}>
@@ -139,18 +172,19 @@ function ShelfSection({
         <span className="absolute top-1/2 right-1.5 h-1 w-1 -translate-y-1/2 rounded-full bg-[#7d5f35]" />
       </button>
       <div
+        ref={rowRef}
         className="flex flex-wrap content-start items-end px-2"
         style={{
-          minHeight: ROW,
+          minHeight: row,
           // a wooden board under every row: the shadow it casts on the back panel, the soft
           // shadow under the books, the lit top surface and the front edge
-          backgroundImage: `linear-gradient(to bottom, transparent 0, transparent ${ROW - BOARD - 8}px, rgba(0,0,0,0.28) ${ROW - BOARD}px, #c99466 ${ROW - BOARD}px, #b8835a ${ROW - BOARD + 4}px, #966440 ${ROW - BOARD + 4}px, #7a4e31 ${ROW}px)`,
-          backgroundSize: `100% ${ROW}px`,
+          backgroundImage: `linear-gradient(to bottom, transparent 0, transparent ${row - BOARD - 8}px, rgba(0,0,0,0.28) ${row - BOARD}px, #c99466 ${row - BOARD}px, #b8835a ${row - BOARD + 4}px, #966440 ${row - BOARD + 4}px, #7a4e31 ${row}px)`,
+          backgroundSize: `100% ${row}px`,
           backgroundRepeat: 'repeat-y',
         }}
       >
         {books.length === 0 && !decor && (
-          <div className="flex items-end pb-3" style={{ height: ROW }}>
+          <div className="flex items-end pb-3" style={{ height: row }}>
             <span className="text-xs text-cream/50 italic">empty for now</span>
           </div>
         )}
@@ -160,9 +194,10 @@ function ShelfSection({
           const newGroup =
             prev && (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? 'ml-1.5' : 'ml-[1px]';
           return (
-            <div key={b.id} className={`flex items-end ${i === 0 ? '' : newGroup}`} style={{ height: ROW, paddingBottom: BOARD }}>
+            <div key={b.id} className={`flex items-end ${i === 0 ? '' : newGroup}`} style={{ height: row, paddingBottom: BOARD }}>
               <Spine
                 book={b}
+                scale={scale}
                 delay={startDelay + Math.min(i * 0.025, 0.6)}
                 // like a real bookcase, the last book sometimes leans over
                 lean={i === books.length - 1 && books.length > 2 && hash(b.id) % 2 === 0}
@@ -170,9 +205,12 @@ function ShelfSection({
             </div>
           );
         })}
-        {decor && (
-          <div className="ml-3 flex items-end" style={{ height: ROW, paddingBottom: BOARD }}>
-            {decor}
+        {showDecor && (
+          <div
+            className="ml-3 flex items-end"
+            style={{ height: row, paddingBottom: BOARD, width: 72 * scale }}
+          >
+            <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom left' }}>{decor}</div>
           </div>
         )}
       </div>

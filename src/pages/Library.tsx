@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { useBooks } from '../lib/hooks';
+import { useBooks, useMeta } from '../lib/hooks';
+import { setMeta } from '../db';
 import { STATUSES, type Book, type Status } from '../types';
 import { Cover } from '../components/Cover';
 import { StarsDisplay } from '../components/Stars';
@@ -43,7 +44,10 @@ export default function Library() {
   const [query, setQuery] = useState('');
   const [genre, setGenre] = useState<string | null>(null);
   const [lang, setLang] = useState<'all' | 'en' | 'nl'>('all');
-  const [sort, setSort] = useState<Sort>(tab === 'read' ? 'rating' : 'added');
+  // The chosen sort order is remembered on this device
+  const savedSort = useMeta<Sort | null>('librarySort', null);
+  const sort: Sort = savedSort ?? (tab === 'read' ? 'rating' : 'added');
+  const setSort = (s: Sort) => void setMeta('librarySort', s);
   const [showFilters, setShowFilters] = useState(false);
 
   const counts = useMemo(() => {
@@ -117,11 +121,6 @@ export default function Library() {
           ))}
         </div>
 
-        {/* How the list is sorted right now (tap to change) */}
-        <button onClick={() => setShowFilters(true)} className="mb-3 text-xs text-mocha">
-          Sorted by <span className="font-medium text-cocoa">{SORTS.find((x) => x.id === sort)?.label.toLowerCase()}</span> ·{' '}
-          <span className="text-wine underline decoration-dotted">change</span>
-        </button>
 
         {/* Filters */}
         <AnimatePresence>
