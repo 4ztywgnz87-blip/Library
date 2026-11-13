@@ -193,16 +193,17 @@ Mijn vorige schatting (€2–5) was te laag voor Opus.
 
 ## 8. Fasering
 
-| Fase | Inhoud | Resultaat |
+| Fase | Inhoud | Status |
 |---|---|---|
-| **0. Opzet** | project, design-tokens, hosting, login | lege app online op haar startscherm |
-| **1. Bibliotheek** | zoeken en toevoegen, statussen, kwartsterren, review, lijsten met filters, offline | ze kan haar boeken invoeren |
-| **2. Cover-foto** | camera → herkenning, barcode | boeken toevoegen met één foto |
-| **3. Series + auteurs** | seriepagina's, ontbrekende delen, aangekondigde boeken, favoriete auteurs | |
-| **4. Vragenlijst + aanbevelingen** | profielquiz, *What's next?*, winkelmodus | het hart van de app |
-| **5. Boekenkast** | geanimeerde kast met decoratie | de cosy kers op de taart |
-| **6. Afwerking** | micro-animaties, lege staten, testen op iPhone, iPad en Mac | |
-| Later | statistieken, deelbare wenslijst, seizoensdecoratie | |
+| **0. Opzet** | project, design-tokens, hosting | ✅ online |
+| **1. Bibliotheek** | zoeken en toevoegen, statussen, kwartsterren, review, lijsten met filters, offline | ✅ online |
+| **2. Cover-foto** | camera → herkenning, barcode | ✅ online (AI in testmodus) |
+| **3. Series + auteurs** | seriepagina's, ontbrekende delen, aangekondigde boeken, favoriete auteurs | ✅ online |
+| **4. Vragenlijst + aanbevelingen** | profielquiz, *What's next?*, winkelmodus | ✅ online (AI in testmodus) |
+| **5. Boekenkast** | geanimeerde kast met decoratie | ✅ online |
+| **Extra** | statistieken ("My reading") | ✅ online |
+| **6. Afwerking** | echte AI aanzetten, testen op iPhone, iPad en Mac, bijsturen | volgende stap |
+| Later | deelbare wenslijst, seizoensdecoratie | |
 
 Na elke fase krijgt ze een link om te testen, zodat ze kan meedenken.
 

@@ -38,12 +38,17 @@ npm run deploy                              # → https://snug.snugshelf.workers
 Snug has a single reader, so it opens without logging in. Anyone with the URL can open it.
 Earlier login options (email code, password, Face ID) are in the git history if they are wanted later.
 
-### AI (later phases)
+### AI
+
+Used for reading a cover photo (Claude Haiku 5.5), What's next tips, the bookshop fit check and full
+series lists (Claude Sonnet 5.5, with server-side refusal fallback). Code: `worker/ai.ts`.
 
 `AI_MODE` in `wrangler.jsonc`:
 
 - `mock` (default): free, canned answers, for testing the screens and flow
-- `live`: real Claude calls; needs `npx wrangler secret put ANTHROPIC_API_KEY`
+- `live`: real Claude calls; needs `npx wrangler secret put ANTHROPIC_API_KEY`, then `npm run deploy`
+
+Answers are cached in D1 (`ai_cache`), so the same question twice only costs once.
 
 `AI_DAILY_LIMIT` caps the number of AI calls per day. Use prepaid credit without auto-reload in the
 Anthropic Console, so costs can never exceed what's loaded.
