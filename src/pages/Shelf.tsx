@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { shelfOrder } from '../lib/library';
 import { STATUSES, type Book, type Status } from '../types';
-import { BookPile, Bookend, Candle, FairyLights, Mug, Plant, ShelfCat } from '../components/ShelfDecor';
+import { Bookend, Candle, FairyLights, Mug, Plant, ShelfCat } from '../components/ShelfDecor';
 
 const ROW = 140; // px per shelf row (spines + board)
 const BOARD = 12;
@@ -37,29 +37,37 @@ function spineStyle(b: Book) {
 function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean }) {
   const navigate = useNavigate();
   const { height, width, color } = spineStyle(book);
-  const style = hash(book.title + book.id) % 3; // three kinds of spine design
-  // Fit the title on the spine: wider spines get two lines, long titles a smaller font
+  const style = hash(book.title + book.id) % 3; // three kinds of spine decoration
+  const gold = '#e3c288';
+  // The title runs along the spine. It is turned with a rotation (not vertical writing mode),
+  // which Safari on iPhone renders reliably, also when the title has to be cut off.
+  const textLength = height - 34; // room along the spine
   const twoLines = width >= 30 && book.title.length > 14;
   const charsPerLine = twoLines ? Math.ceil(book.title.length / 2) : book.title.length;
-  const fontSize = Math.max(7.5, Math.min(11, (height - 40) / (charsPerLine * 0.58)));
-  const gold = '#e3c288';
+  const fontSize = Math.max(7.5, Math.min(11, textLength / (charsPerLine * 0.56)));
   const band = <span className="block h-[2px] w-[78%] rounded-full" style={{ background: gold, opacity: 0.8 }} />;
   const rib = <span className="block h-[4px] w-full bg-black/25 shadow-[0_1px_0_rgba(255,255,255,0.15)]" />;
-  const ends = (
-    <>
+  const ends = (top: boolean) => (
+    <span className="flex w-full flex-col items-center gap-[2px]">
+      {!top && book.rating !== undefined && book.rating >= 4.5 && (
+        <span className="mb-0.5 text-[8px] leading-none" style={{ color: gold }}>
+          ★
+        </span>
+      )}
       {style === 0 && (
         <>
           {band}
           {band}
         </>
       )}
+      {style === 1 && <span className="block h-[4px] w-[4px] rotate-45" style={{ background: gold, opacity: 0.85 }} />}
       {style === 2 && (
         <>
           {rib}
           {rib}
         </>
       )}
-    </>
+    </span>
   );
   return (
     <motion.button
@@ -82,31 +90,20 @@ function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean
         backgroundColor: color,
       }}
     >
-      <span className="flex w-full flex-col items-center gap-[2px]">{ends}</span>
+      {ends(true)}
       <span
-        className={`font-soft overflow-hidden leading-[1.05] font-semibold [writing-mode:vertical-rl] ${
-          twoLines ? 'line-clamp-2' : 'line-clamp-1'
-        } ${style === 1 ? 'rounded-[2px] px-[2px] py-1.5' : 'px-[2px]'}`}
+        className="font-soft pointer-events-none absolute top-1/2 left-1/2 flex items-center justify-center text-center leading-[1.05] font-semibold text-[#f6efe6]"
         style={{
+          width: textLength,
+          height: width - 4,
           fontSize,
-          maxHeight: '74%',
-          color: style === 1 ? '#3b2a22' : '#f6efe6',
-          background: style === 1 ? '#efe2c8' : undefined,
-          boxShadow: style === 1 ? `0 0 0 1.5px ${gold}` : undefined,
-          textShadow: style === 1 ? undefined : '0 1px 1px rgba(0,0,0,0.35)',
+          transform: 'translate(-50%, -50%) rotate(90deg)',
+          textShadow: '0 1px 1px rgba(0,0,0,0.35)',
         }}
       >
-        {book.title}
+        <span className={`overflow-hidden ${twoLines ? 'line-clamp-2' : 'line-clamp-1'}`}>{book.title}</span>
       </span>
-      <span className="flex w-full flex-col items-center gap-[2px]">
-        {book.rating !== undefined && book.rating >= 4.5 && (
-          <span className="text-[8px] leading-none" style={{ color: gold }}>
-            ★
-          </span>
-        )}
-        {ends}
-        {style === 1 && <span className="block h-[5px] w-[5px] rotate-45" style={{ background: gold, opacity: 0.85 }} />}
-      </span>
+      {ends(false)}
     </motion.button>
   );
 }
@@ -189,37 +186,65 @@ export default function Shelf() {
 
   if (!books) return null;
 
-  const decor: Record<Status, ReactNode> = {
+  const decor: Partial<Record<Status, ReactNode>> = {
     reading: <Bookend className="h-16" />,
-    owned: <Plant className="h-24" />,
+    owned: <Candle className="h-20" />,
     read: <Mug className="h-20" />,
-    wishlist: <Candle className="h-20" />,
   };
 
   return (
     <div>
       <div className="pt-safe h-4" />
       <div className="mx-auto max-w-4xl px-3 pb-10">
-        {/* things on top of the bookcase */}
-        <div className="relative flex h-24 items-end justify-between px-5">
-          <Plant className="h-24" />
-          <ShelfCat className="absolute bottom-[-4px] left-1/2 h-20 -translate-x-1/2" />
-          <div className="relative flex items-end">
-            <BookPile className="w-20" />
-            <Candle className="absolute bottom-[38px] left-1/2 h-14 -translate-x-1/2" />
-          </div>
+        {/* things on top of the bookcase: a plant and the cat (its tail hangs over the edge) */}
+        <div className="relative h-28">
+          <Plant className="absolute bottom-0 left-4 h-24" />
+          <ShelfCat className="absolute right-[10%] bottom-[-49px] z-20 h-[160px]" />
         </div>
 
-        {/* crown moulding */}
-        <div className="relative z-10 -mx-1.5 h-4 rounded-t-lg bg-gradient-to-b from-[#b98257] to-[#8b5e3c] shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_3px_rgba(0,0,0,0.3)]" />
-        {/* the bookcase */}
+        {/* crown: a little arched pediment on a layered cornice with dentils */}
+        <div className="relative z-10">
+          <svg viewBox="0 0 200 22" className="absolute bottom-full left-1/2 h-5 w-[44%] -translate-x-1/2" preserveAspectRatio="none" aria-hidden>
+            <defs>
+              <linearGradient id="pediment" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#c08a5d" />
+                <stop offset="1" stopColor="#9a6a45" />
+              </linearGradient>
+            </defs>
+            <path d="M0 22C46 22 60 1 100 1s54 21 100 21z" fill="url(#pediment)" />
+            <path d="M14 21C56 20 66 4 100 4s44 16 86 17" stroke="#fff" strokeOpacity="0.18" strokeWidth="1.5" fill="none" />
+          </svg>
+          <div className="-mx-4 h-2.5 rounded-t-md bg-gradient-to-b from-[#c99466] to-[#a7754d] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" />
+          <div className="-mx-3 h-3 bg-gradient-to-b from-[#8b5e3c] to-[#6f4a30]" />
+          <div
+            className="-mx-2 h-2.5"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(90deg, #a7754d 0 7px, #6f4a30 7px 11px), linear-gradient(#a7754d, #a7754d)',
+              boxShadow: '0 3px 4px rgba(0,0,0,0.25)',
+            }}
+          />
+        </div>
+
+        {/* the bookcase, with fluted side posts */}
         <div
-          className="px-3 pt-2 pb-3 shadow-[0_22px_40px_-18px_rgba(59,42,34,0.75)]"
+          className="relative px-4 pt-2 pb-3 shadow-[0_22px_40px_-18px_rgba(59,42,34,0.75)]"
           style={{
             backgroundImage:
               'repeating-linear-gradient(97deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 9px, rgba(255,255,255,0.03) 9px 11px, transparent 11px 17px), linear-gradient(90deg, #8d6040, #a7754d 50%, #8d6040)',
           }}
         >
+          {['left-0', 'right-0'].map((side) => (
+            <div
+              key={side}
+              className={`pointer-events-none absolute inset-y-0 ${side} w-4`}
+              style={{
+                backgroundImage:
+                  'repeating-linear-gradient(90deg, #9c6b46 0 2px, #6f4a30 2px 3.5px, #b07d52 3.5px 5px)',
+                boxShadow: 'inset 0 0 4px rgba(0,0,0,0.3)',
+              }}
+            />
+          ))}
           <div
             className="relative overflow-hidden rounded-[3px] pt-1 shadow-[inset_0_10px_22px_rgba(0,0,0,0.5),inset_6px_0_12px_rgba(0,0,0,0.3),inset_-6px_0_12px_rgba(0,0,0,0.3)]"
             style={{
@@ -242,11 +267,21 @@ export default function Shelf() {
             ))}
           </div>
         </div>
-        {/* plinth + feet */}
-        <div className="-mx-1 h-4 rounded-b-md bg-gradient-to-b from-[#8b5e3c] to-[#6b4630] shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]" />
-        <div className="flex justify-between px-5">
-          <div className="h-2.5 w-10 rounded-b-md bg-[#5a3a28]" />
-          <div className="h-2.5 w-10 rounded-b-md bg-[#5a3a28]" />
+
+        {/* base: plinth, a curved apron and little bun feet */}
+        <div className="-mx-2 h-3 bg-gradient-to-b from-[#a7754d] to-[#7d5236] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]" />
+        <svg viewBox="0 0 400 24" preserveAspectRatio="none" className="-mx-1 block h-6 w-[calc(100%+0.5rem)]" aria-hidden>
+          <defs>
+            <linearGradient id="apron" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#7d5236" />
+              <stop offset="1" stopColor="#5f3d28" />
+            </linearGradient>
+          </defs>
+          <path d="M0 0h400v24h-34c-10 0-14-13-30-13H64c-16 0-20 13-30 13H0z" fill="url(#apron)" />
+        </svg>
+        <div className="-mt-1 flex justify-between px-1">
+          <div className="h-3 w-9 rounded-b-full bg-gradient-to-b from-[#6b4630] to-[#4f3222]" />
+          <div className="h-3 w-9 rounded-b-full bg-gradient-to-b from-[#6b4630] to-[#4f3222]" />
         </div>
 
         <p className="mt-5 text-center text-xs text-mocha">Tap a spine to open the book · tap a label to see that list</p>

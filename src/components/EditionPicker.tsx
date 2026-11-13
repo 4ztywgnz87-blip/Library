@@ -18,10 +18,13 @@ async function googleCovers(title: string, author: string): Promise<Option[]> {
   const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`);
   if (!res.ok) return [];
   const json = (await res.json()) as {
-    items?: { volumeInfo: { imageLinks?: { thumbnail?: string }; publisher?: string; publishedDate?: string } }[];
+    items?: {
+      volumeInfo: { imageLinks?: { thumbnail?: string }; publisher?: string; publishedDate?: string; language?: string };
+    }[];
   };
   return (json.items ?? [])
-    .filter((i) => i.volumeInfo.imageLinks?.thumbnail)
+    // English and Dutch editions only
+    .filter((i) => i.volumeInfo.imageLinks?.thumbnail && ['en', 'nl'].includes(i.volumeInfo.language ?? ''))
     .map((i) => {
       const base = i.volumeInfo.imageLinks!.thumbnail!.replace(/^http:/, 'https:').replace('&edge=curl', '');
       return {
@@ -49,7 +52,7 @@ export function EditionPicker({
   onPick,
   onClose,
 }: {
-  book: Book;
+  book: Pick<Book, 'title' | 'authors'>;
   onPick: (cover: string) => void;
   onClose: () => void;
 }) {

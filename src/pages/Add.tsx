@@ -11,6 +11,7 @@ import { Button, PageHeader, Segmented, Toggle } from '../components/ui';
 import { BarcodeIcon, CameraIcon, CheckIcon, CloseIcon, SearchIcon } from '../components/Icons';
 import { SleepyCat } from '../components/SleepyCat';
 import { BarcodeScanner } from '../components/BarcodeScanner';
+import { EditionPicker } from '../components/EditionPicker';
 import { identifyCover } from '../lib/ai';
 import { shrinkPhoto } from '../lib/photo';
 import type { IdentifyResponse } from '../shared';
@@ -276,6 +277,8 @@ function AddSheet({
   const [status, setStatus] = useState<Status>('owned');
   const [language, setLanguage] = useState<Lang>(result.language ?? 'en');
   const [special, setSpecial] = useState(false);
+  const [editionCover, setEditionCover] = useState<string | undefined>();
+  const [pickingEdition, setPickingEdition] = useState(false);
   // Most books added as "read" were finished a while ago; only "this year" counts in this year's stats
   const [finished, setFinished] = useState<'this' | 'earlier'>('earlier');
   const [saving, setSaving] = useState(false);
@@ -293,6 +296,7 @@ function AddSheet({
       status,
       language,
       specialEdition: special,
+      customCover: special ? editionCover : undefined,
       tags: [],
       addedAt: now,
       updatedAt: now,
@@ -321,7 +325,7 @@ function AddSheet({
         <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-sand md:hidden" />
         <div className="space-y-5 p-5">
           <div className="flex gap-4">
-            <Cover book={result} className="w-20 shrink-0" />
+            <Cover book={{ ...result, customCover: special ? editionCover : undefined }} className="w-20 shrink-0" />
             <div className="min-w-0">
               <h2 className="text-xl leading-snug font-semibold">{result.title}</h2>
               <p className="text-sm text-cocoa">{result.authors.join(', ')}</p>
@@ -386,7 +390,33 @@ function AddSheet({
             </div>
           )}
 
-          {status !== 'wishlist' && <Toggle checked={special} onChange={setSpecial} label="✦ Special edition" />}
+          {status !== 'wishlist' && (
+            <div className="space-y-2">
+              <Toggle
+                checked={special}
+                onChange={(on) => {
+                  setSpecial(on);
+                  if (on && !editionCover) setPickingEdition(true);
+                }}
+                label="✦ Special edition"
+              />
+              {special && (
+                <button className="text-sm text-wine underline" onClick={() => setPickingEdition(true)}>
+                  {editionCover ? 'Change edition cover' : 'Choose my edition’s cover'}
+                </button>
+              )}
+            </div>
+          )}
+          {pickingEdition && (
+            <EditionPicker
+              book={result}
+              onClose={() => setPickingEdition(false)}
+              onPick={(cover) => {
+                setEditionCover(cover);
+                setPickingEdition(false);
+              }}
+            />
+          )}
 
           <div className="flex gap-3 pt-1">
             <Button variant="soft" onClick={onClose} className="flex-1">

@@ -89,9 +89,21 @@ app.get('/editions', async (c) => {
     });
     if (!res.ok) continue;
     const json = (await res.json()) as {
-      entries: { covers?: number[]; publishers?: string[]; publish_date?: string }[];
+      entries: {
+        title?: string;
+        covers?: number[];
+        publishers?: string[];
+        publish_date?: string;
+        languages?: { key: string }[];
+      }[];
     };
+    const norm = (t = '') => t.toLowerCase().replace(/[^a-z0-9]/g, '');
     for (const e of json.entries) {
+      // Only English and Dutch editions. Without language info, keep it only if the title
+      // is the original one (translations have another title).
+      const langs = (e.languages ?? []).map((l) => l.key.split('/').pop());
+      const ok = langs.length ? langs.some((l) => l === 'eng' || l === 'dut') : norm(e.title).startsWith(norm(title));
+      if (!ok) continue;
       for (const id of e.covers ?? []) {
         if (id > 0 && !covers.some((x) => x.id === id)) {
           covers.push({ id, label: [e.publishers?.[0], e.publish_date].filter(Boolean).join(' · ') });
