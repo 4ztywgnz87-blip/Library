@@ -304,7 +304,7 @@ function AddSheet({
       startedAt: status === 'reading' ? now : undefined,
       finishedAt: status === 'read' && finished === 'this' ? now : undefined,
     });
-    if (!book.series) void lookupSeries(book); // fills in the series in the background
+    if (!book.series || !book.genres.length) void lookupSeries(book); // fills in series/genres in the background
     navigate(status === 'read' ? `/book/${book.id}?rate=1` : `/book/${book.id}`, { replace: true });
   };
 

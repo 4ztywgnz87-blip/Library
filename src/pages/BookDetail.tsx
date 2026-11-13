@@ -230,7 +230,8 @@ const finishedYear = (b: Book) => (b.finishedAt ? new Date(b.finishedAt).getFull
  * so nothing changes by accident.
  */
 function RatingCard({ book }: { book: Book }) {
-  const [editing, setEditing] = useState(book.rating === undefined);
+  // Opens ready to rate, unless she already saved this card once (e.g. only a year, no stars)
+  const [editing, setEditing] = useState(book.rating === undefined && !book.ratingSaved);
   const [rating, setRating] = useState(book.rating);
   const [review, setReview] = useState(book.review ?? '');
   const [tags, setTags] = useState(book.tags);
@@ -249,7 +250,7 @@ function RatingCard({ book }: { book: Book }) {
     // Keep the exact date if the year didn't change; otherwise mid-year of the chosen year
     const finishedAt =
       year === undefined ? undefined : year === finishedYear(book) ? book.finishedAt : year === now ? Date.now() : Date.UTC(year, 6, 1);
-    await updateBook(book.id, { rating, review: review.trim() || undefined, tags, finishedAt });
+    await updateBook(book.id, { rating, review: review.trim() || undefined, tags, finishedAt, ratingSaved: true });
     setEditing(false);
   };
 
@@ -330,12 +331,10 @@ function RatingCard({ book }: { book: Book }) {
         </div>
       </div>
       <div className="flex gap-3">
-        {book.rating !== undefined && (
-          <Button variant="soft" className="flex-1" onClick={() => setEditing(false)}>
-            Cancel
-          </Button>
-        )}
-        <Button className="flex-[2]" onClick={save} disabled={rating === undefined}>
+        <Button variant="soft" className="flex-1" onClick={() => setEditing(false)}>
+          Cancel
+        </Button>
+        <Button className="flex-[2]" onClick={save}>
           Save
         </Button>
       </div>
@@ -351,7 +350,7 @@ function SeriesCard({ book }: { book: Book }) {
 
   // Fill in the series automatically the first time the book is opened
   useEffect(() => {
-    if (book.series || book.seriesChecked) return;
+    if ((book.series && book.genres.length) || (book.lookupVersion ?? 0) >= 2) return;
     setLooking(true);
     lookupSeries(book).finally(() => setLooking(false));
   }, [book.id]); // eslint-disable-line react-hooks/exhaustive-deps

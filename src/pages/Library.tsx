@@ -117,6 +117,12 @@ export default function Library() {
           ))}
         </div>
 
+        {/* How the list is sorted right now (tap to change) */}
+        <button onClick={() => setShowFilters(true)} className="mb-3 text-xs text-mocha">
+          Sorted by <span className="font-medium text-cocoa">{SORTS.find((x) => x.id === sort)?.label.toLowerCase()}</span> ·{' '}
+          <span className="text-wine underline decoration-dotted">change</span>
+        </button>
+
         {/* Filters */}
         <AnimatePresence>
           {showFilters && (

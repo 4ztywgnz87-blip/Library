@@ -198,11 +198,20 @@ export async function searchBooks(query: string, signal?: AbortSignal): Promise<
   const isIsbn = /^[\d-]{10,17}$/.test(q);
   const gq = isIsbn ? `isbn:${q.replace(/-/g, '')}` : q;
 
-  const [google, ol] = await Promise.allSettled([searchGoogle(gq, signal), searchOpenLibrary(q, signal)]);
+  // While typing, the last word is often unfinished ("a court of splin"): also search with it
+  // as a prefix, so the book shows up before the word is complete
+  const last = q.split(/\s+/).pop() ?? '';
+  const partial = !isIsbn && last.length >= 2 && !/\s$/.test(query);
+  const [google, ol, olPrefix] = await Promise.allSettled([
+    searchGoogle(gq, signal),
+    searchOpenLibrary(q, signal),
+    partial ? searchOpenLibrary(`${q}*`, signal) : Promise.resolve([]),
+  ]);
   const merged = new Map<string, SearchResult>();
   for (const r of [
     ...(google.status === 'fulfilled' ? google.value : []),
     ...(ol.status === 'fulfilled' ? ol.value : []),
+    ...(olPrefix.status === 'fulfilled' ? olPrefix.value : []),
   ]) {
     const key = bookKey(r);
     const existing = merged.get(key);
@@ -225,9 +234,13 @@ export async function searchBooks(query: string, signal?: AbortSignal): Promise<
     if (signal?.aborted) return [];
     throw new Error('Search is not reachable right now');
   }
-  // Real editions with a cover first; box sets, journals, summaries etc. last
+  // Titles that start with what she typed first, then real editions with a cover;
+  // box sets, journals, summaries etc. last
+  const typed = normalize(q);
   const score = (r: SearchResult) =>
-    (r.coverUrl ? 0 : 1) + (JUNK.test(`${r.title} ${r.subtitle ?? ''}`) ? 2 : 0);
+    (normalize(r.title).startsWith(typed) || normalize(`${r.title} ${r.authors.join(' ')}`).startsWith(typed) ? 0 : 3) +
+    (r.coverUrl ? 0 : 1) +
+    (JUNK.test(`${r.title} ${r.subtitle ?? ''}`) ? 2 : 0);
   return [...merged.values()].sort((a, b) => score(a) - score(b));
 }
 

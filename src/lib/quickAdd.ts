@@ -43,6 +43,6 @@ export async function quickAdd(
     updatedAt: now,
     series: extra.series ?? data.series,
   });
-  if (!saved.series) void lookupSeries(saved);
+  if (!saved.series || !saved.genres.length) void lookupSeries(saved);
   return saved;
 }

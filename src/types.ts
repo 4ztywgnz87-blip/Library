@@ -3,7 +3,7 @@ export type Lang = 'en' | 'nl';
 
 export const STATUSES: { id: Status; label: string; short: string }[] = [
   { id: 'reading', label: 'Currently reading', short: 'Reading' },
-  { id: 'owned', label: 'On my shelf', short: 'Owned' },
+  { id: 'owned', label: 'To read', short: 'To read' },
   { id: 'read', label: 'Read', short: 'Read' },
   { id: 'wishlist', label: 'Wishlist', short: 'Wishlist' },
 ];
@@ -47,6 +47,8 @@ export interface Book {
   series?: SeriesInfo;
   /** Series was looked up automatically (so we don't keep asking) */
   seriesChecked?: boolean;
+  /** Version of the automatic series/genre lookup that last ran for this book */
+  lookupVersion?: number;
   /** Spine colour taken from the cover, and which cover it came from */
   spineColor?: string;
   spineColorFrom?: string;
@@ -57,6 +59,8 @@ export interface Book {
   specialEdition: boolean;
   /** 0.25 – 5 in quarter steps */
   rating?: number;
+  /** The rating card was saved at least once (also without stars) */
+  ratingSaved?: boolean;
   review?: string;
   tags: string[];
 

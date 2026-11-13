@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
@@ -40,11 +40,40 @@ export default function Shop() {
     return books.filter((b) => normalize(`${b.title} ${b.authors.join(' ')}`).includes(q)).slice(0, 5);
   }, [query, books]);
 
-  const check = async (title: string, author: string) => {
+  // Search results while typing (debounced), like on the Add screen
+  const [found, setFound] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  useEffect(() => {
+    const q = query.trim();
+    setFound([]);
+    if (q.length < 3 || !navigator.onLine) return;
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await searchBooks(q, ctrl.signal);
+        if (!ctrl.signal.aborted) setFound(results.slice(0, 8));
+      } catch {
+        // offline or not found: the library check above still works
+      } finally {
+        if (!ctrl.signal.aborted) setSearching(false);
+      }
+    }, 400);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [query]);
+
+  const check = async (title: string, author: string, picked?: SearchResult) => {
     const own = books?.find((b) => bookKey(b) === bookKey({ title, authors: [author] }));
     if (own) return setState({ kind: 'owned', book: own });
     setState({ kind: 'working', text: 'Checking if it fits you…' });
     try {
+      if (picked) {
+        const fit = await fitCheck({ title: picked.title, author: picked.authors[0] ?? author, description: picked.description });
+        return setState({ kind: 'fit', book: picked, fit });
+      }
       const results = await searchBooks(`${title} ${author}`);
       const matches = author ? sameBook(results, title, author) : results;
       const found = matches.find((r) => r.coverUrl) ?? matches[0] ?? {
@@ -112,13 +141,31 @@ export default function Shop() {
                 ))}
               </div>
             ) : (
-              <Card className="flex items-center justify-between gap-3">
-                <p className="text-sm text-cocoa">Not in your library yet.</p>
-                <Button variant="soft" className="shrink-0 px-4 py-2 text-xs" onClick={() => check(query, '')}>
-                  Does it fit me?
-                </Button>
-              </Card>
+              <p className="text-sm text-cocoa">Not in your library yet. Which one is it?</p>
             )}
+            {/* search results, so she can tap the exact book */}
+            {found.length > 0 && (
+              <ul className="mt-3 divide-y divide-sand/70">
+                {found.map((r) => (
+                  <li key={(r.googleId ?? r.olKey ?? '') + r.title}>
+                    <button className="flex w-full gap-3 py-2.5 text-left" onClick={() => check(r.title, r.authors[0] ?? '', r)}>
+                      <Cover book={r} className="w-11 shrink-0" rounded="rounded" />
+                      <div className="min-w-0">
+                        <p className="text-sm leading-snug font-medium">{r.title}</p>
+                        <p className="text-xs text-cocoa">{r.authors.join(', ')}</p>
+                        {r.series && (
+                          <p className="text-xs text-mocha">
+                            {r.series.name}
+                            {r.series.number ? ` #${r.series.number}` : ''}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {searching && found.length === 0 && <p className="mt-3 text-sm text-mocha">Searching…</p>}
           </div>
         )}
 

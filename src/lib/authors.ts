@@ -1,7 +1,7 @@
 import { getMeta, setMeta } from '../db';
 import type { Book } from '../types';
 import { bookKey } from './library';
-import { mapGenres, parseSeries } from './bookSearch';
+import { mapGenres, parseSeries, sameBook, searchBooks } from './bookSearch';
 
 export interface AuthorNews {
   title: string;
@@ -78,7 +78,9 @@ async function fromGoogle(author: string): Promise<AuthorNews[]> {
         title,
         author,
         series,
-        coverUrl: v.imageLinks?.thumbnail?.replace(/^http:/, 'https:').replace('&edge=curl', '') + '&fife=w400',
+        coverUrl: v.imageLinks?.thumbnail
+          ? `${v.imageLinks.thumbnail.replace(/^http:/, 'https:').replace('&edge=curl', '')}&fife=w400`
+          : undefined,
         publishedDate: v.publishedDate!,
         upcoming: Date.parse(v.publishedDate!) > Date.now(),
         isbn13: v.industryIdentifiers?.find((x) => x.type === 'ISBN_13')?.identifier,
@@ -118,7 +120,7 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
 
 /** New and upcoming books by an author (cached for a day) */
 export async function authorNews(author: string): Promise<AuthorNews[]> {
-  const cacheKey = `authorNews:${author.toLowerCase()}`;
+  const cacheKey = `authorNews2:${author.toLowerCase()}`; // v2: covers filled in
   const cached = await getMeta<{ at: number; items: AuthorNews[] } | null>(cacheKey, null);
   if (cached && Date.now() - cached.at < DAY) return cached.items;
   let items: AuthorNews[];
@@ -135,6 +137,11 @@ export async function authorNews(author: string): Promise<AuthorNews[]> {
     seen.add(k);
     return true;
   });
+  // Books without a cover in this source: borrow one from the regular book search
+  for (const item of items.filter((i) => !i.coverUrl)) {
+    const results = await searchBooks(`${item.title} ${item.author}`).catch(() => []);
+    item.coverUrl = sameBook(results, item.title, item.author).find((r) => r.coverUrl)?.coverUrl;
+  }
   await setMeta(cacheKey, { at: Date.now(), items });
   return items;
 }

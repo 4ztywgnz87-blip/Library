@@ -277,7 +277,7 @@ export default function Shelf() {
             {/* one shelf with her books (the ones she's reading first, with a bookmark), one with read books */}
             {(
               [
-                { status: 'owned', label: 'On my shelf', books: [...byStatus.reading, ...byStatus.owned] },
+                { status: 'owned', label: 'To read', books: [...byStatus.reading, ...byStatus.owned] },
                 { status: 'read', label: 'Read', books: byStatus.read },
               ] as const
             ).map((shelf, i) => (
@@ -308,8 +308,6 @@ export default function Shelf() {
           <div className="h-3 w-9 rounded-b-full bg-gradient-to-b from-[#6b4630] to-[#4f3222]" />
           <div className="h-3 w-9 rounded-b-full bg-gradient-to-b from-[#6b4630] to-[#4f3222]" />
         </div>
-
-        <p className="mt-5 text-center text-xs text-mocha">Tap a spine to open the book · tap a label to see that list</p>
       </div>
     </div>
   );
