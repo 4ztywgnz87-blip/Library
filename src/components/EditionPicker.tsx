@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import type { Book } from '../types';
 import { shrinkPhoto } from '../lib/photo';
+import { googleBooks } from '../lib/bookSearch';
 import { CameraIcon, CloseIcon } from './Icons';
 
 interface Option {
@@ -12,11 +13,10 @@ interface Option {
 }
 
 async function googleCovers(title: string, author: string): Promise<Option[]> {
-  const key = import.meta.env.VITE_GOOGLE_BOOKS_KEY as string | undefined;
-  const params = new URLSearchParams({ q: `intitle:"${title}" inauthor:"${author}"`, maxResults: '40', printType: 'books' });
-  if (key) params.set('key', key);
-  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`);
-  if (!res.ok) return [];
+  const res = await googleBooks(
+    new URLSearchParams({ q: `intitle:"${title}" inauthor:"${author}"`, maxResults: '40', printType: 'books' }),
+  ).catch(() => undefined);
+  if (!res) return [];
   const json = (await res.json()) as {
     items?: {
       volumeInfo: { imageLinks?: { thumbnail?: string }; publisher?: string; publishedDate?: string; language?: string };

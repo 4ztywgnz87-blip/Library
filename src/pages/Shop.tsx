@@ -52,7 +52,7 @@ export default function Shop() {
       setSearching(true);
       try {
         const results = await searchBooks(q, ctrl.signal);
-        if (!ctrl.signal.aborted) setFound(results.slice(0, 8));
+        if (!ctrl.signal.aborted) setFound(results.slice(0, 10));
       } catch {
         // offline or not found: the library check above still works
       } finally {
@@ -64,6 +64,10 @@ export default function Shop() {
       ctrl.abort();
     };
   }, [query]);
+
+  // books she already has are shown above ("Yes! It's already in your library"), not again below
+  const ownedKeys = new Set((books ?? []).map((b) => bookKey(b)));
+  const notOwned = found.filter((r) => !ownedKeys.has(bookKey(r))).slice(0, 8);
 
   const check = async (title: string, author: string, picked?: SearchResult) => {
     const own = books?.find((b) => bookKey(b) === bookKey({ title, authors: [author] }));
@@ -144,9 +148,9 @@ export default function Shop() {
               <p className="text-sm text-cocoa">Not in your library yet. Which one is it?</p>
             )}
             {/* search results, so she can tap the exact book */}
-            {found.length > 0 && (
+            {notOwned.length > 0 && (
               <ul className="mt-3 divide-y divide-sand/70">
-                {found.map((r) => (
+                {notOwned.map((r) => (
                   <li key={(r.googleId ?? r.olKey ?? '') + r.title}>
                     <button className="flex w-full gap-3 py-2.5 text-left" onClick={() => check(r.title, r.authors[0] ?? '', r)}>
                       <Cover book={r} className="w-11 shrink-0" rounded="rounded" />
@@ -165,7 +169,7 @@ export default function Shop() {
                 ))}
               </ul>
             )}
-            {searching && found.length === 0 && <p className="mt-3 text-sm text-mocha">Searching…</p>}
+            {searching && notOwned.length === 0 && <p className="mt-3 text-sm text-mocha">Searching…</p>}
           </div>
         )}
 

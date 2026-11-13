@@ -176,7 +176,7 @@ export default function Add() {
           {query.trim().length < 2 && !reading && (
             <div className="flex flex-col items-center py-10 text-center text-sm text-cocoa">
               <SleepyCat className="w-32 opacity-90" />
-              <p className="mt-3">Take a photo of the cover, scan the barcode, or search by title.</p>
+              <p className="mt-3">Take a photo of the cover, or search by title, author or ISBN.</p>
             </div>
           )}
 
@@ -410,9 +410,15 @@ function AddSheet({
             <Button variant="soft" onClick={onClose} className="flex-1">
               Cancel
             </Button>
-            <Button onClick={add} disabled={saving} className="flex-[2]">
-              {saving ? 'Adding…' : 'Add to library'}
-            </Button>
+            {existingId ? (
+              <Button onClick={() => navigate(`/book/${existingId}`, { replace: true })} className="flex-[2]">
+                Open in my library
+              </Button>
+            ) : (
+              <Button onClick={add} disabled={saving} className="flex-[2]">
+                {saving ? 'Adding…' : 'Add to library'}
+              </Button>
+            )}
           </div>
         </div>
       </motion.div>

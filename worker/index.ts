@@ -10,6 +10,8 @@ export interface Env {
   AI_MODE?: string;
   AI_DAILY_LIMIT?: string;
   ANTHROPIC_API_KEY?: string;
+  /** Optional: gives Google Books its own quota */
+  GOOGLE_BOOKS_KEY?: string;
 }
 
 /** Snug has one reader for now, so there is no login: everything belongs to this one library. */
@@ -122,6 +124,38 @@ app.get('/book-series', async (c) => c.json(await findBookSeries(c.req.query('ti
 
 /** All books of a series in reading order */
 app.get('/series-books', async (c) => c.json({ books: await seriesParts(c.req.query('key') ?? '') }));
+
+// ---------- Google Books (fallback when the phone's direct call is rate limited; cached a day) ----------
+
+app.get('/gbooks', async (c) => {
+  const params = new URLSearchParams();
+  for (const k of ['q', 'maxResults', 'printType', 'orderBy']) {
+    const v = c.req.query(k);
+    if (v) params.set(k, v);
+  }
+  if (!params.get('q')) return c.json({ items: [] });
+  if (c.env.GOOGLE_BOOKS_KEY) params.set('key', c.env.GOOGLE_BOOKS_KEY);
+  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`, {
+    cf: { cacheTtl: 86_400, cacheEverything: true },
+  });
+  if (!res.ok) return c.json({ error: 'Google Books unavailable' }, 502);
+  return new Response(res.body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' } });
+});
+
+// Open Library search, same idea (cached a day)
+app.get('/olsearch', async (c) => {
+  const params = new URLSearchParams();
+  for (const k of ['q', 'title', 'author', 'sort', 'limit', 'fields']) {
+    const v = c.req.query(k);
+    if (v) params.set(k, v);
+  }
+  const res = await fetch(`https://openlibrary.org/search.json?${params}`, {
+    headers: { 'User-Agent': 'Snug personal library app' },
+    cf: { cacheTtl: 86_400, cacheEverything: true },
+  });
+  if (!res.ok) return c.json({ error: 'Open Library unavailable' }, 502);
+  return new Response(res.body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' } });
+});
 
 // ---------- cover images (same-origin copy, so the app can read their colours) ----------
 

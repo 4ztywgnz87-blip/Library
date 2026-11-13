@@ -63,6 +63,28 @@ export default function Profile() {
           </Card>
         </Link>
 
+        <Card className="space-y-2">
+          <p className="text-xs tracking-wide text-mocha uppercase">Backup</p>
+          <p className="text-sm text-cocoa">
+            Your library is saved online automatically. Want a copy for yourself? Download everything as a file.
+          </p>
+          <button
+            className="rounded-full bg-linen px-4 py-2.5 text-sm font-medium hover:bg-sand"
+            onClick={async () => {
+              const books = await db.books.filter((b) => !b.deleted).toArray();
+              const data = { exportedAt: new Date().toISOString(), profile: profileForName, books: books.map(({ dirty: _d, ...b }) => b) };
+              const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `snug-backup-${new Date().toISOString().slice(0, 10)}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Download backup
+          </button>
+        </Card>
+
         {/* Saving happens by itself; this only shows up if something is still waiting */}
         {pending > 0 && (
           <p className="text-center text-xs text-mocha">

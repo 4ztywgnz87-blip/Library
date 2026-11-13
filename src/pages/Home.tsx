@@ -7,8 +7,10 @@ import { SparkleIcon, ChevronIcon } from '../components/Icons';
 import { EmptyState } from '../components/SleepyCat';
 import { AuthorNewsSection } from '../components/AuthorNews';
 import { SeriesCard } from './Series';
-import { groupSeries } from '../lib/series';
-import { useProfile } from '../lib/profile';
+import { groupSeries, seriesProgress } from '../lib/series';
+import { useSeriesParts } from '../lib/seriesTotals';
+import { useMemo, useState } from 'react';
+import { updateProfile, useProfile } from '../lib/profile';
 
 /** Greeting + a little emoji that fits the time of day */
 function greeting(): [string, string] {
@@ -25,6 +27,7 @@ export default function Home() {
   const oldName = useMeta<string>('readerName', '');
   const profile = useProfile();
   const name = profile.name ?? oldName;
+  const seriesParts = useSeriesParts(useMemo(() => groupSeries(books ?? []), [books]));
   if (!books) return null;
 
   const reading = books.filter((b) => b.status === 'reading');
@@ -38,9 +41,11 @@ export default function Home() {
   const series = groupSeries(books);
   // Series she's busy with (or still has parts of to read), the ones she's furthest in first
   const seriesToShow = series
-    .filter((g) => g.read < g.books.length + g.missing.length)
-    .sort((a, b) => b.read / (b.books.length + b.missing.length) - a.read / (a.books.length + a.missing.length))
-    .slice(0, 3);
+    .map((g) => ({ g, p: seriesProgress(g, seriesParts[g.name]) }))
+    .filter(({ g, p }) => p.read < p.total && (g.read > 0 || g.books.some((b) => b.status === 'reading')))
+    .sort((a, b) => b.p.read / b.p.total - a.p.read / a.p.total)
+    .slice(0, 3)
+    .map(({ g }) => g);
 
   return (
     <div className="pt-safe mx-auto max-w-5xl px-4">
@@ -52,9 +57,22 @@ export default function Home() {
       </header>
 
       {books.length === 0 ? (
-        <EmptyState title="Your library is still empty">
-          Tap the <span className="font-medium text-wine">+</span> below to add your first book.
-        </EmptyState>
+        <div className="space-y-4">
+          <EmptyState title="Welcome to Snug">
+            Your cosy little library. Tap the <span className="font-medium text-wine">+</span> below to add your
+            first book.
+          </EmptyState>
+          {!name && <NameCard />}
+          <Link to="/quiz" className="block">
+            <Card className="flex items-center gap-3 bg-blush/60">
+              <span className="text-2xl">💌</span>
+              <p className="flex-1 text-sm text-wine">
+                <span className="font-medium">Take the 2-minute reader quiz</span> so Snug gets to know your taste.
+              </p>
+              <ChevronIcon className="text-wine" width={18} height={18} />
+            </Card>
+          </Link>
+        </div>
       ) : (
         <div className="space-y-8">
           {/* Currently reading */}
@@ -160,7 +178,7 @@ export default function Home() {
               {/* grid-cols-1 = minmax(0, 1fr): long series names get "…" instead of stretching the card */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {seriesToShow.map((g) => (
-                  <SeriesCard key={g.name} group={g} />
+                  <SeriesCard key={g.name} group={g} known={seriesParts[g.name]} />
                 ))}
               </div>
             </section>
@@ -188,5 +206,31 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+/** First visit: ask what to call her */
+function NameCard() {
+  const [value, setValue] = useState('');
+  return (
+    <Card>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (value.trim()) void updateProfile({ name: value.trim() });
+        }}
+      >
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="What should Snug call you?"
+          className="min-w-0 flex-1 rounded-xl border border-sand bg-white px-3 py-2.5 text-[16px] outline-none focus:border-oat"
+        />
+        <button type="submit" className="rounded-xl bg-wine px-4 text-sm font-medium text-cream disabled:opacity-50" disabled={!value.trim()}>
+          Save
+        </button>
+      </form>
+    </Card>
   );
 }

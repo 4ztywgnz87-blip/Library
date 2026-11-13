@@ -53,4 +53,8 @@ Answers are cached in D1 (`ai_cache`), so the same question twice only costs onc
 `AI_DAILY_LIMIT` caps the number of AI calls per day. Use prepaid credit without auto-reload in the
 Anthropic Console, so costs can never exceed what's loaded.
 
-Optional: `VITE_GOOGLE_BOOKS_KEY` (free Google API key) at build time gives Google Books its own quota.
+Recommended: a free Google Books API key, so search (especially Dutch titles) and edition covers never
+hit Google's shared rate limit. Create one in Google Cloud Console (enable "Books API"), then
+`npx wrangler secret put GOOGLE_BOOKS_KEY` and deploy. The app calls Google directly first and falls
+back to the server (`/api/gbooks`, cached) which uses this key. Open Library has the same fallback
+(`/api/olsearch`) and needs no key.

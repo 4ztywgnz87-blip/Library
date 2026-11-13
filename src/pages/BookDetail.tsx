@@ -105,9 +105,20 @@ export default function BookDetail() {
                 </button>
               ))}
             </div>
+            {/* the obvious next step, one tap */}
             {book.status === 'reading' && (
               <Button className="mt-4 w-full" onClick={() => setStatus('read')}>
                 I finished it! 🎉
+              </Button>
+            )}
+            {book.status === 'owned' && (
+              <Button className="mt-4 w-full" onClick={() => setStatus('reading')}>
+                Start reading 📖
+              </Button>
+            )}
+            {book.status === 'wishlist' && (
+              <Button className="mt-4 w-full" onClick={() => setStatus('owned')}>
+                Got it! 🎉
               </Button>
             )}
           </Card>
@@ -352,7 +363,7 @@ function SeriesCard({ book }: { book: Book }) {
 
   // Fill in the series automatically the first time the book is opened
   useEffect(() => {
-    if ((book.series && book.genres.length) || (book.lookupVersion ?? 0) >= 2) return;
+    if ((book.series && book.genres.length) || (book.lookupVersion ?? 0) >= 3) return;
     setLooking(true);
     lookupSeries(book).finally(() => setLooking(false));
   }, [book.id]); // eslint-disable-line react-hooks/exhaustive-deps

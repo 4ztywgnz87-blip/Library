@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
@@ -29,6 +29,7 @@ export default function Next() {
   const [mock, setMock] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   // Genres she actually reads first, then the rest
   const genres = useMemo(() => {
@@ -48,6 +49,8 @@ export default function Next() {
       setPicks(res.picks);
       setMock(res.mock);
       setShown(exclude);
+      // bring the tips into view (they appear below the choices)
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -137,7 +140,7 @@ export default function Next() {
 
         {/* Results */}
         {picks && !loading && (
-          <div className="mt-8">
+          <div className="mt-8 scroll-mt-20" ref={resultsRef}>
             {picks.length === 0 ? (
               <Card className="text-center text-sm text-cocoa">
                 {source === 'shelf'
@@ -199,11 +202,11 @@ function PickCard({
 
   // New books: borrow a cover from the book search
   useEffect(() => {
-    if (own) return;
+    if (pick.bookId) return; // her own book: it already has its cover
     searchBooks(`${pick.title} ${pick.author}`)
       .then((r) => setCover(sameBook(r, pick.title, pick.author).find((x) => x.coverUrl)?.coverUrl))
       .catch(() => {});
-  }, [own, pick.title, pick.author]);
+  }, [pick.bookId, pick.title, pick.author]);
 
   return (
     <motion.div
@@ -239,10 +242,10 @@ function PickCard({
           </div>
           {pick.seriesNote && <p className="mt-1 text-xs text-mocha">{pick.seriesNote}</p>}
           <p className="mt-2 text-sm leading-relaxed text-ink/90">{pick.why}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex items-center gap-1">
             {source === 'shelf' && own ? (
               <Button
-                className="px-4 py-2 text-xs"
+                className="px-4 py-2 text-xs whitespace-nowrap"
                 onClick={async () => {
                   await updateBook(own.id, { status: 'reading' });
                   navigate(`/book/${own.id}`);
@@ -252,7 +255,7 @@ function PickCard({
               </Button>
             ) : (
               <Button
-                className="px-4 py-2 text-xs"
+                className="px-4 py-2 text-xs whitespace-nowrap"
                 disabled={done}
                 onClick={async () => {
                   setDone(true);
@@ -262,7 +265,7 @@ function PickCard({
                 {done ? 'On your wishlist ✓' : '+ Wishlist'}
               </Button>
             )}
-            <Button variant="ghost" className="px-3 py-2 text-xs" onClick={onNotForMe}>
+            <Button variant="ghost" className="px-3 py-2 text-xs whitespace-nowrap" onClick={onNotForMe}>
               Not for me
             </Button>
           </div>

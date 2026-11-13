@@ -36,14 +36,17 @@ export function Cover({
           className="h-full w-full object-cover"
         />
       ) : (
-        <div
-          className="flex h-full w-full flex-col justify-between p-[10%] text-cream"
-          style={{ background: hashColor(book.title) }}
-        >
-          <span className="font-soft text-[clamp(0.6rem,4cqw,1rem)] leading-tight font-semibold [container-type:inline-size]">
-            {book.title}
-          </span>
-          <span className="text-[0.55rem] tracking-wide uppercase opacity-80">{book.authors[0]}</span>
+        // drawn cover: text scales with the cover's width (cqw), so it reads well tiny and large
+        <div className="h-full w-full [container-type:inline-size]" style={{ background: hashColor(book.title) }}>
+          <div className="flex h-full w-full flex-col justify-between p-[10cqw] text-cream">
+            <div>
+              <span className="mb-[6cqw] block h-[1.5cqw] w-[30cqw] rounded-full bg-cream/50" />
+              <span className="font-soft line-clamp-5 block text-[12.5cqw] leading-[1.12] font-semibold break-words">
+                {book.title}
+              </span>
+            </div>
+            <span className="truncate text-[6.5cqw] tracking-wide uppercase opacity-80">{book.authors[0]}</span>
+          </div>
         </div>
       )}
       {/* spine highlight */}

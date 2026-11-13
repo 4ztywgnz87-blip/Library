@@ -11,23 +11,39 @@ const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_BOOKS_KEY as string | undefined;
 
 // ---------- genres ----------
 
-/** Turns messy store categories into her own genre list */
+const GENRE_PATTERNS: [string, RegExp][] = [
+  ['Fantasy', /fantas|\bfae\b|faer|dragon|magic|witch|vampire|paranormal/],
+  ['Romance', /roman(ce|tic)|rom-com|love stor/],
+  ['Spicy', /erotic|spicy|smut|steamy/],
+  ['Thriller', /thriller|suspense/],
+  ['Mystery', /mystery|detective|crime|whodunit/],
+  ['Historical', /histor/],
+  ['Sci-fi', /science fiction|sci-fi|dystop/],
+  ['Young adult', /young adult fiction|juvenile fiction|\bya\b|teen fiction/],
+];
+
+/**
+ * Turns messy store categories / reader shelves into her own genre list.
+ * With a long list of subjects (Open Library), a genre needs two mentions, so one stray tag
+ * doesn't turn a thriller into a romance.
+ */
 export function mapGenres(categories: string[]): string[] {
-  const text = categories.join(' | ').toLowerCase();
-  const out = new Set<string>();
-  const fantasy = /fantasy|fae|dragon|magic|witch|vampire|paranormal/.test(text);
-  const romance = /romance|love stor/.test(text);
-  if (fantasy && romance) out.add('Romantasy');
-  if (fantasy) out.add('Fantasy');
-  if (romance) out.add('Romance');
-  if (/erotic|erotica|spicy/.test(text)) out.add('Spicy');
-  if (/thriller|suspense/.test(text)) out.add('Thriller');
-  if (/mystery|detective|crime|whodunit/.test(text)) out.add('Mystery');
-  if (/histor/.test(text)) out.add('Historical');
-  if (/science fiction|sci-fi|dystop/.test(text)) out.add('Sci-fi');
-  if (/young adult|juvenile/.test(text)) out.add('Young adult');
-  if (out.size === 0 && /fiction|novel|literature|roman/.test(text)) out.add('Fiction');
-  return [...out];
+  const subjects = categories.map((c) =>
+    c
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, ''),
+  );
+  const long = subjects.length > 6;
+  // a genre counts when it's mentioned twice, or right at the top of the list
+  const fits = (re: RegExp) => {
+    if (!long) return subjects.some((x) => re.test(x));
+    return subjects.filter((x) => re.test(x)).length >= 2 || subjects.slice(0, 4).some((x) => re.test(x));
+  };
+  const out = GENRE_PATTERNS.filter(([, re]) => fits(re)).map(([g]) => g);
+  if (out.includes('Fantasy') && out.includes('Romance')) out.unshift('Romantasy');
+  if (out.length === 0 && subjects.some((x) => /fiction|novel|literature|roman/.test(x))) out.push('Fiction');
+  return out;
 }
 
 // ---------- series ----------
@@ -86,21 +102,33 @@ function stripHtml(s?: string) {
   return s?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-async function searchGoogle(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
-  const params = new URLSearchParams({ q: query, maxResults: '20', printType: 'books' });
-  if (GOOGLE_KEY) params.set('key', GOOGLE_KEY);
-  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`, { signal });
+/** Google Books, directly; if that's refused (rate limit), through Snug's own server, which caches */
+export async function googleBooks(params: URLSearchParams, signal?: AbortSignal): Promise<Response> {
+  const direct = new URLSearchParams(params);
+  if (GOOGLE_KEY) direct.set('key', GOOGLE_KEY);
+  try {
+    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${direct}`, { signal });
+    if (res.ok) return res;
+  } catch (e) {
+    if (signal?.aborted) throw e;
+  }
+  const res = await fetch(`/api/gbooks?${params}`, { signal });
   if (!res.ok) throw new Error(`Google Books ${res.status}`);
+  return res;
+}
+
+async function searchGoogle(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
+  const res = await googleBooks(new URLSearchParams({ q: query, maxResults: '20', printType: 'books' }), signal);
   const json = (await res.json()) as { items?: GoogleVolume[] };
   return (json.items ?? [])
     .filter((v) => v.volumeInfo.title && v.volumeInfo.authors?.length)
-    .map((v) => {
+    .map((v, index) => {
       const info = v.volumeInfo;
       const { title, series } = parseSeries(info.title!, info.subtitle);
       // the language of this edition, as the store lists it
       const lang =
         info.language === 'nl' || info.language === 'en' ? info.language : guessLang(`${info.title} ${info.subtitle ?? ''}`);
-      return {
+      const r: SearchResult = {
         source: 'google' as const,
         title,
         subtitle: info.subtitle,
@@ -115,10 +143,27 @@ async function searchGoogle(query: string, signal?: AbortSignal): Promise<Search
         series,
         language: lang,
       };
+      // Google has no popularity number; its own order is the best signal
+      popularity.set(r, Math.max(0, 30 - index * 1.5));
+      return r;
     });
 }
 
 // ---------- Open Library ----------
+
+/** Open Library search, directly; if that's refused (busy / rate limit), through Snug's own server, which caches */
+export async function openLibrarySearch(params: URLSearchParams, signal?: AbortSignal): Promise<Response> {
+  try {
+    const res = await fetch(`https://openlibrary.org/search.json?${params}`, { signal });
+    if (res.ok) return res;
+  } catch (e) {
+    if (signal?.aborted) throw e;
+  }
+  const res = await fetch(`/api/olsearch?${params}`, { signal });
+  if (!res.ok) throw new Error(`Open Library ${res.status}`);
+  return res;
+}
+
 
 interface OLDoc {
   key: string;
@@ -131,29 +176,31 @@ interface OLDoc {
   number_of_pages_median?: number;
   subject?: string[];
   language?: string[];
+  readinglog_count?: number;
+  edition_count?: number;
 }
 
 async function searchOpenLibrary(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
   const params = new URLSearchParams({
     q: query,
     limit: '20',
-    fields: 'key,title,subtitle,author_name,cover_i,first_publish_year,isbn,number_of_pages_median,subject,language',
+    fields:
+      'key,title,subtitle,author_name,cover_i,first_publish_year,isbn,number_of_pages_median,subject,language,readinglog_count,edition_count',
   });
-  const res = await fetch(`https://openlibrary.org/search.json?${params}`, { signal });
-  if (!res.ok) throw new Error(`Open Library ${res.status}`);
+  const res = await openLibrarySearch(params, signal);
   const json = (await res.json()) as { docs: OLDoc[] };
   return json.docs
     .filter((d) => d.author_name?.length)
     .map((d) => {
       const { title, series } = parseSeries(d.title, d.subtitle);
       const langs = d.language ?? [];
-      return {
+      const r: SearchResult = {
         source: 'openlibrary' as const,
         title,
         subtitle: d.subtitle,
         authors: d.author_name!,
         coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : undefined,
-        genres: mapGenres(d.subject?.slice(0, 30) ?? []),
+        genres: mapGenres(d.subject?.slice(0, 40) ?? []),
         pageCount: d.number_of_pages_median,
         publishedDate: d.first_publish_year?.toString(),
         isbn13: d.isbn?.find((i) => i.length === 13),
@@ -167,6 +214,9 @@ async function searchOpenLibrary(query: string, signal?: AbortSignal): Promise<S
               ? 'en'
               : (guessLang(`${d.title} ${d.subtitle ?? ''}`) ?? (langs.includes('eng') ? 'en' : langs.includes('dut') ? 'nl' : undefined)),
       };
+      // how many readers have it on their shelves (log scale), plus a little for many editions
+      popularity.set(r, Math.log10((d.readinglog_count ?? 0) + 1) * 10 + Math.min(5, (d.edition_count ?? 1) / 4));
+      return r;
     });
 }
 
@@ -183,6 +233,15 @@ export async function fetchOpenLibraryDescription(olKey: string): Promise<string
 }
 
 // ---------- combined ----------
+
+/** How popular a result is (higher = better known); used to rank real books above look-alikes */
+const popularity = new WeakMap<SearchResult, number>();
+
+/** Genres from both sources together; plain "Fiction" only when nothing more specific is known */
+export function mergeGenres(a: string[], b: string[]) {
+  const all = [...new Set([...a, ...b])];
+  return all.length > 1 ? all.filter((g) => g !== 'Fiction') : all;
+}
 
 const JUNK =
   /\b(collection|box ?set|boxed set|books? \d+\s*[-–]\s*\d+|\d books|bundle|tarot|colou?ring|journal|summary|study guide|workbook|calendar|notebook|sampler|analysis)\b/i;
@@ -227,21 +286,32 @@ export async function searchBooks(query: string, signal?: AbortSignal): Promise<
     existing.series ??= r.series;
     existing.olKey ??= r.olKey;
     existing.language ??= r.language;
-    if (!existing.genres.length) existing.genres = r.genres;
+    existing.genres = mergeGenres(existing.genres, r.genres);
+    popularity.set(existing, Math.max(popularity.get(existing) ?? 0, popularity.get(r) ?? 0));
   }
 
   if (google.status === 'rejected' && ol.status === 'rejected') {
     if (signal?.aborted) return [];
     throw new Error('Search is not reachable right now');
   }
-  // Titles that start with what she typed first, then real editions with a cover;
-  // box sets, journals, summaries etc. last
+  // Ranking: titles (or "title author") that start with what she typed come first; within that,
+  // well-known books before obscure look-alikes; no cover and box sets/summaries count against
   const typed = normalize(q);
-  const score = (r: SearchResult) =>
-    (normalize(r.title).startsWith(typed) || normalize(`${r.title} ${r.authors.join(' ')}`).startsWith(typed) ? 0 : 3) +
-    (r.coverUrl ? 0 : 1) +
-    (JUNK.test(`${r.title} ${r.subtitle ?? ''}`) ? 2 : 0);
-  return [...merged.values()].sort((a, b) => score(a) - score(b));
+  const score = (r: SearchResult) => {
+    const title = normalize(r.title);
+    const starts = title.startsWith(typed) || normalize(`${r.title} ${r.authors.join(' ')}`).startsWith(typed);
+    const exact = title === typed;
+    return (
+      (exact ? 25 : starts ? 15 : 0) +
+      (popularity.get(r) ?? 0) -
+      (r.coverUrl ? 0 : 8) -
+      (JUNK.test(`${r.title} ${r.subtitle ?? ''}`) ? 30 : 0)
+    );
+  };
+  const ranked = [...merged.values()].sort((a, b) => score(b) - score(a));
+  // drop obscure, coverless look-alikes when there are enough real results
+  const solid = ranked.filter((r) => r.coverUrl || (popularity.get(r) ?? 0) >= 12);
+  return solid.length >= 3 ? solid : ranked;
 }
 
 /** From search results, the ones that are really this book (same title and author) */

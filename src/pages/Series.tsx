@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
-import { groupSeries, seriesEntries, seriesPath, upcomingParts, type SeriesGroup } from '../lib/series';
+import { groupSeries, seriesEntries, seriesPath, seriesProgress, upcomingParts, type SeriesGroup } from '../lib/series';
+import { useSeriesParts } from '../lib/seriesTotals';
 import { authorNews, type AuthorNews } from '../lib/authors';
 import { normalize } from '../lib/library';
 import { seriesInfo } from '../lib/ai';
@@ -17,7 +18,8 @@ import { EmptyState } from '../components/SleepyCat';
 import { ChevronIcon } from '../components/Icons';
 
 /** Little row of covers with a progress line, used in lists */
-export function SeriesCard({ group }: { group: SeriesGroup }) {
+export function SeriesCard({ group, known }: { group: SeriesGroup; known?: SeriesBook[] }) {
+  const progress = seriesProgress(group, known);
   return (
     <Link to={seriesPath(group.name)} className="block min-w-0">
       <Card className="flex items-center gap-4 transition-transform active:scale-[0.99]">
@@ -39,12 +41,18 @@ export function SeriesCard({ group }: { group: SeriesGroup }) {
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sand">
             <div
               className="h-full rounded-full bg-wine"
-              style={{ width: `${(group.read / Math.max(group.books.length + group.missing.length, 1)) * 100}%` }}
+              style={{ width: `${(progress.read / Math.max(progress.total, 1)) * 100}%` }}
             />
           </div>
           <p className="mt-1 text-xs text-cocoa">
-            {group.read} of {group.books.length + group.missing.length} read
-            {group.missing.length > 0 && <span className="text-wine"> · missing #{group.missing.join(', #')}</span>}
+            {progress.read} of {progress.total} read
+            {progress.missing.length > 0 && (
+              <span className="text-wine">
+                {' '}
+                · missing #{progress.missing.slice(0, 4).join(', #')}
+                {progress.missing.length > 4 ? '…' : ''}
+              </span>
+            )}
           </p>
         </div>
         <ChevronIcon className="shrink-0 text-mocha" width={18} height={18} />
@@ -56,6 +64,7 @@ export function SeriesCard({ group }: { group: SeriesGroup }) {
 export function SeriesList() {
   const books = useBooks();
   const groups = useMemo(() => groupSeries(books ?? []), [books]);
+  const parts = useSeriesParts(groups);
   if (!books) return null;
   return (
     <div>
@@ -66,7 +75,7 @@ export function SeriesList() {
             Books that are part of a series show up here, with the parts you still miss.
           </EmptyState>
         ) : (
-          groups.map((g) => <SeriesCard key={g.name} group={g} />)
+          groups.map((g) => <SeriesCard key={g.name} group={g} known={parts[g.name]} />)
         )}
       </div>
     </div>

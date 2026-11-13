@@ -1,6 +1,7 @@
 import { db } from '../db';
 import type { Book, SeriesInfo } from '../types';
 import { normalize, updateBook } from './library';
+import { mapGenres, mergeGenres } from './bookSearch';
 
 /** First words of a title, e.g. "a court of" for "A Court of Mist and Fury" */
 export const titleStart = (t: string, words = 3) => normalize(t).split(' ').slice(0, words).join(' ');
@@ -40,18 +41,13 @@ async function guessSeriesFromLibrary(book: Pick<Book, 'id' | 'title' | 'authors
   return { name: series.name, number: max ? max + 1 : undefined, key };
 }
 
-/** Genres from the other parts of the series, otherwise from her books by the same author */
-async function guessGenres(book: Pick<Book, 'id' | 'authors'>, series?: SeriesInfo): Promise<string[]> {
-  const all = await db.books.filter((b) => !b.deleted && b.id !== book.id && b.genres.length > 0).toArray();
-  const pool = series
-    ? all.filter((b) => b.series && normalize(b.series.name) === normalize(series.name))
-    : all.filter((b) => normalize(b.authors[0] ?? '') === normalize(book.authors[0] ?? ''));
-  const count = new Map<string, number>();
-  for (const b of pool) for (const g of b.genres) count.set(g, (count.get(g) ?? 0) + 1);
-  return [...count.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([g]) => g);
+/** Genres the other parts of the same series already have */
+async function seriesGenres(book: Pick<Book, 'id'>, series?: SeriesInfo): Promise<string[]> {
+  if (!series) return [];
+  const parts = await db.books
+    .filter((b) => !b.deleted && b.id !== book.id && !!b.series && normalize(b.series.name) === normalize(series.name))
+    .toArray();
+  return [...new Set(parts.flatMap((b) => b.genres))];
 }
 
 /**
@@ -65,7 +61,7 @@ export async function lookupSeries(
   try {
     const params = new URLSearchParams({ title: book.title, author: book.authors[0] ?? '' });
     const res = await fetch(`/api/book-series?${params}`);
-    const found = res.ok ? ((await res.json()) as Partial<SeriesInfo>) : {};
+    const found = res.ok ? ((await res.json()) as Partial<SeriesInfo> & { subjects?: string[] }) : {};
     let series: SeriesInfo | undefined = found.name ? { name: found.name, number: found.number, key: found.key } : undefined;
     if (!series) series = await guessSeriesFromLibrary(book);
 
@@ -73,9 +69,15 @@ export async function lookupSeries(
     if (!current) return undefined;
     const patch: Partial<Book> = { seriesChecked: true, lookupVersion: LOOKUP_VERSION };
     if (!current.series && series) patch.series = series;
-    if (!current.genres.length) {
-      const genres = await guessGenres(current, patch.series ?? current.series);
-      if (genres.length) patch.genres = genres;
+    // Genres: stores often only say "Fiction"; add what readers shelve it under and what the
+    // rest of the series has. Only when she hasn't picked specific genres herself.
+    const vague = current.genres.length === 0 || (current.genres.length === 1 && current.genres[0] === 'Fiction');
+    if (vague) {
+      const genres = mergeGenres(
+        mergeGenres(current.genres, mapGenres(found.subjects ?? [])),
+        await seriesGenres(current, patch.series ?? current.series),
+      );
+      if (genres.join() !== current.genres.join()) patch.genres = genres;
     }
     await updateBook(book.id, patch);
     if (patch.series ?? current.series) await harmonizeSeriesGenres();
@@ -86,7 +88,7 @@ export async function lookupSeries(
 }
 
 /** Bump to look up older books again when the lookup gets smarter */
-const LOOKUP_VERSION = 2;
+const LOOKUP_VERSION = 3;
 
 let running = false;
 
@@ -97,7 +99,7 @@ export async function backfillSeries(max = 25) {
   try {
     const todo = (
       await db.books
-        .filter((b) => !b.deleted && (!b.series || !b.genres.length) && (b.lookupVersion ?? 0) < LOOKUP_VERSION)
+        .filter((b) => !b.deleted && (!b.series || b.genres.length === 0 || b.genres.join() === 'Fiction') && (b.lookupVersion ?? 0) < LOOKUP_VERSION)
         .toArray()
     ).slice(0, max);
     for (const b of todo) await lookupSeries(b);

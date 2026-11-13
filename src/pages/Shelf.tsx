@@ -56,9 +56,11 @@ function Spine({
   // The title runs along the spine. It is turned with a rotation (not vertical writing mode),
   // which Safari on iPhone renders reliably, also when the title has to be cut off.
   const textLength = height - 34; // room along the spine
-  const twoLines = width >= 30 && book.title.length > 14;
-  const charsPerLine = twoLines ? Math.ceil(book.title.length / 2) : book.title.length;
-  const fontSize = Math.max(7.5, Math.min(11, textLength / (charsPerLine * 0.56)));
+  // (two lines as soon as the spine is wide enough for them, so fewer titles get cut off)
+  const twoLines = width >= 22 && book.title.length > 12;
+  const charsPerLine = twoLines ? Math.ceil(book.title.length / 2) + 1 : book.title.length;
+  const maxFont = twoLines ? (width - 5) / 2.15 : 11;
+  const fontSize = Math.max(6, Math.min(11, maxFont, textLength / (charsPerLine * 0.56)));
   const band = <span className="block h-[2px] w-[78%] rounded-full" style={{ background: gold, opacity: 0.8 }} />;
   const rib = <span className="block h-[4px] w-full bg-black/25 shadow-[0_1px_0_rgba(255,255,255,0.15)]" />;
   const ends = (top: boolean) => (

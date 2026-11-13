@@ -61,7 +61,7 @@ export function AuthorNewsSection({ books, favourites }: { books: Book[]; favour
               <div className="relative">
                 <Cover book={{ title: i.title, authors: [i.author], coverUrl: i.coverUrl }} />
                 {i.upcoming && (
-                  <span className="absolute top-1.5 left-1.5 rounded-full bg-gold px-2 py-0.5 text-[0.6rem] font-medium text-white">
+                  <span className="absolute right-1.5 bottom-1.5 rounded-full bg-gold px-2 py-0.5 text-[0.6rem] font-medium text-white shadow">
                     Soon
                   </span>
                 )}

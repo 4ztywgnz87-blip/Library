@@ -185,11 +185,12 @@ const PicksSchema = z.object({
         author: z.string(),
         why: z.string(),
         seriesNote: z.string().nullable(),
-        score: z.number().int().min(0).max(100),
+        score: z.number(),
       }),
-    )
-    .max(3),
+    ),
 });
+
+const clampScore = (n: number) => Math.round(Math.max(0, Math.min(100, n)));
 
 const MOOD_LABELS: Record<string, string> = {
   light: 'light & fun',
@@ -241,9 +242,9 @@ export async function recommend(
   );
 
   const byKey = new Map(books.map((b) => [key(b.title, b.authors[0]), b]));
-  const picks: Pick[] = (result?.picks ?? []).map((p) => {
+  const picks: Pick[] = (result?.picks ?? []).slice(0, 3).map((p) => {
     const own = byKey.get(key(p.title, p.author)) ?? books.find((b) => key(b.title) === key(p.title));
-    return { ...p, seriesNote: p.seriesNote ?? undefined, bookId: own?.id, score: p.score };
+    return { ...p, seriesNote: p.seriesNote ?? undefined, bookId: own?.id, score: clampScore(p.score) };
   });
   const fitting = req.source === 'shelf' ? picks.filter((p) => p.bookId) : picks.filter((p) => !p.bookId);
   return { picks: await inSeriesOrder(fitting, req.source, books), mock: false };
@@ -331,7 +332,7 @@ async function inSeriesOrder(picks: Pick[], source: RecommendRequest['source'], 
  * Test-mode tips, still tailored to her: the taste engine learns from her ratings, reviews,
  * tags and quiz, scores every candidate and explains the match in her own terms.
  */
-function mockRecommend(req: RecommendRequest, books: Book[], profile?: ReaderProfile): Pick[] {
+export function mockRecommend(req: RecommendRequest, books: Book[], profile?: ReaderProfile): Pick[] {
   const taste = learnTaste(books, profile);
   const exclude = new Set((req.exclude ?? []).map((t) => key(t)));
   const notForMe = new Set((profile?.notForMe ?? []).map((t) => key(t.replace(/\s*\(.*\)$/, ''))));
@@ -343,7 +344,21 @@ function mockRecommend(req: RecommendRequest, books: Book[], profile?: ReaderPro
           .filter((b) => b.status === 'owned')
           .map((b) => ({
             book: b,
-            c: { title: b.title, author: b.authors[0] ?? '', genres: b.genres, traits: bookTraits(b) } as Candidate,
+            c: {
+              title: b.title,
+              author: b.authors[0] ?? '',
+              genres: b.genres,
+              traits: bookTraits(b),
+              previous:
+                b.series?.number && b.series.number > 1
+                  ? books.find(
+                      (x) =>
+                        x.status === 'read' &&
+                        x.series?.number === b.series!.number! - 1 &&
+                        key(x.series.name) === key(b.series!.name),
+                    )
+                  : undefined,
+            } as Candidate,
           }))
       : (() => {
           const have = new Set(books.map((b) => key(b.title, b.authors[0])));
@@ -370,7 +385,7 @@ function mockRecommend(req: RecommendRequest, books: Book[], profile?: ReaderPro
 
 const FitSchema = z.object({
   verdict: z.enum(['love', 'like', 'maybe', 'skip']),
-  score: z.number().int().min(0).max(100),
+  score: z.number(),
   why: z.string(),
   seriesNote: z.string().nullable(),
 });
@@ -402,7 +417,7 @@ export async function fitCheck(
     ),
   );
   if (!result) return { verdict: 'maybe', score: 50, why: "Snug couldn't judge this one.", seriesNote: null, mock: false };
-  return { ...result, mock: false };
+  return { ...result, score: clampScore(result.score), mock: false };
 }
 
 // ---------- series ----------

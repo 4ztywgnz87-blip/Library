@@ -14,6 +14,7 @@ interface OLWork {
 const toNumber = (pos?: string) => (pos && /^\d+(\.\d+)?$/.test(pos) ? Number(pos) : undefined);
 
 export interface FoundSeries {
+  subjects?: string[];
   name?: string;
   number?: number;
   key?: string;
@@ -22,16 +23,20 @@ export interface FoundSeries {
 export async function findBookSeries(title: string, author: string): Promise<FoundSeries> {
   if (!title) return {};
   const res = await olFetch(
-    `/search.json?${new URLSearchParams({ title, author, limit: '3', fields: 'key,title,series_key,series_name' })}`,
+    `/search.json?${new URLSearchParams({ title, author, limit: '3', fields: 'key,title,series_key,series_name,subject' })}`,
   );
   if (!res.ok) return {};
-  const docs = ((await res.json()) as { docs: { key: string; series_key?: string[]; series_name?: string[] }[] }).docs;
+  const docs = ((await res.json()) as {
+    docs: { key: string; series_key?: string[]; series_name?: string[]; subject?: string[] }[];
+  }).docs;
+  // what readers shelve it under, for genres
+  const subjects = docs[0]?.subject?.slice(0, 40);
   const doc = docs.find((d) => d.series_key?.length);
-  if (!doc) return {};
+  if (!doc) return { subjects };
   const key = doc.series_key![0];
   const work = await olFetch(`${doc.key}.json`);
   const position = work.ok ? ((await work.json()) as OLWork).series?.find((s) => s.series.key.endsWith(key))?.position : undefined;
-  return { name: doc.series_name?.[0], number: toNumber(position), key };
+  return { name: doc.series_name?.[0], number: toNumber(position), key, subjects: doc.subject?.slice(0, 40) ?? subjects };
 }
 
 export interface SeriesPart {

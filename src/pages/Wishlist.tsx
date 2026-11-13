@@ -37,7 +37,8 @@ export default function Wishlist() {
                 >
                   <Link to={`/book/${b.id}`} className="block active:scale-[0.98]">
                     <Cover book={b} />
-                    <p className="mt-2 line-clamp-2 text-xs leading-snug font-medium">{b.title}</p>
+                    {/* fixed height, so the buttons line up across the row */}
+                    <p className="mt-2 line-clamp-2 h-[2.1rem] text-xs leading-snug font-medium">{b.title}</p>
                     <p className="truncate text-[0.7rem] text-mocha">
                       {b.series?.number ? `${b.series.name} #${b.series.number} · ` : ''}
                       {b.authors[0]}

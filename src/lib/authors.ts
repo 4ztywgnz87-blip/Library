@@ -1,7 +1,7 @@
 import { getMeta, setMeta } from '../db';
 import type { Book } from '../types';
 import { bookKey } from './library';
-import { mapGenres, parseSeries, sameBook, searchBooks } from './bookSearch';
+import { googleBooks, mapGenres, openLibrarySearch, parseSeries, sameBook, searchBooks } from './bookSearch';
 
 export interface AuthorNews {
   title: string;
@@ -82,11 +82,9 @@ function isRealNewBook(title: string, authors: string[] | undefined, author: str
 // ---------- sources ----------
 
 async function fromGoogle(author: string): Promise<AuthorNews[]> {
-  const key = import.meta.env.VITE_GOOGLE_BOOKS_KEY as string | undefined;
-  const params = new URLSearchParams({ q: `inauthor:"${author}"`, orderBy: 'newest', maxResults: '30', printType: 'books' });
-  if (key) params.set('key', key);
-  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`);
-  if (!res.ok) throw new Error('google');
+  const res = await googleBooks(
+    new URLSearchParams({ q: `inauthor:"${author}"`, orderBy: 'newest', maxResults: '30', printType: 'books' }),
+  );
   const json = (await res.json()) as {
     items?: {
       volumeInfo: {
@@ -137,8 +135,7 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
     limit: '30',
     fields: 'title,subtitle,author_name,first_publish_year,publish_date,cover_i,subject,language',
   });
-  const res = await fetch(`https://openlibrary.org/search.json?${params}`);
-  if (!res.ok) throw new Error('ol');
+  const res = await openLibrarySearch(params);
   const json = (await res.json()) as {
     docs: {
       title: string;
