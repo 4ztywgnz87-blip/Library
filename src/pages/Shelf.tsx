@@ -70,7 +70,7 @@ function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean
       title={`${book.title} · ${book.authors[0] ?? ''}`}
       aria-label={book.title}
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0, rotate: lean ? 6 : 0 }}
+      animate={{ opacity: 1, y: 0, rotate: lean ? -7 : 0 }}
       transition={{ delay, type: 'spring', stiffness: 260, damping: 22 }}
       whileHover={{ y: -8 }}
       whileTap={{ y: -16, scale: 1.04 }}
@@ -79,7 +79,8 @@ function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean
       style={{
         height,
         width,
-        transformOrigin: 'bottom left',
+        // a leaning book rests its top against its neighbour; its foot slides out a little
+        transformOrigin: lean ? 'top left' : 'bottom center',
         // rounded spine: light from the left, shadow on the right, and a fine cloth texture
         backgroundImage:
           'linear-gradient(90deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.18) 16%, rgba(255,255,255,0.05) 38%, rgba(0,0,0,0.06) 70%, rgba(0,0,0,0.38) 100%), repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 3px)',
@@ -199,7 +200,7 @@ export default function Shelf() {
   return (
     <div>
       <div className="pt-safe h-4" />
-      <div className="mx-auto max-w-4xl px-3 pb-10">
+      <div className="mx-auto max-w-4xl px-5 pb-10">
         {/* things on top of the bookcase: a plant and the cat (its tail hangs over the edge) */}
         <div className="relative h-44">
           {/* pot stands on top, vines hang over the front edge of the cornice */}

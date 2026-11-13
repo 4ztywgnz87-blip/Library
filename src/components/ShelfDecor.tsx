@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { motion } from 'motion/react';
 
 /** A terracotta pot with a leafy plant that sways gently */
@@ -45,11 +45,25 @@ export function Plant({ className = '' }: { className?: string }) {
   );
 }
 
-/** A candle in a glass jar with a flickering flame and warm glow */
+/**
+ * A candle in a glass jar. Tap to blow it out (a wisp of smoke curls up), tap again to light it.
+ */
 export function Candle({ className = '' }: { className?: string }) {
   const id = useId();
+  const [lit, setLit] = useState(true);
+  const [puffs, setPuffs] = useState(0); // bumps each time it's blown out, to replay the smoke
   return (
-    <svg viewBox="0 0 60 100" className={className} aria-hidden>
+    <svg
+      viewBox="0 0 60 100"
+      className={`${className} cursor-pointer`}
+      role="button"
+      aria-label={lit ? 'Blow out the candle' : 'Light the candle'}
+      onClick={() => {
+        if (lit) setPuffs((n) => n + 1);
+        setLit(!lit);
+      }}
+      style={{ overflow: 'visible' }}
+    >
       <defs>
         <radialGradient id={`${id}glow`}>
           <stop offset="0" stopColor="#ffd98a" stopOpacity="0.75" />
@@ -67,35 +81,65 @@ export function Candle({ className = '' }: { className?: string }) {
           <stop offset="1" stopColor="#e2d1b8" />
         </linearGradient>
       </defs>
-      <motion.circle
-        cx="30"
-        cy="40"
-        r="30"
-        fill={`url(#${id}glow)`}
-        animate={{ opacity: [0.7, 1, 0.8, 0.95, 0.7], scale: [1, 1.06, 0.98, 1.04, 1] }}
-        style={{ transformOrigin: '30px 40px', transformBox: 'view-box' }}
-        transition={{ duration: 2.6, repeat: Infinity }}
-      />
+      {/* warm glow (fades away when blown out) */}
+      <motion.g animate={{ opacity: lit ? 1 : 0 }} transition={{ duration: 0.5 }}>
+        <motion.circle
+          cx="30"
+          cy="40"
+          r="30"
+          fill={`url(#${id}glow)`}
+          animate={{ opacity: [0.7, 1, 0.8, 0.95, 0.7] }}
+          transition={{ duration: 2.6, repeat: Infinity }}
+        />
+      </motion.g>
       {/* wax inside the jar */}
       <rect x="14" y="56" width="32" height="38" rx="3" fill={`url(#${id}wax)`} />
       <ellipse cx="30" cy="56" rx="16" ry="3" fill="#f6e7cd" />
-      <ellipse cx="30" cy="56" rx="7" ry="1.4" fill="#e9cf9f" />
-      {/* flame */}
+      <ellipse cx="30" cy="56" rx="7" ry="1.4" fill={lit ? '#e9cf9f' : '#efe0c6'} />
+      {/* wick, glowing at the tip for a moment after blowing out */}
       <rect x="29.3" y="47" width="1.4" height="9" rx="0.7" fill="#3b2a22" />
-      <motion.path
-        d="M30 30c6 8 7 14 0 20-7-6-6-12 0-20z"
-        fill="#f6a93b"
+      <motion.circle
+        key={`ember${puffs}`}
+        cx="30"
+        cy="47.5"
+        r="1.1"
+        fill="#ff8a3d"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: lit || puffs === 0 ? 0 : [0.9, 0] }}
+        transition={{ duration: 1.6 }}
+      />
+      {/* flame: shrinks away when blown out, grows back when lit */}
+      <motion.g
         style={{ transformOrigin: '30px 50px', transformBox: 'view-box' }}
-        animate={{ scaleY: [1, 1.14, 0.94, 1.08, 1], scaleX: [1, 0.94, 1.04, 0.97, 1], rotate: [0, 2.5, -2, 1, 0] }}
-        transition={{ duration: 1.7, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.path
-        d="M30 38c3 4 3.5 7 0 11-3.5-4-3-7 0-11z"
-        fill="#fff4cf"
-        style={{ transformOrigin: '30px 49px', transformBox: 'view-box' }}
-        animate={{ scaleY: [1, 1.1, 0.95, 1] }}
-        transition={{ duration: 1.3, repeat: Infinity }}
-      />
+        initial={false}
+        animate={{ scale: lit ? 1 : 0, opacity: lit ? 1 : 0 }}
+        transition={{ duration: lit ? 0.45 : 0.18, ease: lit ? 'backOut' : 'easeIn' }}
+      >
+        <motion.path
+          d="M30 30c6 8 7 14 0 20-7-6-6-12 0-20z"
+          fill="#f6a93b"
+          style={{ transformOrigin: '30px 50px', transformBox: 'view-box' }}
+          animate={{ scaleY: [1, 1.12, 0.95, 1.07, 1], scaleX: [1, 0.95, 1.03, 0.97, 1], rotate: [0, 2.5, -2, 1, 0] }}
+          transition={{ duration: 1.7, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <path d="M30 38c3 4 3.5 7 0 11-3.5-4-3-7 0-11z" fill="#fff4cf" />
+      </motion.g>
+      {/* a wisp of smoke after blowing out */}
+      {!lit &&
+        puffs > 0 &&
+        [0, 1].map((i) => (
+          <motion.path
+            key={`smoke${puffs}-${i}`}
+            d={i === 0 ? 'M30 46c-4-6 4-10 0-16s4-10 0-16' : 'M31 46c3-5-3-9 0-14s-3-9 0-13'}
+            stroke="#e3dad0"
+            strokeWidth={i === 0 ? 2.8 : 1.8}
+            strokeLinecap="round"
+            fill="none"
+            initial={{ opacity: 0, y: 0, x: 0, pathLength: 0 }}
+            animate={{ opacity: [0, 0.8, 0.5, 0], y: -26, x: [0, 2, -2, 1], pathLength: 1 }}
+            transition={{ duration: 3.2, delay: i * 0.3, ease: 'easeOut' }}
+          />
+        ))}
       {/* glass jar */}
       <path d="M11 44h38v48a6 6 0 0 1-6 6H17a6 6 0 0 1-6-6z" fill={`url(#${id}glass)`} stroke="#fff" strokeOpacity="0.35" />
       <rect x="10" y="42" width="40" height="4" rx="2" fill="#fff" fillOpacity="0.3" />
@@ -152,13 +196,12 @@ export function Mug({ className = '' }: { className?: string }) {
 }
 
 /**
- * The tabby cat lounging on top of the bookcase. The tail keeps its shape and swings by
- * rotating around where it joins the body (morphing its shape made it flicker on iPhone);
- * the eyes blink by flattening the eye itself, so nothing shifts out of place.
+ * The tabby cat asleep on top of the bookcase (dreaming of the wishlist). Eyes closed, little
+ * "z"s drift up towards the dream cloud, and now and then the tail gives a lazy flick. The tail
+ * keeps its shape and only rotates around where it joins the body, so nothing can flicker.
  */
 export function ShelfCat({ className = '' }: { className?: string }) {
   const id = useId();
-  const blinkT = { duration: 4.5, repeat: Infinity, times: [0, 0.46, 0.5, 0.54, 1] };
   return (
     <svg viewBox="0 0 150 80" className={className} aria-hidden style={{ overflow: 'visible' }}>
       <defs>
@@ -167,17 +210,16 @@ export function ShelfCat({ className = '' }: { className?: string }) {
           <stop offset="1" stopColor="#9a6a43" />
         </linearGradient>
       </defs>
-      {/* tail */}
+      {/* tail: a slow, lazy flick now and then */}
       <motion.g
         style={{ transformOrigin: '112px 66px', transformBox: 'view-box', willChange: 'transform' }}
-        animate={{ rotate: [0, 16, 0] }}
-        transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
+        animate={{ rotate: [0, 0, 12, 0, 0] }}
+        transition={{ duration: 7, repeat: Infinity, times: [0, 0.55, 0.68, 0.82, 1], ease: 'easeInOut' }}
       >
         <path d="M112 66c18 2 28-6 30-20" stroke="#a87449" strokeWidth="8" strokeLinecap="round" fill="none" />
       </motion.g>
       {/* body */}
       <path d="M44 74c-4-20 14-34 40-34 24 0 36 12 34 34z" fill={`url(#${id}fur)`} />
-      {/* stripes */}
       <path d="M70 42c2 6 2 12 0 18M82 40c2 7 2 14 0 21M94 42c2 6 2 12 0 18M104 48c2 5 2 10 0 14" stroke="#8a5a36" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.6" />
       {/* front paws */}
       <ellipse cx="34" cy="74" rx="9" ry="4.5" fill="#f2e3cf" />
@@ -189,19 +231,31 @@ export function ShelfCat({ className = '' }: { className?: string }) {
       <path d="M57 26l6-5 1.2 8z" fill="#e7b9a8" />
       <ellipse cx="45" cy="47" rx="25" ry="21" fill={`url(#${id}fur)`} />
       <path d="M40 27c2 3 2 6 0 9M46 26c1 3 1 6 0 9M52 27c-1 3-1 6 0 9" stroke="#8a5a36" strokeWidth="2.2" strokeLinecap="round" fill="none" opacity="0.6" />
-      {/* muzzle + chest */}
+      {/* muzzle */}
       <ellipse cx="45" cy="57" rx="12" ry="9" fill="#f2e3cf" />
       <path d="M42 53.5h6l-3 3z" fill="#d98b84" />
       <path d="M45 56.5v2.5M45 59c-2 2-4 2-5 0M45 59c2 2 4 2 5 0" stroke="#5c4033" strokeWidth="1" fill="none" strokeLinecap="round" />
-      {/* eyes */}
-      {[35, 55].map((cx) => (
-        <g key={cx}>
-          <motion.ellipse cx={cx} cy="45" rx="4.2" initial={{ ry: 3.4 }} animate={{ ry: [3.4, 3.4, 0.35, 3.4, 3.4] }} transition={blinkT} fill="#e9d38a" />
-          <motion.ellipse cx={cx} cy="45" rx="1.4" initial={{ ry: 3 }} animate={{ ry: [3, 3, 0.25, 3, 3] }} transition={blinkT} fill="#2b1d16" />
-        </g>
-      ))}
+      {/* closed, sleepy eyes */}
+      <path d="M30.5 45.5q4.5 3.2 9 0M50.5 45.5q4.5 3.2 9 0" stroke="#3b2a22" strokeWidth="1.6" strokeLinecap="round" fill="none" />
       {/* whiskers */}
       <path d="M33 57l-14-2M33 60l-13 2M57 57l14-2M57 60l13 2" stroke="#fff" strokeOpacity="0.7" strokeWidth="0.8" strokeLinecap="round" />
+      {/* z z z, drifting up and away from the head (left of the ear) */}
+      {[0, 1, 2].map((i) => (
+        <motion.text
+          key={i}
+          x="12"
+          y="30"
+          fontFamily="Fraunces Variable, serif"
+          fontWeight="600"
+          fontSize={10 + i * 3}
+          fill="#8a7565"
+          initial={{ opacity: 0, x: 0, y: 0 }}
+          animate={{ opacity: [0, 0.95, 0], x: [0, -7, -14], y: [0, -14, -28] }}
+          transition={{ duration: 3.6, repeat: Infinity, delay: i * 1.2, ease: 'easeOut' }}
+        >
+          z
+        </motion.text>
+      ))}
     </svg>
   );
 }
@@ -368,14 +422,14 @@ export function HangingPlant({ className = '' }: { className?: string }) {
           <stop offset="1" stopColor="#9c5039" />
         </linearGradient>
       </defs>
-      {/* vines behind the pot, hanging over the front edge */}
-      {vine('M30 46c-8 20-6 44-12 70-3 14-2 26 2 36', [[24, 66, 160, 1, 0], [20, 86, 200, 1.1, 2], [17, 106, 150, 1, 1], [16, 124, 210, 0.9, 0], [19, 142, 170, 0.8, 2]], 0, 30)}
-      {vine('M44 46c4 22 2 40 6 62 2 10 0 18-2 24', [[46, 70, 200, 1, 1], [49, 90, 160, 1.1, 0], [50, 110, 210, 0.9, 2], [48, 128, 170, 0.8, 1]], 0.8, 44)}
-      {vine('M58 46c8 14 12 28 12 44', [[64, 62, 210, 1, 2], [69, 78, 160, 0.9, 0], [70, 92, 200, 0.8, 1]], 1.6, 58)}
       {/* pot */}
       <path d="M22 50h46l-5 30H27z" fill={`url(#${id}pot)`} />
       <rect x="18" y="44" width="54" height="9" rx="2.5" fill="#d08a6c" />
       <path d="M28 56c1 7 2 14 3 21" stroke="#fff" strokeOpacity="0.18" strokeWidth="3" strokeLinecap="round" />
+      {/* vines spilling over the rim, in front of the pot, and down over the cornice */}
+      {vine('M26 48c-6 16-6 38-10 62-2 14-1 28 3 40', [[22, 62, 160, 1, 0], [18, 82, 200, 1.1, 2], [16, 102, 150, 1, 1], [16, 122, 210, 0.9, 0], [19, 142, 170, 0.8, 2]], 0, 26)}
+      {vine('M42 49c3 18 2 36 5 56 2 12 1 22-1 30', [[44, 64, 200, 1, 1], [46, 84, 160, 1.1, 0], [47, 104, 210, 0.9, 2], [46, 124, 170, 0.8, 1]], 0.8, 42)}
+      {vine('M60 48c7 12 10 26 10 42', [[63, 60, 210, 1, 2], [68, 74, 160, 0.9, 0], [70, 88, 200, 0.8, 1]], 1.6, 60)}
       {/* leaves on top of the pot */}
       {leaf(30, 44, -20, 1.1, 1)}
       {leaf(40, 42, 5, 1.2, 0)}

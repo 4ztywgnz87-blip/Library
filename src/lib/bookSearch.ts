@@ -43,6 +43,20 @@ export function parseSeries(title: string, subtitle?: string): { title: string; 
   return { title };
 }
 
+// ---------- language ----------
+
+const DUTCH = /\b(de|het|een|van|en|ik|je|jij|niet|wat|zijn|haar|hij|zij|wij|ons|voor|met|naar|uit|op|bij|als|maar|nooit|altijd|liefde|nacht|dag|meisje|huis|boek|deel)\b/gi;
+const ENGLISH = /\b(the|a|an|of|and|to|in|is|you|it|we|my|your|never|always|love|night|day|girl|house|book|with|from)\b/gi;
+
+/** Rough guess from the title: Dutch or English? */
+export function guessLang(text: string): Lang | undefined {
+  const nl = text.match(DUTCH)?.length ?? 0;
+  const en = text.match(ENGLISH)?.length ?? 0;
+  if (nl > en) return 'nl';
+  if (en > nl) return 'en';
+  return undefined;
+}
+
 // ---------- Google Books ----------
 
 interface GoogleVolume {
@@ -83,7 +97,9 @@ async function searchGoogle(query: string, signal?: AbortSignal): Promise<Search
     .map((v) => {
       const info = v.volumeInfo;
       const { title, series } = parseSeries(info.title!, info.subtitle);
-      const lang = info.language === 'nl' || info.language === 'en' ? info.language : undefined;
+      // the language of this edition, as the store lists it
+      const lang =
+        info.language === 'nl' || info.language === 'en' ? info.language : guessLang(`${info.title} ${info.subtitle ?? ''}`);
       return {
         source: 'google' as const,
         title,
@@ -143,7 +159,13 @@ async function searchOpenLibrary(query: string, signal?: AbortSignal): Promise<S
         isbn13: d.isbn?.find((i) => i.length === 13),
         olKey: d.key,
         series,
-        language: langs.length === 1 && langs[0] === 'dut' ? 'nl' : langs.includes('eng') ? 'en' : undefined,
+        // Open Library lists the languages of all editions; the title tells which one this is
+        language:
+          langs.length === 1 && langs[0] === 'dut'
+            ? 'nl'
+            : langs.length === 1 && langs[0] === 'eng'
+              ? 'en'
+              : (guessLang(`${d.title} ${d.subtitle ?? ''}`) ?? (langs.includes('eng') ? 'en' : langs.includes('dut') ? 'nl' : undefined)),
       };
     });
 }
@@ -195,6 +217,7 @@ export async function searchBooks(query: string, signal?: AbortSignal): Promise<
     existing.isbn13 ??= r.isbn13;
     existing.series ??= r.series;
     existing.olKey ??= r.olKey;
+    existing.language ??= r.language;
     if (!existing.genres.length) existing.genres = r.genres;
   }
 

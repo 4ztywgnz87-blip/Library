@@ -10,6 +10,7 @@ import { StarsDisplay, StarsInput, formatRating } from '../components/Stars';
 import { Button, Card, Chip, PageHeader, Segmented, Toggle } from '../components/ui';
 import { CameraIcon, ChevronIcon, TrashIcon } from '../components/Icons';
 import { EditionPicker } from '../components/EditionPicker';
+import { ConfirmSheet } from '../components/ConfirmSheet';
 import { lookupSeries } from '../lib/seriesLookup';
 
 const TAG_SUGGESTIONS = ['spicy 🌶️', 'emotional 😭', 'plot twist 🤯', 'funny 😂', 'slow burn 🔥', 'cosy ☕', 'dark 🖤', 'page-turner'];
@@ -21,6 +22,7 @@ export default function BookDetail() {
   const [params] = useSearchParams();
   const [celebrate, setCelebrate] = useState(0);
   const [pickingEdition, setPickingEdition] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const ratingRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -183,18 +185,29 @@ export default function BookDetail() {
           <div className="flex justify-center pt-4">
             <button
               className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm text-cocoa hover:bg-linen"
-              onClick={async () => {
-                if (confirm(`Remove "${book.title}" from your library?`)) {
-                  await deleteBook(book.id);
-                  navigate(-1);
-                }
-              }}
+              onClick={() => setConfirmRemove(true)}
             >
               <TrashIcon width={16} height={16} /> Remove from library
             </button>
           </div>
         </div>
       </div>
+
+      {confirmRemove && (
+        <ConfirmSheet
+          title="Remove this book?"
+          confirmLabel="Remove"
+          onCancel={() => setConfirmRemove(false)}
+          onConfirm={async () => {
+            setConfirmRemove(false);
+            await deleteBook(book.id);
+            navigate(-1);
+          }}
+        >
+          <span className="font-medium text-ink">{book.title}</span> will leave your library, with its rating and
+          review.
+        </ConfirmSheet>
+      )}
 
       {pickingEdition && (
         <EditionPicker
