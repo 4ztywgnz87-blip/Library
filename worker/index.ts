@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type { SyncRecord } from '../src/types';
 import { ASSETS } from './assets.gen';
@@ -7,6 +7,7 @@ export interface Env {
   DB: D1Database;
   ALLOWED_EMAIL: string;
   RESEND_API_KEY?: string;
+  BREVO_API_KEY?: string;
   MAIL_FROM?: string;
   AI_MODE?: string;
   AI_DAILY_LIMIT?: string;
@@ -17,7 +18,7 @@ type Vars = { email: string };
 
 const SESSION_COOKIE = 'snug_session';
 const SESSION_DAYS = 365;
-const LOGIN_LINK_MINUTES = 30;
+const LOGIN_MINUTES = 15;
 
 const app = new Hono<{ Bindings: Env; Variables: Vars }>().basePath('/api');
 
@@ -35,27 +36,63 @@ function randomToken(): string {
 
 const normEmail = (e: string) => e.trim().toLowerCase();
 
-async function sendLoginMail(env: Env, to: string, link: string): Promise<void> {
-  if (!env.RESEND_API_KEY) {
-    // Development / no mail provider: show the link in the server log
-    console.log(`\n✉️  Login link for ${to}:\n${link}\n`);
+function randomCode(): string {
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000;
+  return n.toString().padStart(6, '0');
+}
+
+const hasMail = (env: Env) => !!(env.BREVO_API_KEY || env.RESEND_API_KEY);
+
+function mailHtml(code: string, link: string) {
+  return `<div style="font-family:Georgia,serif;background:#F6EFE6;padding:32px;color:#3B2A22;text-align:center">
+    <h2 style="margin:0 0 8px">Your Snug login code</h2>
+    <p style="margin:0 0 20px;color:#7A6455">Type this code in the app. It works for ${LOGIN_MINUTES} minutes.</p>
+    <div style="font-size:36px;letter-spacing:10px;font-weight:bold;background:#fff;border-radius:16px;padding:16px 8px;display:inline-block;min-width:240px">${code}</div>
+    <p style="margin:28px 0 8px;color:#7A6455;font-size:14px">Or open Snug in your browser:</p>
+    <p><a href="${link}" style="display:inline-block;background:#7A2E3A;color:#fff;padding:12px 22px;border-radius:999px;text-decoration:none;font-family:Arial,sans-serif">Open Snug</a></p>
+  </div>`;
+}
+
+async function sendLoginMail(env: Env, to: string, code: string, link: string): Promise<void> {
+  const subject = `${code} is your Snug login code 📚`;
+  const html = mailHtml(code, link);
+  if (env.BREVO_API_KEY) {
+    // Brevo: free, only needs a verified sender address (no own domain)
+    const from = env.MAIL_FROM || '';
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ sender: { name: 'Snug', email: from }, to: [{ email: to }], subject, htmlContent: html }),
+    });
+    if (!res.ok) throw new Error(`Mail failed: ${res.status} ${await res.text()}`);
     return;
   }
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: env.MAIL_FROM || 'Snug <onboarding@resend.dev>',
-      to,
-      subject: 'Your Snug login link 📚',
-      html: `<div style="font-family:Georgia,serif;background:#F6EFE6;padding:32px;color:#3B2A22">
-        <h2 style="margin:0 0 12px">Welcome back to Snug</h2>
-        <p>Tap the button to open your library. The link works for ${LOGIN_LINK_MINUTES} minutes.</p>
-        <p><a href="${link}" style="display:inline-block;background:#7A2E3A;color:#fff;padding:12px 22px;border-radius:999px;text-decoration:none">Open Snug</a></p>
-      </div>`,
-    }),
+  if (env.RESEND_API_KEY) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: env.MAIL_FROM || 'Snug <onboarding@resend.dev>', to, subject, html }),
+    });
+    if (!res.ok) throw new Error(`Mail failed: ${res.status} ${await res.text()}`);
+    return;
+  }
+  // Development / no mail provider: show it in the server log
+  console.log(`\n✉️  Login for ${to}: code ${code}\n${link}\n`);
+}
+
+async function startSession(c: Context<{ Bindings: Env; Variables: Vars }>, email: string) {
+  const sessionId = randomToken();
+  const now = Date.now();
+  await c.env.DB.prepare('INSERT INTO sessions (id_hash, email, created_at, expires_at) VALUES (?, ?, ?, ?)')
+    .bind(await sha256(sessionId), email, now, now + SESSION_DAYS * 86_400_000)
+    .run();
+  setCookie(c, SESSION_COOKIE, sessionId, {
+    httpOnly: true,
+    secure: new URL(c.req.url).protocol === 'https:',
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: SESSION_DAYS * 86_400,
   });
-  if (!res.ok) throw new Error(`Mail failed: ${res.status} ${await res.text()}`);
 }
 
 // ---------- auth ----------
@@ -63,18 +100,50 @@ async function sendLoginMail(env: Env, to: string, link: string): Promise<void> 
 app.post('/auth/request', async (c) => {
   const { email } = await c.req.json<{ email?: string }>();
   if (!email) return c.json({ error: 'Email required' }, 400);
+  const to = normEmail(email);
   const allowed = (c.env.ALLOWED_EMAIL || '').split(',').map(normEmail).filter(Boolean);
 
   // Always answer the same, so the endpoint doesn't reveal which emails are allowed
-  if (allowed.includes(normEmail(email))) {
+  if (allowed.includes(to)) {
+    const now = Date.now();
+    const recent = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM login_tokens WHERE email = ? AND created_at > ?')
+      .bind(to, now - 15 * 60_000)
+      .first<{ n: number }>();
+    if ((recent?.n ?? 0) >= 5) return c.json({ error: 'Too many tries, wait a few minutes' }, 429);
+
     const token = randomToken();
-    await c.env.DB.prepare('INSERT INTO login_tokens (token_hash, email, expires_at) VALUES (?, ?, ?)')
-      .bind(await sha256(token), normEmail(email), Date.now() + LOGIN_LINK_MINUTES * 60_000)
+    const code = randomCode();
+    await c.env.DB.prepare(
+      'INSERT INTO login_tokens (token_hash, email, expires_at, code_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+    )
+      .bind(await sha256(token), to, now + LOGIN_MINUTES * 60_000, await sha256(`${to}:${code}`), now)
       .run();
     const origin = c.req.header('origin') || new URL(c.req.url).origin;
-    await sendLoginMail(c.env, normEmail(email), `${origin}/api/auth/verify?token=${token}`);
+    await sendLoginMail(c.env, to, code, `${origin}/api/auth/verify?token=${token}`);
   }
-  return c.json({ ok: true, mail: !!c.env.RESEND_API_KEY });
+  return c.json({ ok: true, mail: hasMail(c.env) });
+});
+
+app.post('/auth/code', async (c) => {
+  const { email, code } = await c.req.json<{ email?: string; code?: string }>();
+  if (!email || !code) return c.json({ error: 'Email and code required' }, 400);
+  const to = normEmail(email);
+  const row = await c.env.DB.prepare(
+    `SELECT token_hash, code_hash, attempts FROM login_tokens
+     WHERE email = ? AND used = 0 AND expires_at > ? AND code_hash IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`,
+  )
+    .bind(to, Date.now())
+    .first<{ token_hash: string; code_hash: string; attempts: number }>();
+  if (!row || row.attempts >= 5) return c.json({ error: 'This code has expired. Ask for a new one.' }, 400);
+
+  if ((await sha256(`${to}:${code.replace(/\D/g, '')}`)) !== row.code_hash) {
+    await c.env.DB.prepare('UPDATE login_tokens SET attempts = attempts + 1 WHERE token_hash = ?').bind(row.token_hash).run();
+    return c.json({ error: 'That code is not right. Try again.' }, 400);
+  }
+  await c.env.DB.prepare('UPDATE login_tokens SET used = 1 WHERE token_hash = ?').bind(row.token_hash).run();
+  await startSession(c, to);
+  return c.json({ ok: true });
 });
 
 app.get('/auth/verify', async (c) => {
@@ -87,25 +156,13 @@ app.get('/auth/verify', async (c) => {
   if (!row || row.used || row.expires_at < Date.now()) return c.redirect('/login?error=expired');
 
   await c.env.DB.prepare('UPDATE login_tokens SET used = 1 WHERE token_hash = ?').bind(hash).run();
-  const sessionId = randomToken();
-  const now = Date.now();
-  await c.env.DB.prepare('INSERT INTO sessions (id_hash, email, created_at, expires_at) VALUES (?, ?, ?, ?)')
-    .bind(await sha256(sessionId), row.email, now, now + SESSION_DAYS * 86_400_000)
-    .run();
-
-  setCookie(c, SESSION_COOKIE, sessionId, {
-    httpOnly: true,
-    secure: new URL(c.req.url).protocol === 'https:',
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: SESSION_DAYS * 86_400,
-  });
+  await startSession(c, row.email);
   return c.redirect('/');
 });
 
 // Everything below requires a session
 app.use('/*', async (c, next) => {
-  if (c.req.path.startsWith('/api/auth/request') || c.req.path.startsWith('/api/auth/verify')) return next();
+  if (['/api/auth/request', '/api/auth/verify', '/api/auth/code'].includes(c.req.path)) return next();
   const sid = getCookie(c, SESSION_COOKIE);
   if (!sid) return c.json({ error: 'Not logged in' }, 401);
   const row = await c.env.DB.prepare('SELECT email, expires_at FROM sessions WHERE id_hash = ?')

@@ -39,10 +39,17 @@ npm run deploy                              # → https://snug.snugshelf.workers
 
 ### Login emails
 
-Login links are sent with [Resend](https://resend.com) (free: 3,000 mails/month).
-Without your own domain, Resend can only send to the email address of the Resend account itself,
-so the simplest setup is a Resend account created with **her** email address.
-With your own domain (± €10/year) you can verify it in Resend and set `MAIL_FROM`.
+Login works with a 6-digit code by email (typed in the app, so it also works from the iPhone home
+screen) plus a link in the same mail. Mail is sent with [Brevo](https://www.brevo.com) (free, 300/day,
+only needs a verified sender address, no own domain):
+
+```bash
+npx wrangler secret put BREVO_API_KEY
+npx wrangler secret put MAIL_FROM           # the verified sender address in Brevo
+```
+
+Resend (`RESEND_API_KEY`) also works. Without a mail service, create a link with
+`node scripts/login-link.mjs <email>` or in the app under Me → Login link.
 
 ### AI (later phases)
 

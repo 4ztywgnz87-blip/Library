@@ -28,7 +28,7 @@ export default function App() {
   const onLoggedOut = useCallback(() => setAuth('out'), []);
 
   if (auth === 'checking') return <div className="min-h-dvh bg-cream" />;
-  if (auth === 'out') return <Login />;
+  if (auth === 'out') return <Login onLoggedIn={() => setAuth('in')} />;
 
   return (
     <BrowserRouter>

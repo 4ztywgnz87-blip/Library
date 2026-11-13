@@ -27,9 +27,21 @@ export async function requestLoginLink(email: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
   });
-  if (!res.ok) throw new Error('Could not send the link');
+  if (res.status === 429) throw new Error('Too many tries, wait a few minutes');
+  if (!res.ok) throw new Error('Could not send the email, try again in a moment');
   const json = (await res.json()) as { mail?: boolean };
   return { mailEnabled: json.mail !== false };
+}
+
+export async function verifyCode(email: string, code: string) {
+  const res = await fetch('/api/auth/code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code }),
+  });
+  const json = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(json.error ?? 'Something went wrong');
+  await setMeta('loggedIn', true);
 }
 
 export async function logout() {
