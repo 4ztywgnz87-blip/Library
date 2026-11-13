@@ -188,11 +188,6 @@ export default function Library() {
                         Reading
                       </span>
                     )}
-                    {b.specialEdition && (
-                      <span className="absolute top-1.5 right-1.5 rounded-full bg-gold px-1.5 py-0.5 text-[0.6rem] text-white" title="Special edition">
-                        ✦
-                      </span>
-                    )}
                   </div>
                   <p className="mt-2 line-clamp-2 text-xs leading-snug font-medium text-ink">{b.title}</p>
                   <p className="truncate text-[0.7rem] text-mocha">

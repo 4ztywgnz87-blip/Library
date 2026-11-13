@@ -5,8 +5,8 @@ import { useBooks } from '../lib/hooks';
 import { shelfOrder } from '../lib/library';
 import { isLight, updateSpineColors } from '../lib/coverColor';
 import { hashColor } from '../components/Cover';
-import { STATUSES, type Book, type Status } from '../types';
-import { Bookend, Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
+import type { Book, Status } from '../types';
+import { Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
 
 const ROW = 140; // px per shelf row (spines + board)
 const BOARD = 12;
@@ -67,7 +67,7 @@ function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean
   );
   return (
     <motion.button
-      title={`${book.title} · ${book.authors[0] ?? ''}`}
+      title={`${book.title} · ${book.authors[0] ?? ''}${book.status === 'reading' ? ' · reading now' : ''}`}
       aria-label={book.title}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0, rotate: lean ? -7 : 0 }}
@@ -75,7 +75,7 @@ function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean
       whileHover={{ y: -8 }}
       whileTap={{ y: -16, scale: 1.04 }}
       onClick={() => setTimeout(() => navigate(`/book/${book.id}`), 160)}
-      className="relative flex shrink-0 flex-col items-center justify-between overflow-hidden rounded-t-[3px] rounded-b-[1px] py-1.5 shadow-[1px_0_0_rgba(0,0,0,0.35)]"
+      className="relative flex shrink-0 flex-col items-center justify-between rounded-t-[3px] rounded-b-[1px] py-1.5 shadow-[1px_0_0_rgba(0,0,0,0.35)]"
       style={{
         height,
         width,
@@ -87,6 +87,13 @@ function Spine({ book, delay, lean }: { book: Book; delay: number; lean: boolean
         backgroundColor: color,
       }}
     >
+      {book.status === 'reading' && (
+        // a bookmark ribbon peeking out of the top and hanging down the side
+        <span
+          className="pointer-events-none absolute -top-[9px] right-[3px] z-10 h-[32px] w-[6px] bg-gradient-to-b from-[#9b3a49] to-[#7a2e3a] shadow-[1px_1px_1px_rgba(0,0,0,0.3)]"
+          style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%)' }}
+        />
+      )}
       {ends(true)}
       <span
         className="font-soft pointer-events-none absolute top-1/2 left-1/2 flex items-center justify-center text-center leading-[1.05] font-semibold"
@@ -115,7 +122,7 @@ function ShelfSection({
 }: {
   status: Status;
   label: string;
-  books: Book[];
+  books: readonly Book[];
   decor?: ReactNode;
   startDelay: number;
 }) {
@@ -192,7 +199,6 @@ export default function Shelf() {
   const wishCount = byStatus.wishlist.length;
 
   const decor: Partial<Record<Status, ReactNode>> = {
-    reading: <Bookend className="h-16 w-[26px]" />,
     owned: <Candle className="h-20 w-12" />,
     read: <Mug className="h-20 w-[68px]" />,
   };
@@ -268,13 +274,19 @@ export default function Shelf() {
             }}
           >
             <FairyLights className="pointer-events-none mb-1 h-7 w-full" />
-            {STATUSES.filter((s) => s.id !== 'wishlist').map((s, i) => (
+            {/* one shelf with her books (the ones she's reading first, with a bookmark), one with read books */}
+            {(
+              [
+                { status: 'owned', label: 'On my shelf', books: [...byStatus.reading, ...byStatus.owned] },
+                { status: 'read', label: 'Read', books: byStatus.read },
+              ] as const
+            ).map((shelf, i) => (
               <ShelfSection
-                key={s.id}
-                status={s.id}
-                label={s.label}
-                books={byStatus[s.id]}
-                decor={decor[s.id]}
+                key={shelf.status}
+                status={shelf.status}
+                label={shelf.label}
+                books={shelf.books}
+                decor={decor[shelf.status]}
                 startDelay={i * 0.15}
               />
             ))}

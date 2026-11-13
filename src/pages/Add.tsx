@@ -400,11 +400,11 @@ function AddSheet({
                   setSpecial(on);
                   if (on && !editionCover) setPickingEdition(true);
                 }}
-                label="✦ Special edition"
+                label="Other cover"
               />
               {special && (
                 <button className="text-sm text-wine underline" onClick={() => setPickingEdition(true)}>
-                  {editionCover ? 'Change edition cover' : 'Choose my edition’s cover'}
+                  {editionCover ? 'Change cover' : 'Choose cover'}
                 </button>
               )}
             </div>

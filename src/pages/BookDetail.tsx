@@ -84,9 +84,6 @@ export default function BookDetail() {
               {book.series.number ? ` · book ${book.series.number}` : ''}
             </p>
           )}
-          {book.specialEdition && (
-            <span className="mt-2 rounded-full bg-gold/15 px-3 py-1 text-xs text-[#8a6a3a]">✦ Special edition</span>
-          )}
         </div>
 
         <div className="mt-8 space-y-4">
@@ -133,7 +130,7 @@ export default function BookDetail() {
                 { id: 'nl', label: '🇳🇱 Dutch' },
               ]}
             />
-            <Toggle checked={book.specialEdition} onChange={(specialEdition) => set({ specialEdition })} label="✦ Special edition" />
+            <Toggle checked={book.specialEdition} onChange={(specialEdition) => set({ specialEdition })} label="Other cover" />
             {book.specialEdition && (
               <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -141,7 +138,7 @@ export default function BookDetail() {
                   className="inline-flex items-center gap-2 rounded-full bg-linen px-4 py-2.5 text-sm text-ink hover:bg-sand"
                 >
                   <CameraIcon width={18} height={18} />
-                  {book.customCover ? 'Change edition cover' : 'Choose my edition’s cover'}
+                  {book.customCover ? 'Change cover' : 'Choose cover'}
                 </button>
                 {book.customCover && (
                   <button className="text-xs text-cocoa underline" onClick={() => set({ customCover: undefined })}>
@@ -394,15 +391,16 @@ function SeriesCard({ book }: { book: Book }) {
         <p className="mt-2 text-sm text-cocoa">Looks like a standalone.</p>
       )}
       {!editing && book.series && (
-        <Link to={seriesPath(book.series.name)} className="mt-2 flex items-center justify-between text-sm">
-          <span>
+        <div className="mt-2">
+          {/* the name gets the full width, so long series names don't break awkwardly */}
+          <p className="text-sm leading-snug">
             {book.series.name}
-            {book.series.number ? ` · book ${book.series.number}` : ''}
-          </span>
-          <span className="flex items-center text-wine">
+            {book.series.number ? <span className="text-cocoa"> · book {book.series.number}</span> : ''}
+          </p>
+          <Link to={seriesPath(book.series.name)} className="mt-2 inline-flex items-center text-sm font-medium text-wine">
             View series <ChevronIcon width={16} height={16} />
-          </span>
-        </Link>
+          </Link>
+        </div>
       )}
       {editing && (
         <div className="mt-3 space-y-3">

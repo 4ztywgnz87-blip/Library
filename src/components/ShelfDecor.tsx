@@ -361,10 +361,10 @@ export function DreamCloud({ count, className = '' }: { count: number; className
         <circle cx="140" cy="106" r="4" fill={`url(#${id}c)`} />
         <circle cx="149" cy="116" r="2.6" fill={`url(#${id}c)`} />
       </g>
-      <text x="80" y="47" textAnchor="middle" fontFamily="Inter Variable, sans-serif" fontSize="8.5" letterSpacing="1.2" fill="#a08a78">
+      <text x="80" y="49" textAnchor="middle" fontFamily="Inter Variable, sans-serif" fontSize="7.5" letterSpacing="1.1" fill="#a08a78">
         WISHLIST
       </text>
-      <text x="80" y="64" textAnchor="middle" fontFamily="Fraunces Variable, serif" fontSize="14.5" fontWeight="600" fill="#7a2e3a">
+      <text x="80" y="63" textAnchor="middle" fontFamily="Fraunces Variable, serif" fontSize="12" fontWeight="600" fill="#7a2e3a">
         {count === 0 ? 'Dreaming of books' : `Dreaming of ${count} ${count === 1 ? 'book' : 'books'}`}
       </text>
       {[
