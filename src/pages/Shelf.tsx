@@ -159,6 +159,15 @@ function ShelfSection({
   // the decoration only stands where there's room on the last row; it never gets a row of its own
   const lastRowUsed = (booksWidth * scale) % room;
   const showDecor = !!decor && (books.length === 0 || lastRowUsed + DECOR * scale <= room);
+  // Where the decoration stands: between two series/authors (a fixed spot per shelf), not always at the end
+  const groupOf = (b: Book) => b.series?.name ?? b.authors[0];
+  const boundaries = books.map((_, i) => i).filter((i) => i > 0 && groupOf(books[i - 1]) !== groupOf(books[i]));
+  const decorAt = boundaries.length ? boundaries[hash(status) % boundaries.length] : books.length;
+  const decorEl = (
+    <div key="decor" className="mx-2 flex items-end" style={{ height: row, paddingBottom: BOARD, width: 72 * scale }}>
+      <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom left' }}>{decor}</div>
+    </div>
+  );
 
   return (
     // the shelf above casts a soft shadow onto the back panel, starting right under its board
@@ -193,8 +202,8 @@ function ShelfSection({
           const prev = books[i - 1];
           const newGroup =
             prev && (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? 'ml-1.5' : 'ml-[1px]';
-          return (
-            <div key={b.id} className={`flex items-end ${i === 0 ? '' : newGroup}`} style={{ height: row, paddingBottom: BOARD }}>
+          const spine = (
+            <div key={b.id} className={`flex items-end ${i === 0 || i === decorAt ? '' : newGroup}`} style={{ height: row, paddingBottom: BOARD }}>
               <Spine
                 book={b}
                 scale={scale}
@@ -204,15 +213,9 @@ function ShelfSection({
               />
             </div>
           );
+          return showDecor && i === decorAt ? [decorEl, spine] : spine;
         })}
-        {showDecor && (
-          <div
-            className="ml-3 flex items-end"
-            style={{ height: row, paddingBottom: BOARD, width: 72 * scale }}
-          >
-            <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom left' }}>{decor}</div>
-          </div>
-        )}
+        {showDecor && decorAt >= books.length && decorEl}
       </div>
     </section>
   );
