@@ -7,7 +7,8 @@ import { bookKey, newId, saveBook } from '../lib/library';
 import { useBooks } from '../lib/hooks';
 import { STATUSES, type Lang, type Status } from '../types';
 import { Cover } from '../components/Cover';
-import { Button, PageHeader, Segmented, Toggle } from '../components/ui';
+import { Button, PageHeader, Segmented } from '../components/ui';
+import { CoverChoice } from '../components/CoverChoice';
 import { CameraIcon, PhotosIcon, CheckIcon, CloseIcon, SearchIcon } from '../components/Icons';
 import { PhotoInput } from '../components/PhotoInput';
 import { SleepyCat } from '../components/SleepyCat';
@@ -15,6 +16,7 @@ import { EditionPicker } from '../components/EditionPicker';
 import { lookupSeries } from '../lib/seriesLookup';
 import { identifyCover } from '../lib/ai';
 import { shrinkPhoto } from '../lib/photo';
+import { clearSearches, forgetSearch, rememberSearch, useRecentSearches } from '../lib/recent';
 import type { IdentifyResponse } from '../shared';
 
 export default function Add() {
@@ -56,14 +58,27 @@ export default function Add() {
     try {
       const result = await identifyCover(await shrinkPhoto(file));
       setRecognised(result);
-      if (result.isbn) setQuery(result.isbn);
-      else if (result.title) setQuery([result.title, result.author].filter(Boolean).join(' '));
+      const q = result.isbn || [result.title, result.author].filter(Boolean).join(' ');
+      if (q) {
+        setQuery(q);
+        void rememberSearch({ q, kind: 'photo', title: result.title ?? undefined, author: result.author ?? undefined });
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setReading(false);
     }
   };
+
+  const recent = useRecentSearches();
+
+  // A search she lingered on (results shown for a moment) goes into "Recent"
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3 || !results.length || loading) return;
+    const t = setTimeout(() => void rememberSearch({ q, kind: 'search' }), 2500);
+    return () => clearTimeout(t);
+  }, [query, results, loading]);
 
   const owned = useMemo(() => {
     const m = new Map<string, string>();
@@ -80,6 +95,7 @@ export default function Add() {
     if (q.length < 2) {
       setResults([]);
       setError(null);
+      setLoading(false);
       return;
     }
     const ctrl = new AbortController();
@@ -110,6 +126,13 @@ export default function Add() {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.currentTarget.blur(); // hides the keyboard so the results are visible
+                void rememberSearch({ q: query, kind: 'search' });
+              }
+            }}
+            enterKeyHint="search"
             placeholder="Title, author or ISBN"
             className="w-full rounded-full border border-sand bg-white py-3.5 pr-11 pl-12 text-[16px] shadow-[var(--shadow-soft)] outline-none placeholder:text-mocha focus:border-oat"
           />
@@ -170,7 +193,52 @@ export default function Add() {
           {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
             <p className="py-8 text-center text-sm text-cocoa">No books found. Try the author's name too?</p>
           )}
-          {query.trim().length < 2 && !reading && (
+          {query.trim().length < 2 && !reading && recent.length > 0 && (
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-xs tracking-wide text-mocha uppercase">Recent</p>
+                <button className="text-xs text-cocoa underline" onClick={() => void clearSearches()}>
+                  Clear
+                </button>
+              </div>
+              <ul className="divide-y divide-sand/70">
+                {recent.map((r) => (
+                  <li key={r.q} className="flex items-center gap-3">
+                    <button
+                      className="flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left active:opacity-70"
+                      onClick={() => setQuery(r.q)}
+                    >
+                      {r.cover ? (
+                        <img
+                          src={r.cover}
+                          alt=""
+                          className="h-12 w-8 shrink-0 rounded-sm object-cover shadow-[var(--shadow-book)]"
+                        />
+                      ) : (
+                        <span className="flex h-12 w-8 shrink-0 items-center justify-center rounded-sm bg-linen text-mocha">
+                          {r.kind === 'photo' ? (
+                            <CameraIcon width={16} height={16} />
+                          ) : (
+                            <SearchIcon width={16} height={16} />
+                          )}
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-ink">{r.title ?? r.q}</span>
+                        <span className="block truncate text-xs text-mocha">
+                          {[r.kind === 'photo' ? 'Cover photo' : !r.title && 'Search', r.author].filter(Boolean).join(' · ')}
+                        </span>
+                      </span>
+                    </button>
+                    <button aria-label="Remove" className="p-2 text-mocha" onClick={() => void forgetSearch(r.q)}>
+                      <CloseIcon width={16} height={16} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {query.trim().length < 2 && !reading && recent.length === 0 && (
             <div className="flex flex-col items-center py-10 text-center text-sm text-cocoa">
               <SleepyCat className="w-32 opacity-90" />
               <p className="mt-3">
@@ -184,7 +252,19 @@ export default function Add() {
               const existingId = owned.get(bookKey(r)) ?? (r.isbn13 ? owned.get(r.isbn13) : undefined);
               return (
                 <li key={(r.googleId ?? r.olKey) + r.title}>
-                  <button onClick={() => setPicked(r)} className="flex w-full gap-4 py-3 text-left">
+                  <button
+                    onClick={() => {
+                      void rememberSearch({
+                        q: query,
+                        kind: 'search',
+                        title: r.title,
+                        author: r.authors[0],
+                        cover: r.coverUrl,
+                      });
+                      setPicked(r);
+                    }}
+                    className="flex w-full gap-4 py-3 text-left"
+                  >
                     <Cover book={r} className="w-14 shrink-0" rounded="rounded" />
                     <div className="min-w-0 flex-1">
                       <p className="leading-snug font-medium">{r.title}</p>
@@ -253,7 +333,6 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('owned');
   const [language, setLanguage] = useState<Lang>(result.language ?? 'en');
-  const [special, setSpecial] = useState(false);
   const [editionCover, setEditionCover] = useState<string | undefined>();
   const [pickingEdition, setPickingEdition] = useState(false);
   // Most books added as "read" were finished a while ago; only "this year" counts in this year's stats
@@ -271,8 +350,8 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
       id: newId(),
       status,
       language,
-      specialEdition: special,
-      customCover: special ? editionCover : undefined,
+      specialEdition: !!editionCover,
+      customCover: editionCover,
       tags: [],
       addedAt: now,
       updatedAt: now,
@@ -305,7 +384,7 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
             <Cover
               book={{
                 ...result,
-                customCover: special ? editionCover : undefined,
+                customCover: editionCover,
               }}
               className="w-20 shrink-0"
             />
@@ -380,19 +459,12 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
 
           {status !== 'wishlist' && (
             <div className="space-y-2">
-              <Toggle
-                checked={special}
-                onChange={(on) => {
-                  setSpecial(on);
-                  if (on && !editionCover) setPickingEdition(true);
-                }}
-                label="Other cover"
+              <p className="text-xs tracking-wide text-mocha uppercase">Cover</p>
+              <CoverChoice
+                cover={editionCover}
+                onChoose={() => setPickingEdition(true)}
+                onReset={() => setEditionCover(undefined)}
               />
-              {special && (
-                <button className="text-sm text-wine underline" onClick={() => setPickingEdition(true)}>
-                  {editionCover ? 'Change cover' : 'Choose cover'}
-                </button>
-              )}
             </div>
           )}
           {pickingEdition && (

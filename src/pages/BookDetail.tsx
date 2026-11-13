@@ -7,13 +7,23 @@ import { deleteBook, updateBook } from '../lib/library';
 import { GENRES, STATUSES, type Book, type Status } from '../types';
 import { Cover } from '../components/Cover';
 import { StarsDisplay, StarsInput, formatRating } from '../components/Stars';
-import { Button, Card, Chip, PageHeader, Segmented, Toggle } from '../components/ui';
-import { CameraIcon, ChevronIcon, TrashIcon } from '../components/Icons';
+import { Button, Card, Chip, PageHeader, Segmented } from '../components/ui';
+import { CoverChoice } from '../components/CoverChoice';
+import { ChevronIcon, TrashIcon } from '../components/Icons';
 import { EditionPicker } from '../components/EditionPicker';
 import { ConfirmSheet } from '../components/ConfirmSheet';
 import { lookupSeries, setGenreForSeries } from '../lib/seriesLookup';
 
-const TAG_SUGGESTIONS = ['spicy 🌶️', 'emotional 😭', 'plot twist 🤯', 'funny 😂', 'slow burn 🔥', 'cosy ☕', 'dark 🖤', 'page-turner'];
+const TAG_SUGGESTIONS = [
+  'spicy 🌶️',
+  'emotional 😭',
+  'plot twist 🤯',
+  'funny 😂',
+  'slow burn 🔥',
+  'cosy ☕',
+  'dark 🖤',
+  'page-turner',
+];
 
 export default function BookDetail() {
   const { id } = useParams();
@@ -141,23 +151,11 @@ export default function BookDetail() {
                 { id: 'nl', label: '🇳🇱 Dutch' },
               ]}
             />
-            <Toggle checked={book.specialEdition} onChange={(specialEdition) => set({ specialEdition })} label="Other cover" />
-            {book.specialEdition && (
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={() => setPickingEdition(true)}
-                  className="inline-flex items-center gap-2 rounded-full bg-linen px-4 py-2.5 text-sm text-ink hover:bg-sand"
-                >
-                  <CameraIcon width={18} height={18} />
-                  {book.customCover ? 'Change cover' : 'Choose cover'}
-                </button>
-                {book.customCover && (
-                  <button className="text-xs text-cocoa underline" onClick={() => set({ customCover: undefined })}>
-                    use standard cover
-                  </button>
-                )}
-              </div>
-            )}
+            <CoverChoice
+              cover={book.customCover}
+              onChoose={() => setPickingEdition(true)}
+              onReset={() => set({ customCover: undefined, specialEdition: false })}
+            />
           </Card>
 
           {/* Genres */}
@@ -169,11 +167,7 @@ export default function BookDetail() {
               {[...new Set([...GENRES, ...book.genres])].map((g) => {
                 const on = book.genres.includes(g);
                 return (
-                  <Chip
-                    key={g}
-                    active={on}
-                    onClick={() => setGenreForSeries(book, g, !on)}
-                  >
+                  <Chip key={g} active={on} onClick={() => setGenreForSeries(book, g, !on)}>
                     {g}
                   </Chip>
                 );
@@ -225,7 +219,7 @@ export default function BookDetail() {
           onClose={() => setPickingEdition(false)}
           onPick={async (cover) => {
             setPickingEdition(false);
-            await set({ customCover: cover });
+            await set({ customCover: cover, specialEdition: true });
           }}
         />
       )}
@@ -262,7 +256,13 @@ function RatingCard({ book }: { book: Book }) {
   const save = async () => {
     // Keep the exact date if the year didn't change; otherwise mid-year of the chosen year
     const finishedAt =
-      year === undefined ? undefined : year === finishedYear(book) ? book.finishedAt : year === now ? Date.now() : Date.UTC(year, 6, 1);
+      year === undefined
+        ? undefined
+        : year === finishedYear(book)
+          ? book.finishedAt
+          : year === now
+            ? Date.now()
+            : Date.UTC(year, 6, 1);
     await updateBook(book.id, { rating, review: review.trim() || undefined, tags, finishedAt, ratingSaved: true });
     setEditing(false);
   };
@@ -296,7 +296,9 @@ function RatingCard({ book }: { book: Book }) {
             ))}
           </div>
         )}
-        <p className="text-xs text-mocha">{finishedYear(book) ? `Finished in ${finishedYear(book)}` : 'Finished a while ago'}</p>
+        <p className="text-xs text-mocha">
+          {finishedYear(book) ? `Finished in ${finishedYear(book)}` : 'Finished a while ago'}
+        </p>
       </Card>
     );
   }
@@ -409,7 +411,10 @@ function SeriesCard({ book }: { book: Book }) {
             {book.series.name}
             {book.series.number ? <span className="text-cocoa"> · book {book.series.number}</span> : ''}
           </p>
-          <Link to={seriesPath(book.series.name)} className="mt-2 inline-flex items-center text-sm font-medium text-wine">
+          <Link
+            to={seriesPath(book.series.name)}
+            className="mt-2 inline-flex items-center text-sm font-medium text-wine"
+          >
             View series <ChevronIcon width={16} height={16} />
           </Link>
         </div>
