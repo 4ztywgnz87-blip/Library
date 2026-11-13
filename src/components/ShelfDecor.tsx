@@ -303,9 +303,9 @@ export function FairyLights({ className = '' }: { className?: string }) {
 }
 
 /** A wooden bookend with a little brass detail */
-export function Bookend({ className = '' }: { className?: string }) {
+export function Bookend({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <svg viewBox="0 0 34 84" className={className} aria-hidden>
+    <svg viewBox="0 0 34 84" className={className} style={style} aria-hidden>
       <path d="M4 84V34a14 14 0 0 1 14-14h6v64z" fill="#5f6b52" />
       <path d="M8 84V36a10 10 0 0 1 10-10" stroke="#fff" strokeOpacity="0.15" strokeWidth="2" fill="none" />
       <circle cx="15" cy="40" r="3" fill="#c49a5a" />

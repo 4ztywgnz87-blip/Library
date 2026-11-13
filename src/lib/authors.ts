@@ -43,15 +43,47 @@ export function followedAuthors(books: Book[], favourites: string[]) {
   });
 }
 
+/** Published in the last ~6 months, or coming out */
 function recent(date: string | undefined) {
   if (!date) return false;
   const t = Date.parse(date.length === 4 ? `${date}-07-01` : date);
   return !Number.isNaN(t) && t > Date.now() - 180 * DAY;
 }
 
+// ---------- telling real new books from translations, re-issues and placeholders ----------
+
+const FOREIGN =
+  /\b(el|la|los|las|del|un|una|uno|um|uma|nunca|talvez|jamais|día|dia|edición|edicion|especial|alas|de la|le|les|des|une|et|du|der|die|das|und|ein|eine|il|lo|gli|och|og|ja)\b|[áéíóúñãõçâêôàèìòùäöüß¿¡]/i;
+const NOT_A_NEW_BOOK =
+  /\b(box ?set|collection|bind-?up|omnibus|books? \d+\s*[-–&]\s*\d+|\d books|summary|study guide|workbook|journal|colou?ring|calendar|language edition|untitled|tbc|tba)\b|\s\/\s/i;
+
+/** "Onyx Storm (Deluxe Limited Edition)" → "Onyx Storm" */
+export function baseTitle(t: string) {
+  return t
+    .replace(/\s*[([].*?[)\]]\s*/g, ' ')
+    .replace(/\s*[:–—-]\s*(a novel|the .*edition|.*edition|.*sprayed edges.*)$/i, '')
+    .replace(/\b(deluxe|special|collector'?s|limited|exclusive|signed|illustrated|anniversary)\b.*\bedition\b/i, '')
+    .replace(/\b(with )?(stencil(l)?ed |sprayed )edges?\b/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Is this a real, new English/Dutch book by (only) this author? */
+function isRealNewBook(title: string, authors: string[] | undefined, author: string) {
+  const same = (a: string) => a.toLowerCase().replace(/[^a-z]/g, '') === author.toLowerCase().replace(/[^a-z]/g, '');
+  if (!authors?.length || !same(authors[0])) return false;
+  if (authors.length > 1) return false; // translations list the translator as second author
+  if (NOT_A_NEW_BOOK.test(title)) return false;
+  if (FOREIGN.test(title)) return false;
+  if (/^[\w\s]+ \d+$/.test(title) && title.split(' ').length <= 3) return false; // "The Empyrean 5"
+  return true;
+}
+
+// ---------- sources ----------
+
 async function fromGoogle(author: string): Promise<AuthorNews[]> {
   const key = import.meta.env.VITE_GOOGLE_BOOKS_KEY as string | undefined;
-  const params = new URLSearchParams({ q: `inauthor:"${author}"`, orderBy: 'newest', maxResults: '20', printType: 'books' });
+  const params = new URLSearchParams({ q: `inauthor:"${author}"`, orderBy: 'newest', maxResults: '30', printType: 'books' });
   if (key) params.set('key', key);
   const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`);
   if (!res.ok) throw new Error('google');
@@ -75,15 +107,14 @@ async function fromGoogle(author: string): Promise<AuthorNews[]> {
     .filter(
       (v) =>
         v.title &&
-        v.authors?.some((a) => a.toLowerCase() === author.toLowerCase()) &&
+        (v.language === 'en' || v.language === 'nl') &&
         recent(v.publishedDate) &&
-        // English and Dutch editions only (no "Día de ceifa" for "Sunrise on the Reaping")
-        (v.language === 'en' || v.language === 'nl'),
+        isRealNewBook(v.title, v.authors, author),
     )
     .map((v) => {
       const { title, series } = parseSeries(v.title!, v.subtitle);
       return {
-        title,
+        title: baseTitle(title),
         author,
         series,
         coverUrl: v.imageLinks?.thumbnail
@@ -98,79 +129,91 @@ async function fromGoogle(author: string): Promise<AuthorNews[]> {
     });
 }
 
+/** Open Library works: one per book, with the original title */
 async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
   const params = new URLSearchParams({
     author,
     sort: 'new',
-    limit: '15',
+    limit: '30',
     fields: 'title,subtitle,author_name,first_publish_year,cover_i,subject,language',
   });
   const res = await fetch(`https://openlibrary.org/search.json?${params}`);
   if (!res.ok) throw new Error('ol');
   const json = (await res.json()) as {
-    docs: { title: string; subtitle?: string; first_publish_year?: number; cover_i?: number; subject?: string[]; language?: string[] }[];
+    docs: {
+      title: string;
+      subtitle?: string;
+      author_name?: string[];
+      first_publish_year?: number;
+      cover_i?: number;
+      subject?: string[];
+      language?: string[];
+    }[];
   };
+  const year = new Date().getFullYear();
   return json.docs
     .filter(
       (d) =>
         d.first_publish_year &&
-        d.first_publish_year >= new Date().getFullYear() &&
-        (!d.language || d.language.some((l) => l === 'eng' || l === 'dut')),
+        d.first_publish_year >= year &&
+        // English/Dutch, or no language known yet (brand new)
+        (!d.language?.length || d.language.some((l) => l === 'eng' || l === 'dut')) &&
+        isRealNewBook(d.title, d.author_name, author),
     )
     .map((d) => {
       const { title, series } = parseSeries(d.title, d.subtitle);
       return {
-        title,
+        title: baseTitle(title),
         author,
         series,
         coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : undefined,
         publishedDate: String(d.first_publish_year),
-        upcoming: d.first_publish_year! > new Date().getFullYear(),
+        upcoming: d.first_publish_year! > year,
         genres: mapGenres(d.subject?.slice(0, 20) ?? []),
       };
     });
 }
 
-/** Title without edition extras: "Onyx Storm (Deluxe Limited Edition)" → "Onyx Storm" */
-export function baseTitle(t: string) {
-  return t
-    .replace(/\s*[([].*?[)\]]\s*/g, ' ')
-    .replace(/\s*[:–—-]\s*(a novel|the .*edition|.*edition|.*sprayed edges.*)$/i, '')
-    .replace(/\b(deluxe|special|collector'?s|limited|exclusive|signed|illustrated|anniversary)\b.*\bedition\b/i, '')
-    .replace(/\b(with )?(stencil(l)?ed |sprayed )edges?\b/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/** New and upcoming books by an author (cached for a day) */
+/** New and upcoming books by an author, from both sources combined (cached for a day) */
 export async function authorNews(author: string): Promise<AuthorNews[]> {
-  const cacheKey = `authorNews3:${author.toLowerCase()}`; // v3: EN/NL only, one entry per book
+  const cacheKey = `authorNews4:${author.toLowerCase()}`; // v4: stricter filters, both sources
   const cached = await getMeta<{ at: number; items: AuthorNews[] } | null>(cacheKey, null);
   if (cached && Date.now() - cached.at < DAY) return cached.items;
-  let items: AuthorNews[];
-  try {
-    items = await fromGoogle(author);
-  } catch {
-    items = await fromOpenLibrary(author).catch(() => []);
-  }
-  // One entry per book: stores list many editions ("... (Deluxe Edition)", "... with sprayed edges")
+
+  const [google, ol] = await Promise.all([fromGoogle(author).catch(() => []), fromOpenLibrary(author).catch(() => [])]);
+
+  // One entry per book: Google gives exact dates and descriptions, Open Library the canonical
+  // title and often a cover; fill in each other's gaps
   const byBook = new Map<string, AuthorNews>();
-  for (const i of items) {
-    if (/box ?set|collection|\d books/i.test(i.title)) continue;
-    const k = bookKey({ title: baseTitle(i.title), authors: [i.author] });
+  for (const i of [...google, ...ol]) {
+    const k = bookKey({ title: i.title, authors: [i.author] });
     const prev = byBook.get(k);
-    // keep the plain edition (shortest title), and remember a cover if it had none
-    if (!prev || i.title.length < prev.title.length) byBook.set(k, { ...i, title: baseTitle(i.title), coverUrl: i.coverUrl ?? prev?.coverUrl });
-    else prev.coverUrl ??= i.coverUrl;
+    if (!prev) {
+      byBook.set(k, { ...i });
+      continue;
+    }
+    prev.coverUrl ??= i.coverUrl;
+    prev.description ??= i.description;
+    prev.isbn13 ??= i.isbn13;
+    prev.series ??= i.series;
+    if (!prev.genres.length) prev.genres = i.genres;
+    if (prev.publishedDate.length < i.publishedDate.length) prev.publishedDate = i.publishedDate;
   }
-  items = [...byBook.values()];
-  // Books without a cover in this source: borrow one from the regular book search
+  const items = [...byBook.values()];
+
+  // Still no cover: borrow one, but only from an English/Dutch edition with exactly this title
   for (const item of items.filter((i) => !i.coverUrl)) {
     const results = await searchBooks(`${item.title} ${item.author}`).catch(() => []);
+    const want = bookKey({ title: item.title, authors: [item.author] });
     item.coverUrl = sameBook(results, item.title, item.author).find(
-      (r) => r.coverUrl && (r.language === 'en' || r.language === 'nl' || r.language === undefined),
+      (r) =>
+        r.coverUrl &&
+        bookKey({ title: baseTitle(r.title), authors: [item.author] }) === want &&
+        r.language !== undefined &&
+        (r.language === 'en' || r.language === 'nl'),
     )?.coverUrl;
   }
+
   await setMeta(cacheKey, { at: Date.now(), items });
   return items;
 }

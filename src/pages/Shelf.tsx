@@ -6,7 +6,7 @@ import { shelfOrder } from '../lib/library';
 import { isLight, updateSpineColors } from '../lib/coverColor';
 import { hashColor } from '../components/Cover';
 import type { Book, Status } from '../types';
-import { Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
+import { Bookend, Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
 
 const ROW = 140; // px per shelf row (spines + board)
 const BOARD = 12;
@@ -163,9 +163,16 @@ function ShelfSection({
   const groupOf = (b: Book) => b.series?.name ?? b.authors[0];
   const boundaries = books.map((_, i) => i).filter((i) => i > 0 && groupOf(books[i - 1]) !== groupOf(books[i]));
   const decorAt = boundaries.length ? boundaries[hash(status) % boundaries.length] : books.length;
+  // When books follow the decoration, a bookend keeps them upright
+  const decorMid = showDecor && decorAt < books.length;
   const decorEl = (
-    <div key="decor" className="mx-2 flex items-end" style={{ height: row, paddingBottom: BOARD, width: 72 * scale }}>
+    <div
+      key="decor"
+      className={`ml-2 flex items-end gap-1 ${decorMid ? 'mr-0 justify-between' : 'mr-2'}`}
+      style={{ height: row, paddingBottom: BOARD, width: (decorMid ? 72 + 30 : 72) * scale }}
+    >
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom left' }}>{decor}</div>
+      {decorMid && <Bookend className="shrink-0" style={{ height: 64 * scale, width: 26 * scale }} />}
     </div>
   );
 
@@ -209,7 +216,13 @@ function ShelfSection({
                 scale={scale}
                 delay={startDelay + Math.min(i * 0.025, 0.6)}
                 // like a real bookcase, the last book sometimes leans over
-                lean={i === books.length - 1 && books.length > 2 && hash(b.id) % 2 === 0}
+                // (never right before a decoration, so it can't slide under it)
+                lean={
+                  i === books.length - 1 &&
+                  !(showDecor && decorAt === books.length) &&
+                  books.length > 2 &&
+                  hash(b.id) % 2 === 0
+                }
               />
             </div>
           );
