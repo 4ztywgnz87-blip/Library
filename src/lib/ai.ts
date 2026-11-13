@@ -32,7 +32,7 @@ export async function recommend(req: RecommendRequest) {
   return post<RecommendResponse>('/api/ai/recommend', req);
 }
 
-export async function fitCheck(book: { title: string; author: string; description?: string }) {
+export async function fitCheck(book: { title: string; author: string; description?: string; genres?: string[] }) {
   await syncNow();
   return post<FitResponse>('/api/ai/fit', book);
 }

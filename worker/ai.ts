@@ -12,6 +12,7 @@ import type {
   SeriesResponse,
 } from '../src/shared';
 import { MOCK_BUY_LIST } from './mockBooks';
+import { bookTraits, learnTaste, scoreBook, traitsIn, type Candidate } from './taste';
 import { findBookSeries, seriesParts, type FoundSeries } from './series';
 
 export interface AiEnv {
@@ -184,6 +185,7 @@ const PicksSchema = z.object({
         author: z.string(),
         why: z.string(),
         seriesNote: z.string().nullable(),
+        score: z.number().int().min(0).max(100),
       }),
     )
     .max(3),
@@ -221,6 +223,8 @@ export async function recommend(
     req.mood ? `Mood: ${MOOD_LABELS[req.mood] ?? req.mood}.` : '',
     req.exclude?.length ? `Do not repeat these suggestions: ${req.exclude.join('; ')}.` : '',
     'Give your 3 best picks (fewer only if there are not enough fitting books), best first.',
+    'For each pick give a match score 0–100: how well it fits her taste (her ratings, her own words in reviews, her quiz) and, if she asked for one, the genre and mood. Be honest: 90+ only for a near-certain favourite.',
+    'The "why" must be specific to her: name one or two of her books and what she rated or wrote about them.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -239,7 +243,7 @@ export async function recommend(
   const byKey = new Map(books.map((b) => [key(b.title, b.authors[0]), b]));
   const picks: Pick[] = (result?.picks ?? []).map((p) => {
     const own = byKey.get(key(p.title, p.author)) ?? books.find((b) => key(b.title) === key(p.title));
-    return { ...p, seriesNote: p.seriesNote ?? undefined, bookId: own?.id };
+    return { ...p, seriesNote: p.seriesNote ?? undefined, bookId: own?.id, score: p.score };
   });
   const fitting = req.source === 'shelf' ? picks.filter((p) => p.bookId) : picks.filter((p) => !p.bookId);
   return { picks: await inSeriesOrder(fitting, req.source, books), mock: false };
@@ -289,6 +293,7 @@ async function inSeriesOrder(picks: Pick[], source: RecommendRequest['source'], 
           bookId: earlier.id,
           why: `Start with book ${k} of ${series.name} first, it's waiting on your shelf. ${pick.why}`,
           seriesNote: `${series.name} #${k}`,
+          score: pick.score,
         });
       }
       continue; // she doesn't own the earlier part: not a shelf tip
@@ -313,6 +318,7 @@ async function inSeriesOrder(picks: Pick[], source: RecommendRequest['source'], 
         author: pick.author,
         why: `It's book ${k} of ${series.name}, so start here! ${pick.why}`,
         seriesNote: `${series.name} #${k}`,
+        score: pick.score,
       });
     }
   }
@@ -321,59 +327,43 @@ async function inSeriesOrder(picks: Pick[], source: RecommendRequest['source'], 
   return out.filter((p) => (seen.has(key(p.title)) ? false : (seen.add(key(p.title)), true)));
 }
 
+/**
+ * Test-mode tips, still tailored to her: the taste engine learns from her ratings, reviews,
+ * tags and quiz, scores every candidate and explains the match in her own terms.
+ */
 function mockRecommend(req: RecommendRequest, books: Book[], profile?: ReaderProfile): Pick[] {
+  const taste = learnTaste(books, profile);
   const exclude = new Set((req.exclude ?? []).map((t) => key(t)));
-  const notForMe = new Set((profile?.notForMe ?? []).map((t) => key(t)));
-  const favs = new Set((profile?.favouriteAuthors ?? []).map((a) => a.toLowerCase()));
-  const loved = books.filter((b) => (b.rating ?? 0) >= 4);
+  const notForMe = new Set((profile?.notForMe ?? []).map((t) => key(t.replace(/\s*\(.*\)$/, ''))));
+  const wish = { genre: req.genre, mood: req.mood };
 
-  if (req.source === 'shelf') {
-    const candidates = books
-      .filter((b) => b.status === 'owned' && !exclude.has(key(b.title)) && !notForMe.has(key(b.title)))
-      .map((b) => {
-        let score = Math.random();
-        if (req.genre && b.genres.includes(req.genre)) score += 3;
-        if (favs.has((b.authors[0] ?? '').toLowerCase())) score += 1;
-        if (loved.some((l) => l.series && b.series && l.series.name === b.series.name)) score += 2;
-        if (loved.some((l) => l.authors[0] === b.authors[0])) score += 1;
-        // Don't jump ahead in a series: the part before this one should be read
-        const n = b.series?.number;
-        if (b.series && n && n > 1) {
-          const prev = books.find((x) => x.series?.name === b.series!.name && x.series?.number === n - 1);
-          if (prev?.status !== 'read') score -= 5;
-        }
-        return { b, score };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3);
-    return candidates.map(({ b }) => {
-      const sameAuthor = loved.find((l) => l.authors[0] === b.authors[0] && l.id !== b.id);
-      const why = sameAuthor
-        ? `You gave ${sameAuthor.title} ${sameAuthor.rating} stars, and this one is by ${b.authors[0]} too. (Test mode: real tips come once the AI is switched on.)`
-        : `It's been waiting on your shelf${b.genres[0] ? ` and fits your love for ${b.genres[0].toLowerCase()}` : ''}. (Test mode: real tips come once the AI is switched on.)`;
-      return { title: b.title, author: b.authors[0] ?? '', why, bookId: b.id, seriesNote: b.series ? `${b.series.name} #${b.series.number ?? '?'}` : undefined };
-    });
-  }
+  const candidates =
+    req.source === 'shelf'
+      ? books
+          .filter((b) => b.status === 'owned')
+          .map((b) => ({
+            book: b,
+            c: { title: b.title, author: b.authors[0] ?? '', genres: b.genres, traits: bookTraits(b) } as Candidate,
+          }))
+      : (() => {
+          const have = new Set(books.map((b) => key(b.title, b.authors[0])));
+          return MOCK_BUY_LIST.filter((m) => !have.has(key(m.title, m.author))).map((m) => ({ book: undefined, c: m as Candidate }));
+        })();
 
-  const have = new Set(books.map((b) => key(b.title, b.authors[0])));
-  const pool = MOCK_BUY_LIST.filter(
-    (m) =>
-      !have.has(key(m.title, m.author)) &&
-      !exclude.has(key(m.title)) &&
-      !notForMe.has(key(m.title)) &&
-      (!req.genre || m.genres.includes(req.genre)) &&
-      (!req.mood || m.moods.includes(req.mood)),
-  );
-  const list = (pool.length >= 3 ? pool : MOCK_BUY_LIST.filter((m) => !have.has(key(m.title, m.author)) && !exclude.has(key(m.title))))
-    .map((m) => ({ m, r: Math.random() }))
-    .sort((a, b) => a.r - b.r)
+  return candidates
+    .filter(({ c }) => !exclude.has(key(c.title)) && !notForMe.has(key(c.title)))
+    .map(({ book, c }) => ({ book, c, ...scoreBook(c, taste, books, wish) }))
+    .filter((x) => !req.genre || x.c.genres.includes(req.genre))
+    .sort((a, b) => b.score - a.score)
     .slice(0, 3)
-    .map(({ m }) => m);
-  return list.map((m) => ({
-    title: m.title,
-    author: m.author,
-    why: `${m.blurb} (Test mode: real, personal tips come once the AI is switched on.)`,
-  }));
+    .map(({ book, c, score, why }) => ({
+      title: c.title,
+      author: c.author,
+      why,
+      score,
+      bookId: book?.id,
+      seriesNote: book?.series ? `${book.series.name} #${book.series.number ?? '?'}` : undefined,
+    }));
 }
 
 // ---------- "Does this fit me?" ----------
@@ -387,15 +377,17 @@ const FitSchema = z.object({
 
 export async function fitCheck(
   env: AiEnv,
-  book: { title: string; author: string; description?: string },
+  book: { title: string; author: string; description?: string; genres?: string[] },
   books: Book[],
   profile?: ReaderProfile,
 ): Promise<FitResponse> {
   if (!isLive(env)) {
-    const sameAuthor = books.find((b) => b.authors[0]?.toLowerCase() === book.author.toLowerCase() && (b.rating ?? 0) >= 4);
-    return sameAuthor
-      ? { verdict: 'love', score: 88, why: `You loved ${sameAuthor.title} by the same author. (Test mode)`, seriesNote: null, mock: true }
-      : { verdict: 'maybe', score: 60, why: 'Hard to say without the AI switched on. (Test mode)', seriesNote: null, mock: true };
+    // Test mode: the same taste engine as the tips, so scores mean the same everywhere
+    const taste = learnTaste(books, profile);
+    const traits = traitsIn(`${book.description ?? ''} ${(book.genres ?? []).join(' ')}`);
+    const { score, why } = scoreBook({ title: book.title, author: book.author, genres: book.genres ?? [], traits }, taste, books, {});
+    const verdict = score >= 85 ? 'love' : score >= 70 ? 'like' : score >= 55 ? 'maybe' : 'skip';
+    return { verdict, score, why, seriesNote: null, mock: true };
   }
   const result = await cached(env, ['fit', book, books, profile], 7, () =>
     ask(

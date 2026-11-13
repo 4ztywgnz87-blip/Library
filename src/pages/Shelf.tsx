@@ -10,6 +10,7 @@ import { Bookend, Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat }
 
 const ROW = 140; // px per shelf row (spines + board)
 const BOARD = 12;
+const GROUP_GAP = 3; // px between two series/authors; books of one series touch
 const MIN_SCALE = 0.72; // books never get smaller than this before a new row is added
 
 
@@ -142,7 +143,7 @@ function ShelfSection({
   status: Status;
   label: string;
   books: readonly Book[];
-  decor?: ReactNode;
+  decor?: { el: ReactNode; width: number };
   startDelay: number;
 }) {
   const navigate = useNavigate();
@@ -159,10 +160,10 @@ function ShelfSection({
   }, []);
   const booksWidth = books.reduce((sum, b, i) => {
     const prev = books[i - 1];
-    const gap = !prev ? 0 : (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? 6 : 1;
+    const gap = !prev ? 0 : (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? GROUP_GAP : 0;
     return sum + spineStyle(b).width + gap;
   }, 0);
-  const DECOR = 84;
+  const DECOR = (decor?.width ?? 0) + 20 + (books.length ? 18 : 0); // decoration + margins (+ bookend)
   const room = Math.max(1, available - 2);
   // shrink just enough for books (+ decoration) to fit on one row, but not below MIN_SCALE
   const scale = !available
@@ -183,10 +184,12 @@ function ShelfSection({
   const decorEl = (
     <div
       key="decor"
-      className={`ml-2 flex items-end gap-1 ${decorMid ? 'mr-0 justify-between' : 'mr-2'}`}
-      style={{ height: row, paddingBottom: BOARD, width: (decorMid ? 72 + 30 : 72) * scale }}
+      className={`ml-1.5 flex items-end gap-1 ${decorMid ? 'mr-0' : 'mr-1.5'}`}
+      style={{ height: row, paddingBottom: BOARD }}
     >
-      <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom left' }}>{decor}</div>
+      <div style={{ width: (decor?.width ?? 0) * scale }}>
+        <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom left' }}>{decor?.el}</div>
+      </div>
       {decorMid && <Bookend className="shrink-0" style={{ height: 64 * scale, width: (64 * 24 * scale) / 84 }} />}
     </div>
   );
@@ -223,7 +226,7 @@ function ShelfSection({
           // a little breathing room between different series/authors
           const prev = books[i - 1];
           const newGroup =
-            prev && (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? 'ml-1.5' : 'ml-[1px]';
+            prev && (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? 'ml-[3px]' : '';
           // Leaning books rest their top against the left neighbour (a book or the bookend) and
           // their foot slides a little to the right, so they get some room on that side.
           // Who leans: sometimes the last book of the shelf, or the book just before a decoration.
@@ -274,9 +277,10 @@ export default function Shelf() {
   if (!books) return null;
   const wishCount = byStatus.wishlist.length;
 
-  const decor: Partial<Record<Status, ReactNode>> = {
-    owned: <Candle className="h-20 w-12" />,
-    read: <Mug className="h-20 w-[68px]" />,
+  // decorations with their natural width (px), so their spot on the shelf is exactly that wide
+  const decor: Partial<Record<Status, { el: ReactNode; width: number }>> = {
+    owned: { el: <Candle className="h-20 w-12" />, width: 48 },
+    read: { el: <Mug className="h-20 w-[68px]" />, width: 68 },
   };
 
   return (

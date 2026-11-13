@@ -13,6 +13,7 @@ import { Cover } from '../components/Cover';
 import { Button, Card, Chip, PageHeader } from '../components/ui';
 import { SparkleIcon } from '../components/Icons';
 import { BookPreview, type PreviewBook } from '../components/BookPreview';
+import { MatchRing, matchLabel } from '../components/MatchRing';
 import { useHistoryModal } from '../lib/modal';
 
 type Source = RecommendRequest['source'];
@@ -167,7 +168,7 @@ export default function Next() {
               </Button>
               {mock && (
                 <p className="max-w-sm text-center text-xs text-mocha">
-                  Test mode: these tips are simple picks without AI. Real, personal tips come once the AI is switched on.
+                  Test mode: tips come from Snug's own taste guesses (your ratings, reviews and quiz). With the AI on, Claude makes them even more personal.
                 </p>
               )}
             </div>
@@ -224,8 +225,18 @@ function PickCard({
           <p className="mt-2 text-center font-soft text-sm text-mocha">#{rank + 1}</p>
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-lg leading-snug font-semibold">{pick.title}</h3>
-          <p className="text-sm text-cocoa">{pick.author}</p>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-lg leading-snug font-semibold">{pick.title}</h3>
+              <p className="text-sm text-cocoa">{pick.author}</p>
+            </div>
+            {pick.score !== undefined && (
+              <div className="flex flex-col items-center">
+                <MatchRing score={pick.score} />
+                <span className="mt-0.5 text-[0.6rem] whitespace-nowrap text-mocha">{matchLabel(pick.score)}</span>
+              </div>
+            )}
+          </div>
           {pick.seriesNote && <p className="mt-1 text-xs text-mocha">{pick.seriesNote}</p>}
           <p className="mt-2 text-sm leading-relaxed text-ink/90">{pick.why}</p>
           <div className="mt-3 flex flex-wrap gap-2">

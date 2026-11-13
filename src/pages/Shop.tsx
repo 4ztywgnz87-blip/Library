@@ -71,7 +71,7 @@ export default function Shop() {
     setState({ kind: 'working', text: 'Checking if it fits you…' });
     try {
       if (picked) {
-        const fit = await fitCheck({ title: picked.title, author: picked.authors[0] ?? author, description: picked.description });
+        const fit = await fitCheck({ title: picked.title, author: picked.authors[0] ?? author, description: picked.description, genres: picked.genres });
         return setState({ kind: 'fit', book: picked, fit });
       }
       const results = await searchBooks(`${title} ${author}`);
@@ -82,7 +82,7 @@ export default function Shop() {
         authors: [author],
         genres: [],
       };
-      const fit = await fitCheck({ title: found.title, author: found.authors[0] ?? author, description: found.description });
+      const fit = await fitCheck({ title: found.title, author: found.authors[0] ?? author, description: found.description, genres: found.genres });
       setState({ kind: 'fit', book: found, fit });
     } catch (e) {
       setState({ kind: 'error', text: (e as Error).message });

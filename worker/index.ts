@@ -183,11 +183,11 @@ app.post('/ai/recommend', async (c) => {
 });
 
 app.post('/ai/fit', async (c) => {
-  const book = await c.req.json<{ title?: string; author?: string; description?: string }>();
+  const book = await c.req.json<{ title?: string; author?: string; description?: string; genres?: string[] }>();
   if (!book.title || !book.author) return c.json({ error: 'Title and author required' }, 400);
   return aiRoute(c, async () => {
     const { books, profile } = await loadLibrary(c.env);
-    return fitCheck(c.env, { title: book.title!, author: book.author!, description: book.description }, books, profile);
+    return fitCheck(c.env, { title: book.title!, author: book.author!, description: book.description, genres: book.genres }, books, profile);
   });
 });
 

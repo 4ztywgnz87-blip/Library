@@ -50,6 +50,8 @@ export interface Pick {
   why: string;
   /** Set when the pick is a book from her own shelf */
   bookId?: string;
+  /** How well it fits her, 0–100 */
+  score?: number;
   seriesNote?: string;
 }
 
