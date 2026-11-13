@@ -9,7 +9,7 @@ import { STATUSES, type Lang, type Status } from '../types';
 import { Cover } from '../components/Cover';
 import { Button, PageHeader, Segmented } from '../components/ui';
 import { CoverChoice } from '../components/CoverChoice';
-import { CameraIcon, PhotosIcon, CheckIcon, CloseIcon, SearchIcon } from '../components/Icons';
+import { CameraIcon, CheckIcon, CloseIcon, SearchIcon } from '../components/Icons';
 import { PhotoInput } from '../components/PhotoInput';
 import { SleepyCat } from '../components/SleepyCat';
 import { EditionPicker } from '../components/EditionPicker';
@@ -149,24 +149,14 @@ export default function Add() {
           )}
         </div>
 
-        {/* Main way to add: a photo of the cover, new or from the camera roll */}
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <PhotoInput
-            camera
-            disabled={reading}
-            onFile={(f) => void readCover(f)}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-wine px-3 py-3.5 text-sm font-medium text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97]"
-          >
-            <CameraIcon width={20} height={20} /> Take a photo
-          </PhotoInput>
-          <PhotoInput
-            disabled={reading}
-            onFile={(f) => void readCover(f)}
-            className="flex items-center justify-center gap-2 rounded-2xl border border-wine/25 bg-white px-3 py-3.5 text-sm font-medium text-wine shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97]"
-          >
-            <PhotosIcon width={20} height={20} /> From photos
-          </PhotoInput>
-        </div>
+        {/* Main way to add: a photo of the cover (iOS offers camera or photo library) */}
+        <PhotoInput
+          disabled={reading}
+          onFile={(f) => void readCover(f)}
+          className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-wine px-3 py-3.5 text-sm font-medium text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.97]"
+        >
+          <CameraIcon width={20} height={20} /> Photo of the cover
+        </PhotoInput>
 
         {reading && <LoadingTea text="Reading the cover…" />}
         {recognised && (
@@ -226,7 +216,9 @@ export default function Add() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-ink">{r.title ?? r.q}</span>
                         <span className="block truncate text-xs text-mocha">
-                          {[r.kind === 'photo' ? 'Cover photo' : !r.title && 'Search', r.author].filter(Boolean).join(' · ')}
+                          {[r.kind === 'photo' ? 'Cover photo' : !r.title && 'Search', r.author]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </span>
                       </span>
                     </button>
@@ -241,9 +233,7 @@ export default function Add() {
           {query.trim().length < 2 && !reading && recent.length === 0 && (
             <div className="flex flex-col items-center py-10 text-center text-sm text-cocoa">
               <SleepyCat className="w-32 opacity-90" />
-              <p className="mt-3">
-                Take a photo of the cover, pick one from your photos, or search by title, author or ISBN.
-              </p>
+              <p className="mt-3">Take or pick a photo of the cover, or search by title, author or ISBN.</p>
             </div>
           )}
 

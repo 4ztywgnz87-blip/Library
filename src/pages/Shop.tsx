@@ -12,7 +12,7 @@ import { STATUSES, type Book } from '../types';
 import { Cover } from '../components/Cover';
 import { StarsDisplay } from '../components/Stars';
 import { Button, Card, PageHeader } from '../components/ui';
-import { CameraIcon, PhotosIcon, SearchIcon } from '../components/Icons';
+import { CameraIcon, SearchIcon } from '../components/Icons';
 import { PhotoInput } from '../components/PhotoInput';
 
 const VERDICT: Record<FitResponse['verdict'], { label: string; color: string }> = {
@@ -128,22 +128,12 @@ export default function Shop() {
           Snap the cover: Snug tells you if you already have it, and if it's your kind of book.
         </p>
 
-        <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
-          <PhotoInput
-            camera
-            onFile={(f) => void fromPhoto(f)}
-            className="flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-wine px-4 py-5 text-base font-medium text-cream shadow-[var(--shadow-soft)] active:scale-[0.98]"
-          >
-            <CameraIcon width={24} height={24} /> Take a photo of the cover
-          </PhotoInput>
-          <PhotoInput
-            onFile={(f) => void fromPhoto(f)}
-            className="flex flex-col items-center justify-center rounded-[var(--radius-card)] border border-wine/25 bg-white px-4 text-[0.65rem] font-medium text-wine shadow-[var(--shadow-soft)] active:scale-[0.98]"
-          >
-            <PhotosIcon width={24} height={24} />
-            Photos
-          </PhotoInput>
-        </div>
+        <PhotoInput
+          onFile={(f) => void fromPhoto(f)}
+          className="mt-5 flex items-center justify-center gap-2 rounded-[var(--radius-card)] bg-wine px-4 py-5 text-base font-medium text-cream shadow-[var(--shadow-soft)] active:scale-[0.98]"
+        >
+          <CameraIcon width={24} height={24} /> Photo of the cover
+        </PhotoInput>
 
         <div className="relative mt-4">
           <SearchIcon className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-mocha" />

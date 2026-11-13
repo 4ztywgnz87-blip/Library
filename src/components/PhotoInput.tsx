@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
 /**
- * A button that opens the camera (`camera`) or her photo library.
- * Wraps a hidden file input, so it works the same on iPhone, iPad and Mac.
+ * A photo button. On iPhone/iPad it opens the iOS menu: Photo Library or Take Photo
+ * (`camera` skips the menu and opens the camera directly). On a Mac it picks a file.
  */
 export function PhotoInput({
   camera,

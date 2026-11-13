@@ -26,7 +26,10 @@ function when(d?: string, upcoming?: boolean) {
   if (d.length === 4) return upcoming ? `Coming in ${d}` : `Published ${d}`;
   const t = Date.parse(d.length === 7 ? `${d}-01` : d);
   if (Number.isNaN(t)) return d;
-  const date = new Date(t).toLocaleDateString('en-GB', d.length === 7 ? { month: 'long', year: 'numeric' } : { day: 'numeric', month: 'long', year: 'numeric' });
+  const date = new Date(t).toLocaleDateString(
+    'en-GB',
+    d.length === 7 ? { month: 'long', year: 'numeric' } : { day: 'numeric', month: 'long', year: 'numeric' },
+  );
   return t > Date.now() ? `Coming ${date}` : `Published ${date}`;
 }
 
@@ -36,10 +39,12 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
   const [owned, setOwned] = useState<Book | undefined>();
   const [added, setAdded] = useState(false);
   const [open, setOpen] = useState(false);
+  const [looking, setLooking] = useState(!(book.description && book.coverUrl));
 
   useEffect(() => {
     findExisting({ title: book.title, authors: [book.author] }).then(setOwned);
     if (book.description && book.coverUrl) return;
+    setLooking(true);
     // Fill in the blurb (and a cover) from the book search
     searchBooks(`${book.title} ${book.author}`)
       .then((r) => {
@@ -60,12 +65,18 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
             series: d.series ?? match.series,
           }));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLooking(false));
   }, [book]);
 
   return createPortal(
     <>
-      <motion.div className="fixed inset-0 z-40 bg-ink/30" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} />
+      <motion.div
+        className="fixed inset-0 z-40 bg-ink/30"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        onClick={onClose}
+      />
       <motion.div
         className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88dvh] max-w-lg flex-col rounded-t-[1.75rem] bg-cream shadow-2xl md:bottom-8 md:rounded-[1.75rem]"
         initial={{ y: '100%' }}
@@ -79,7 +90,10 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-5">
           <div className="flex gap-4">
-            <Cover book={{ title: details.title, authors: [details.author], coverUrl: details.coverUrl }} className="w-28 shrink-0" />
+            <Cover
+              book={{ title: details.title, authors: [details.author], coverUrl: details.coverUrl }}
+              className="w-28 shrink-0"
+            />
             <div className="min-w-0">
               <h2 className="text-2xl leading-tight font-semibold">{details.title}</h2>
               <p className="mt-1 text-cocoa">{details.author}</p>
@@ -98,12 +112,21 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
           </div>
           {details.description ? (
             <div className="mt-5">
-              <p className={`text-sm leading-relaxed text-ink/90 ${open ? '' : 'line-clamp-6'}`}>{details.description}</p>
+              <p className={`text-sm leading-relaxed text-ink/90 ${open ? '' : 'line-clamp-6'}`}>
+                {details.description}
+              </p>
               {details.description.length > 320 && (
                 <button className="mt-1 text-sm text-wine" onClick={() => setOpen(!open)}>
                   {open ? 'Show less' : 'Read more'}
                 </button>
               )}
+            </div>
+          ) : looking ? (
+            // still fetching the blurb: soft placeholder lines instead of "no description"
+            <div className="mt-5 space-y-2" aria-label="Loading description">
+              {[100, 95, 98, 70].map((w, i) => (
+                <div key={i} className="h-3 animate-pulse rounded-full bg-sand/70" style={{ width: `${w}%` }} />
+              ))}
             </div>
           ) : (
             <p className="mt-5 text-sm text-mocha">No description found yet.</p>

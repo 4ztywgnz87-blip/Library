@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import type { Book } from '../types';
 import { googleBooks } from '../lib/bookSearch';
-import { CameraIcon, CloseIcon, PhotosIcon } from './Icons';
+import { CameraIcon, CloseIcon } from './Icons';
 import { PhotoInput } from './PhotoInput';
 import { CoverCropper } from './CoverCropper';
 
@@ -150,23 +150,13 @@ export function EditionPicker({
             ))}
             {/* Her own photo: the book is found, cut out and straightened */}
             <PhotoInput
-              camera
               onFile={setPhoto}
               className="flex aspect-[2/3] flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-oat text-center text-xs text-cocoa"
             >
               <CameraIcon />
               Not here?
               <br />
-              Take a photo
-            </PhotoInput>
-            <PhotoInput
-              onFile={setPhoto}
-              className="flex aspect-[2/3] flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-oat text-center text-xs text-cocoa"
-            >
-              <PhotosIcon />
-              Pick from
-              <br />
-              your photos
+              Use a photo
             </PhotoInput>
           </div>
           {options !== null && visible.length === 0 && (
