@@ -1,17 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { loginWithLink, requestLoginLink, verifyCode } from '../lib/auth';
+import { hasPassword, loginWithLink, loginWithPassword, requestLoginLink, verifyCode } from '../lib/auth';
 import { Button } from '../components/ui';
 import { SleepyCat } from '../components/SleepyCat';
 
-type Step = 'email' | 'code' | 'nomail';
+type Step = 'loading' | 'password' | 'email' | 'code' | 'nomail';
 
 export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [link, setLink] = useState('');
-  // Without a mail service, Snug is opened with a personal link instead
-  const [step, setStep] = useState<Step>(import.meta.env.VITE_EMAIL_LOGIN === '1' ? 'email' : 'nomail');
+  const [password, setPasswordValue] = useState('');
+  // Password if one is set; otherwise a personal link (or email, when a mail service is set up)
+  const [step, setStep] = useState<Step>('loading');
+  useEffect(() => {
+    hasPassword().then((has) =>
+      setStep(has ? 'password' : import.meta.env.VITE_EMAIL_LOGIN === '1' ? 'email' : 'nomail'),
+    );
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const expired = new URLSearchParams(location.search).get('error');
@@ -57,6 +63,45 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
         <SleepyCat className="mx-auto w-44" />
         <h1 className="mt-4 text-5xl font-semibold text-wine">Snug</h1>
         <p className="mt-2 text-cocoa">Your cosy little library</p>
+
+        {step === 'password' && (
+          <form
+            className="mt-10 space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setError(null);
+              try {
+                await loginWithPassword(password);
+                onLoggedIn();
+              } catch (err) {
+                setError((err as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {/* Lets the iPhone save the password in Keychain (and fill it with Face ID) */}
+            <input type="text" name="username" autoComplete="username" value="Snug" readOnly hidden />
+            <input
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              autoFocus
+              value={password}
+              onChange={(e) => setPasswordValue(e.target.value)}
+              placeholder="Password"
+              className={inputClass}
+            />
+            <Button type="submit" disabled={busy || !password} className="w-full py-3.5">
+              {busy ? 'Opening…' : 'Open my library'}
+            </Button>
+            {error && <p className="text-sm text-wine">{error}</p>}
+            <button type="button" className="pt-2 text-xs text-cocoa underline" onClick={() => setStep('nomail')}>
+              I have a login link
+            </button>
+          </form>
+        )}
 
         {step === 'email' && (
           <form

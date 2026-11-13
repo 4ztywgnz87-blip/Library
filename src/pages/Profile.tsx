@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, setMeta } from '../db';
 import { useMeta } from '../lib/hooks';
 import { syncNow } from '../lib/sync';
-import { logout } from '../lib/auth';
+import { hasPassword, logout, setPassword } from '../lib/auth';
 import { Button, Card, PageHeader } from '../components/ui';
 
 export default function Profile({ onLoggedOut }: { onLoggedOut: () => void }) {
@@ -62,6 +62,8 @@ export default function Profile({ onLoggedOut }: { onLoggedOut: () => void }) {
             {syncing ? 'Syncing…' : 'Sync now'}
           </Button>
         </Card>
+
+        <PasswordCard />
 
         <InviteCard />
 
@@ -145,6 +147,60 @@ function InviteCard() {
           </div>
         </div>
       )}
+    </Card>
+  );
+}
+
+function PasswordCard() {
+  const [has, setHas] = useState<boolean | null>(null);
+  const [value, setValue] = useState('');
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    hasPassword().then(setHas);
+  }, []);
+
+  return (
+    <Card className="space-y-3">
+      <p className="text-xs tracking-wide text-mocha uppercase">Password</p>
+      <p className="text-sm text-cocoa">
+        {has
+          ? 'Snug opens with your password. Change it here if you like.'
+          : 'Set a password to log in on any device. Your iPhone can remember it and fill it in with Face ID.'}
+      </p>
+      <form
+        className="flex gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setMsg(null);
+          try {
+            await setPassword(value);
+            setHas(true);
+            setValue('');
+            setMsg({ ok: true, text: 'Saved ✓' });
+          } catch (err) {
+            setMsg({ ok: false, text: (err as Error).message });
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <input type="text" name="username" autoComplete="username" value="Snug" readOnly hidden />
+        <input
+          type="password"
+          name="new-password"
+          autoComplete="new-password"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={has ? 'New password' : 'Choose a password'}
+          className="min-w-0 flex-1 rounded-xl border border-sand bg-white px-3 py-2.5 text-[16px] outline-none focus:border-oat"
+        />
+        <Button type="submit" variant="soft" disabled={busy || value.length < 6}>
+          Save
+        </Button>
+      </form>
+      {msg && <p className={`text-sm ${msg.ok ? 'text-sage' : 'text-wine'}`}>{msg.text}</p>}
     </Card>
   );
 }

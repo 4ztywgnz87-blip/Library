@@ -95,7 +95,66 @@ async function startSession(c: Context<{ Bindings: Env; Variables: Vars }>, emai
   });
 }
 
+// ---------- password ----------
+
+const PBKDF2_ITERATIONS = 100_000;
+const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+const unb64 = (s: string) => Uint8Array.from(atob(s), (ch) => ch.charCodeAt(0));
+
+async function pbkdf2(password: string, salt: Uint8Array, iterations: number) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
+  return new Uint8Array(bits);
+}
+
+async function hashPassword(password: string) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await pbkdf2(password, salt, PBKDF2_ITERATIONS);
+  return ['pbkdf2', PBKDF2_ITERATIONS, b64(salt), b64(hash)].join(':');
+}
+
+async function checkPassword(password: string, stored: string) {
+  const [, iter, salt, hash] = stored.split(':');
+  const got = await pbkdf2(password, unb64(salt), Number(iter));
+  const want = unb64(hash);
+  let diff = got.length ^ want.length;
+  for (let i = 0; i < Math.min(got.length, want.length); i++) diff |= got[i] ^ want[i];
+  return diff === 0;
+}
+
+async function getPasswordHash(env: Env) {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'password'").first<{ value: string }>();
+  return row?.value;
+}
+
 // ---------- auth ----------
+
+app.get('/auth/status', async (c) => c.json({ hasPassword: !!(await getPasswordHash(c.env)) }));
+
+app.post('/auth/login', async (c) => {
+  const { password } = await c.req.json<{ password?: string }>();
+  const ip = c.req.header('cf-connecting-ip') ?? 'unknown';
+  const now = Date.now();
+
+  // At most 10 wrong tries per 15 minutes per connection, against guessing
+  const tries = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM login_attempts WHERE ip = ? AND ts > ?')
+    .bind(ip, now - 15 * 60_000)
+    .first<{ n: number }>();
+  if ((tries?.n ?? 0) >= 10) return c.json({ error: 'Too many tries. Wait 15 minutes.' }, 429);
+
+  const stored = await getPasswordHash(c.env);
+  if (!stored || !password || !(await checkPassword(password, stored))) {
+    await c.env.DB.batch([
+      c.env.DB.prepare('INSERT INTO login_attempts (ip, ts) VALUES (?, ?)').bind(ip, now),
+      c.env.DB.prepare('DELETE FROM login_attempts WHERE ts < ?').bind(now - 86_400_000),
+    ]);
+    return c.json({ error: 'That password is not right.' }, 400);
+  }
+  const owner = (c.env.ALLOWED_EMAIL || '').split(',').map(normEmail).filter(Boolean)[0];
+  if (!owner) return c.json({ error: 'No reader configured' }, 500);
+  await startSession(c, owner);
+  return c.json({ ok: true });
+});
 
 app.post('/auth/request', async (c) => {
   const { email } = await c.req.json<{ email?: string }>();
@@ -178,7 +237,7 @@ app.post('/auth/link', async (c) => {
 
 // Everything below requires a session
 app.use('/*', async (c, next) => {
-  if (['/api/auth/request', '/api/auth/verify', '/api/auth/code', '/api/auth/link'].includes(c.req.path)) return next();
+  if (['/api/auth/request', '/api/auth/verify', '/api/auth/code', '/api/auth/link', '/api/auth/status', '/api/auth/login'].includes(c.req.path)) return next();
   const sid = getCookie(c, SESSION_COOKIE);
   if (!sid) return c.json({ error: 'Not logged in' }, 401);
   const row = await c.env.DB.prepare('SELECT email, expires_at FROM sessions WHERE id_hash = ?')
@@ -215,6 +274,17 @@ app.post('/auth/invite', async (c) => {
     .bind(await sha256(token), normEmail(email), Date.now() + 7 * 86_400_000)
     .run();
   return c.json({ link: `${new URL(c.req.url).origin}/api/auth/verify?token=${token}` });
+});
+
+app.post('/auth/password', async (c) => {
+  const { password } = await c.req.json<{ password?: string }>();
+  if (!password || password.length < 6) return c.json({ error: 'Use at least 6 characters.' }, 400);
+  await c.env.DB.prepare(
+    "INSERT INTO settings (key, value) VALUES ('password', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+  )
+    .bind(await hashPassword(password))
+    .run();
+  return c.json({ ok: true });
 });
 
 app.get('/auth/me', (c) => c.json({ email: c.get('email') }));

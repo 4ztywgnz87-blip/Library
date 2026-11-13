@@ -57,6 +57,34 @@ export async function loginWithLink(input: string) {
   await setMeta('loggedIn', true);
 }
 
+export async function hasPassword(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/auth/status');
+    return res.ok && ((await res.json()) as { hasPassword: boolean }).hasPassword;
+  } catch {
+    return false;
+  }
+}
+
+async function postJson(url: string, body: unknown) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(json.error ?? 'Something went wrong');
+}
+
+export async function loginWithPassword(password: string) {
+  await postJson('/api/auth/login', { password });
+  await setMeta('loggedIn', true);
+}
+
+export async function setPassword(password: string) {
+  await postJson('/api/auth/password', { password });
+}
+
 export async function logout() {
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   // Each reader has their own library: clear this device's copy so the next person starts clean
