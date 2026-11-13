@@ -80,6 +80,7 @@ export interface SeriesBook {
   title: string;
   status: 'published' | 'announced';
   releaseDate: string | null;
+  coverUrl?: string;
 }
 
 export interface SeriesResponse {

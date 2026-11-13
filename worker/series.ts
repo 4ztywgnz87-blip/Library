@@ -6,6 +6,7 @@ export const olFetch = (path: string) =>
 
 interface OLWork {
   title?: string;
+  covers?: number[];
   first_publish_date?: string;
   series?: { series: { key: string }; position?: string }[];
 }
@@ -38,6 +39,7 @@ export interface SeriesPart {
   title: string;
   status: 'published' | 'announced';
   releaseDate: string | null;
+  coverUrl?: string;
 }
 
 export async function seriesParts(key: string): Promise<SeriesPart[]> {
@@ -60,6 +62,7 @@ export async function seriesParts(key: string): Promise<SeriesPart[]> {
         title: work.title ?? s.title,
         status: released && Date.parse(released) > Date.now() ? 'announced' : 'published',
         releaseDate: released,
+        coverUrl: work.covers?.find((c) => c > 0) ? `https://covers.openlibrary.org/b/id/${work.covers.find((c) => c > 0)}-L.jpg` : undefined,
       };
     }),
   );

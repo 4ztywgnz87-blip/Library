@@ -4,10 +4,10 @@ import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { groupSeries, seriesEntries, seriesPath, upcomingParts, type SeriesGroup } from '../lib/series';
 import { authorNews, type AuthorNews } from '../lib/authors';
-import { titleStart } from '../lib/seriesLookup';
 import { normalize } from '../lib/library';
 import { seriesInfo } from '../lib/ai';
 import { quickAdd } from '../lib/quickAdd';
+import { sameBook, searchBooks } from '../lib/bookSearch';
 import type { SeriesBook } from '../shared';
 import { STATUSES } from '../types';
 import { Cover } from '../components/Cover';
@@ -141,7 +141,7 @@ export function SeriesDetail() {
     );
   }
 
-  const entries = seriesEntries(group, [...known, ...upcomingParts(group, known, news, titleStart)]);
+  const entries = seriesEntries(group, [...known, ...upcomingParts(group, known, news)]);
 
   return (
     <div>
@@ -183,9 +183,7 @@ export function SeriesDetail() {
               ) : (
                 <div className="flex items-center gap-4 rounded-[var(--radius-card)] border-2 border-dashed border-sand px-4 py-3">
                   <span className="w-6 text-center font-soft text-lg text-mocha">{e.number}</span>
-                  <div className="flex aspect-[2/3] w-12 shrink-0 items-center justify-center rounded bg-linen text-lg text-mocha">
-                    ?
-                  </div>
+                  <MissingCover title={e.title} author={group.author} coverUrl={e.coverUrl} />
                   <div className="min-w-0 flex-1">
                     <p className="leading-snug font-medium text-cocoa">{e.title ?? `Book ${e.number}`}</p>
                     <p className="text-xs text-wine">
@@ -206,6 +204,7 @@ export function SeriesDetail() {
                       setAdding(e.number);
                       await quickAdd(e.title, group.author, 'wishlist', {
                         series: { name: group.name, number: e.number },
+                        coverUrl: e.coverUrl,
                       });
                       setAdding(null);
                     }}
@@ -234,4 +233,31 @@ function formatRelease(d: string) {
   const t = Date.parse(d.length === 7 ? `${d}-01` : d);
   if (Number.isNaN(t)) return d;
   return new Date(t).toLocaleDateString('en-GB', d.length === 7 ? { month: 'long', year: 'numeric' } : { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/** Cover of a part she doesn't have: from the series data, or looked up (exactly this book only) */
+function MissingCover({ title, author, coverUrl }: { title?: string; author: string; coverUrl?: string }) {
+  const [cover, setCover] = useState(coverUrl);
+  useEffect(() => {
+    setCover(coverUrl);
+    if (coverUrl || !title || !navigator.onLine) return;
+    let cancelled = false;
+    searchBooks(`${title} ${author}`)
+      .then((r) => {
+        const match = sameBook(r, title, author).find((x) => x.coverUrl && x.language !== undefined && ['en', 'nl'].includes(x.language));
+        if (!cancelled && match) setCover(match.coverUrl);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [title, author, coverUrl]);
+
+  if (!title) {
+    return (
+      <div className="flex aspect-[2/3] w-12 shrink-0 items-center justify-center rounded bg-linen text-lg text-mocha">?</div>
+    );
+  }
+  // slightly faded: she doesn't have it (yet)
+  return <Cover book={{ title, authors: [author], coverUrl: cover }} className="w-12 shrink-0 opacity-80" rounded="rounded" />;
 }

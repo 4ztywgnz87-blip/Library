@@ -41,7 +41,7 @@ export function groupSeries(books: Book[]): SeriesGroup[] {
 
 export type SeriesEntry =
   | { kind: 'mine'; number?: number; book: Book }
-  | { kind: 'missing'; number: number; title?: string; releaseDate?: string | null; announced: boolean };
+  | { kind: 'missing'; number: number; title?: string; releaseDate?: string | null; announced: boolean; coverUrl?: string };
 
 /** Her books + the full series list (when known) + gaps, in reading order */
 export function seriesEntries(group: SeriesGroup, known: SeriesBook[]): SeriesEntry[] {
@@ -58,6 +58,7 @@ export function seriesEntries(group: SeriesGroup, known: SeriesBook[]): SeriesEn
         title: sb.title,
         releaseDate: sb.releaseDate,
         announced: sb.status === 'announced',
+        coverUrl: sb.coverUrl,
       });
     }
   }
@@ -70,37 +71,34 @@ export function seriesEntries(group: SeriesGroup, known: SeriesBook[]): SeriesEn
 export const seriesPath = (name: string) => `/series/${encodeURIComponent(name)}`;
 
 /**
- * Announced (or just released) books by the series' author that belong to this series but
- * aren't in the series list yet: the title starts like the other parts ("A Court of …") or the
- * store lists it in the series. They get the next numbers, in order of release.
+ * Announced (or just released) books by the series' author that the source explicitly lists as
+ * part of this series, but that aren't in the series list yet. (No guessing by title: that could
+ * add the wrong book.) Without a number they get the next ones, in order of release.
  */
 export function upcomingParts(
   group: SeriesGroup,
   known: SeriesBook[],
-  news: { title: string; publishedDate: string; upcoming: boolean; series?: { name: string; number?: number } }[],
-  titleStart: (t: string) => string,
+  news: {
+    title: string;
+    publishedDate: string;
+    upcoming: boolean;
+    coverUrl?: string;
+    series?: { name: string; number?: number };
+  }[],
 ): SeriesBook[] {
-  const titles = [...group.books.map((b) => b.title), ...known.map((k) => k.title)];
-  // the shared title start, if most parts have one
-  const starts = new Map<string, number>();
-  for (const t of titles) starts.set(titleStart(t), (starts.get(titleStart(t)) ?? 0) + 1);
-  const [pattern, count] = [...starts.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0];
-  const usePattern = count >= 2 && count >= titles.length / 2;
-
-  const have = new Set(titles.map((t) => normalize(t)));
+  const have = new Set([...group.books.map((b) => b.title), ...known.map((k) => k.title)].map((t) => normalize(t)));
   const fits = news
-    .filter((n) => !have.has(normalize(n.title)))
-    .filter(
-      (n) =>
-        (n.series && normalize(n.series.name) === normalize(group.name)) || (usePattern && titleStart(n.title) === pattern),
-    )
+    .filter((n) => !have.has(normalize(n.title)) && n.series && normalize(n.series.name) === normalize(group.name))
     .sort((a, b) => a.publishedDate.localeCompare(b.publishedDate));
-
   let next = Math.max(0, ...known.map((k) => k.number), ...group.books.map((b) => b.series?.number ?? 0));
   return fits.map((n) => ({
     number: n.series?.number ?? ++next,
     title: n.title,
-    status: n.upcoming || Date.parse(n.publishedDate.length === 4 ? `${n.publishedDate}-12-31` : n.publishedDate) > Date.now() ? 'announced' : 'published',
+    status:
+      n.upcoming || Date.parse(n.publishedDate.length === 4 ? `${n.publishedDate}-12-31` : n.publishedDate) > Date.now()
+        ? 'announced'
+        : 'published',
     releaseDate: n.publishedDate,
+    coverUrl: n.coverUrl,
   }));
 }

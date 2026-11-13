@@ -100,7 +100,11 @@ function Spine({
         // a leaning book rests its top against its neighbour; its foot slides out a little
         // pivot where the book touches what it leans on: the top of its neighbour book, or the
         // top edge of a (lower) bookend
-        transformOrigin: !lean ? 'bottom center' : restHeight ? `0 ${Math.max(0, height - restHeight)}px` : 'top left',
+        transformOrigin: !lean
+          ? 'bottom center'
+          : restHeight && restHeight < height
+            ? `0 ${height - restHeight}px` // taller than its neighbour: touches the neighbour's top corner
+            : 'top left', // shorter: its own top corner rests against the neighbour
         // rounded spine: light from the left, shadow on the right, and a fine cloth texture
         backgroundImage:
           'linear-gradient(90deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.18) 16%, rgba(255,255,255,0.05) 38%, rgba(0,0,0,0.06) 70%, rgba(0,0,0,0.38) 100%), repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 3px)',
@@ -248,6 +252,8 @@ function ShelfSection({
                 scale={scale}
                 delay={startDelay + Math.min(i * 0.025, 0.6)}
                 lean={lean}
+                // it rests on the top corner of the book to its left: pivot exactly there
+                restHeight={lean && prev ? Math.round(spineStyle(prev).height * scale) : undefined}
               />
             </div>
           );
