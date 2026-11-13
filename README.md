@@ -9,7 +9,7 @@ Built as a web app (PWA): open it in Safari on iPhone/iPad → Share → **Add t
 
 - React + TypeScript + Vite + Tailwind, `motion` for animations
 - Offline-first: everything is stored in the browser (IndexedDB via Dexie) and synced in the background
-- Cloudflare Worker (Hono) + D1 database for login and sync; the built app is embedded in the Worker
+- Cloudflare Worker (Hono) + D1 database for sync; the built app is embedded in the Worker
   (`scripts/embed-assets.mjs`), so everything deploys in one upload
 
 Live: https://snug.snugshelf.workers.dev
@@ -19,37 +19,24 @@ Live: https://snug.snugshelf.workers.dev
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars        # put the allowed email address in it
+cp .dev.vars.example .dev.vars        # only needed for live AI later
 npm run db:migrate:local
 npm run build && npm run dev:api      # app + API on http://localhost:8787
 # or, for live reloading while coding, also run `npm run dev` (http://localhost:5173)
 ```
-
-Without `RESEND_API_KEY`, the login link is printed in the `dev:api` terminal.
 
 ## Deploy (free Cloudflare account)
 
 ```bash
 npx wrangler login                          # or set CLOUDFLARE_API_TOKEN
 npm run db:migrate:remote                   # database + account are already in wrangler.jsonc
-npx wrangler secret put ALLOWED_EMAIL       # allowed emails, comma-separated; each gets their own library
-npx wrangler secret put RESEND_API_KEY      # see "Login emails" below
 npm run deploy                              # → https://snug.snugshelf.workers.dev
 ```
 
-### Login emails
+### No login (for now)
 
-Login works with a 6-digit code by email (typed in the app, so it also works from the iPhone home
-screen) plus a link in the same mail. Mail is sent with [Brevo](https://www.brevo.com) (free, 300/day,
-only needs a verified sender address, no own domain):
-
-```bash
-npx wrangler secret put BREVO_API_KEY
-npx wrangler secret put MAIL_FROM           # the verified sender address in Brevo
-```
-
-Resend (`RESEND_API_KEY`) also works. Without a mail service, create a link with
-`node scripts/login-link.mjs <email>` or in the app under Me → Login link.
+Snug has a single reader, so it opens without logging in. Anyone with the URL can open it.
+Earlier login options (email code, password, Face ID) are in the git history if they are wanted later.
 
 ### AI (later phases)
 

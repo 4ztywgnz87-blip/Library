@@ -162,7 +162,7 @@ Op iPad en Mac wordt dat een zijbalk met een breder raster.
 | Styling/animatie | Tailwind CSS + Framer Motion + SVG voor de kast | strak, met vloeiende animaties |
 | Offline | IndexedDB (Dexie) + service worker | kast, lijsten en "heb ik dit al?" werken zonder bereik |
 | Backend | **Cloudflare Workers + D1-database + R2-opslag** | gratis tier, valt niet stil bij weinig gebruik, synchroniseert tussen toestellen |
-| Login | link via e-mail (zonder wachtwoord), verstuurd via Resend (gratis tier) | eenvoudig |
+| Login | geen (enkel zij gebruikt de app); kan later terugkomen | eenvoudig |
 | Boekdata | **Google Books API** + **Open Library** | gratis: covers, ISBN, series, verschijningsdata |
 | AI | **Claude API**, aangeroepen vanuit de Worker (de sleutel staat nooit in de app) | cover herkennen + aanbevelingen |
 | Hosting | Cloudflare Pages, met een eigen gratis `*.pages.dev`-adres | €0; een eigen domein kan later (± €10/jaar) |
@@ -209,8 +209,8 @@ Na elke fase krijgt ze een link om te testen, zodat ze kan meedenken.
 ## 9. Beslist
 - Naam: **Snug**
 - Aanbevelingen via **Claude Sonnet 5.5**, coverherkenning via Claude Haiku 5.5
-- Het Anthropic-account staat los van haar login (wordt beheerd door de maker)
-- Haar login-e-mail staat als geheime instelling op de server, niet in de code
+- Geen login: Snug opent meteen (enkel zij gebruikt het)
+- Het Anthropic-account wordt beheerd door de maker
 
 ## 10. Testen zonder kosten
 - Zoeken op titel/auteur gebruikt geen AI en is altijd gratis (Google Books + Open Library)

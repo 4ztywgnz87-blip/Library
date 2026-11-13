@@ -30,11 +30,6 @@ export async function syncNow(): Promise<void> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ since, changes }),
       });
-      if (res.status === 401) {
-        await setMeta('loggedIn', false);
-        window.dispatchEvent(new Event('snug:logged-out'));
-        return;
-      }
       if (!res.ok) return;
       const { now, records } = (await res.json()) as { now: number; records: SyncRecord[] };
 
@@ -61,11 +56,17 @@ export async function syncNow(): Promise<void> {
   return running;
 }
 
+/** Syncs now, when coming back online or to the app, and every few minutes. Returns a cleanup function. */
 export function startBackgroundSync() {
-  void syncNow();
-  window.addEventListener('online', () => void syncNow());
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') void syncNow();
-  });
-  setInterval(() => void syncNow(), 5 * 60_000);
+  const sync = () => void syncNow();
+  const onVisible = () => document.visibilityState === 'visible' && sync();
+  sync();
+  window.addEventListener('online', sync);
+  document.addEventListener('visibilitychange', onVisible);
+  const timer = setInterval(sync, 5 * 60_000);
+  return () => {
+    window.removeEventListener('online', sync);
+    document.removeEventListener('visibilitychange', onVisible);
+    clearInterval(timer);
+  };
 }
