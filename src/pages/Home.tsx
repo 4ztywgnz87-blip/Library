@@ -126,7 +126,7 @@ export default function Home() {
           )}
 
           {/* Little stats */}
-          <section className="grid grid-cols-3 gap-3">
+          <Link to="/stats" className="grid grid-cols-3 gap-3" aria-label="See my reading stats">
             {[
               { n: readThisYear, label: `read in ${year}` },
               { n: unread, label: 'waiting on the shelf' },
@@ -137,7 +137,7 @@ export default function Home() {
                 <div className="mt-1 text-xs leading-tight text-cocoa">{s.label}</div>
               </Card>
             ))}
-          </section>
+          </Link>
 
           {/* Series */}
           {seriesToShow.length > 0 && (

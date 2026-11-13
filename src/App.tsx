@@ -11,6 +11,7 @@ import { SeriesDetail, SeriesList } from './pages/Series';
 import Next from './pages/Next';
 import Shop from './pages/Shop';
 import Quiz from './pages/Quiz';
+import Stats from './pages/Stats';
 import { startBackgroundSync } from './lib/sync';
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="next" element={<Next />} />
           <Route path="shop" element={<Shop />} />
           <Route path="quiz" element={<Quiz />} />
+          <Route path="stats" element={<Stats />} />
           <Route path="*" element={<Home />} />
         </Route>
       </Routes>

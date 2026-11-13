@@ -35,6 +35,16 @@ export default function Profile() {
           />
         </Card>
 
+        <Link to="/stats" className="block">
+          <Card className="flex items-center gap-3">
+            <span className="text-2xl">📊</span>
+            <div className="flex-1">
+              <p className="font-soft text-lg">My reading</p>
+              <p className="text-sm text-cocoa">Books per month, favourite genres and your year in books.</p>
+            </div>
+          </Card>
+        </Link>
+
         <FavouriteAuthorsCard />
 
         <Link to="/quiz" className="block">
