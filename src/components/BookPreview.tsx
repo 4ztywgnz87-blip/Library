@@ -9,6 +9,7 @@ import type { Book } from '../types';
 import { Cover } from './Cover';
 import { Button } from './ui';
 import { CloseIcon } from './Icons';
+import { MatchRing, matchLabel } from './MatchRing';
 
 export interface PreviewBook {
   title: string;
@@ -19,6 +20,8 @@ export interface PreviewBook {
   description?: string;
   series?: { name: string; number?: number };
   isbn13?: string;
+  /** How well it fits her (from Trending) */
+  match?: { score: number; why: string; buzz?: string };
 }
 
 function when(d?: string, upcoming?: boolean) {
@@ -110,6 +113,20 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
               )}
             </div>
           </div>
+          {book.match && (
+            <div className="mt-4 flex gap-3 rounded-2xl bg-white/70 p-3">
+              <div className="flex flex-col items-center">
+                <MatchRing score={book.match.score} />
+                <span className="mt-0.5 text-[0.6rem] whitespace-nowrap text-mocha">
+                  {matchLabel(book.match.score)}
+                </span>
+              </div>
+              <div className="min-w-0 text-sm">
+                {book.match.buzz && <p className="text-xs font-medium text-wine">🔥 {book.match.buzz}</p>}
+                <p className="mt-0.5 leading-relaxed text-ink/90">{book.match.why}</p>
+              </div>
+            </div>
+          )}
           {details.description ? (
             <div className="mt-5">
               <p className={`text-sm leading-relaxed text-ink/90 ${open ? '' : 'line-clamp-6'}`}>

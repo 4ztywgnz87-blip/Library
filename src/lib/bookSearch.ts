@@ -64,6 +64,9 @@ export function parseSeries(rawTitle: string, subtitle?: string): { title: strin
       title: paren[1],
       series: { name: paren[2].trim(), number: Number(paren[3]) },
     };
+  // "A Court of Thorns and Roses, 6"
+  const named = subtitle?.match(/^(.+?),\s*(?:book\s*|#\s*)?(\d+(?:\.\d+)?)$/i);
+  if (named) return { title, series: { name: named[1].trim(), number: Number(named[2]) } };
   const sub = subtitle?.match(
     /^(?:(?:book|deel|vol\.?|volume)\s*(\d+)\s*(?:of|in|van)\s*(?:the\s*)?)(.+?)(?:\s*series)?$/i,
   );
@@ -71,6 +74,35 @@ export function parseSeries(rawTitle: string, subtitle?: string): { title: strin
   const sub2 = subtitle?.match(/^(?:a\s+)?(.+?)\s+(?:novel|book|series)\s*(?:#|book\s*)?(\d+)?$/i);
   if (sub2 && sub2[2]) return { title, series: { name: sub2[1].trim(), number: Number(sub2[2]) } };
   return { title };
+}
+
+const ORDINALS: Record<string, number> = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  fifth: 5,
+  sixth: 6,
+  seventh: 7,
+  eighth: 8,
+  ninth: 9,
+  tenth: 10,
+  eleventh: 11,
+  twelfth: 12,
+};
+
+/**
+ * A series stated in so many words in the blurb: "the seventh book in the #1 bestselling
+ * Court of Thorns and Roses (ACOTAR) series"
+ */
+export function seriesFromDescription(description?: string): SeriesInfo | undefined {
+  const m = description?.match(
+    /\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|\d{1,2}(?:st|nd|rd|th))\s+(?:book|novel|instal?l?ment|volume|entry)\s+(?:in|of)\s+the\s+(?:#1\s+)?(?:(?:[\w-]+\s+){0,3}?bestselling\s+)?([A-Z][\w'’&\s-]{2,60}?)\s+(?:\([^)]{1,20}\)\s+)?(?:series|saga)\b/i,
+  );
+  if (!m) return undefined;
+  const word = m[1].toLowerCase();
+  const number = ORDINALS[word] ?? parseInt(word, 10);
+  return number ? { name: m[2].trim(), number } : undefined;
 }
 
 // ---------- language ----------

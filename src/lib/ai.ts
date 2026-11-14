@@ -6,8 +6,10 @@ import type {
   RecommendRequest,
   RecommendResponse,
   SeriesResponse,
+  TrendingResponse,
 } from '../shared';
 import { syncNow } from './sync';
+import { getMeta, setMeta } from '../db';
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   if (!navigator.onLine) throw new Error("You're offline. Tips and cover reading need internet.");
@@ -59,5 +61,22 @@ export async function aiStatus(): Promise<AiStatus | null> {
     return (await (await fetch('/api/ai/status')).json()) as AiStatus;
   } catch {
     return null;
+  }
+}
+
+/** What's popular right now, scored for her. Kept for half a day, so Home opens instantly */
+export async function trending(): Promise<TrendingResponse | null> {
+  const saved = await getMeta<{ at: number; data: TrendingResponse } | null>('trending', null);
+  if (saved && Date.now() - saved.at < 12 * 3_600_000) return saved.data;
+  if (!navigator.onLine) return saved?.data ?? null;
+  try {
+    await syncNow(); // the scores use her latest ratings
+    const res = await fetch('/api/ai/trending');
+    if (!res.ok) return saved?.data ?? null;
+    const data = (await res.json()) as TrendingResponse;
+    await setMeta('trending', { at: Date.now(), data });
+    return data;
+  } catch {
+    return saved?.data ?? null;
   }
 }

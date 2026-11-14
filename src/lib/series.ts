@@ -41,15 +41,20 @@ export function groupSeries(books: Book[]): SeriesGroup[] {
 
 export type SeriesEntry =
   | { kind: 'mine'; number?: number; book: Book }
-  | { kind: 'missing'; number: number; title?: string; releaseDate?: string | null; announced: boolean; coverUrl?: string };
+  | {
+      kind: 'missing';
+      number: number;
+      title?: string;
+      releaseDate?: string | null;
+      announced: boolean;
+      coverUrl?: string;
+    };
 
 /** Her books + the full series list (when known) + gaps, in reading order */
 export function seriesEntries(group: SeriesGroup, known: SeriesBook[]): SeriesEntry[] {
   const entries: SeriesEntry[] = group.books.map((book) => ({ kind: 'mine', number: book.series?.number, book }));
   const have = (sb: SeriesBook) =>
-    group.books.some(
-      (b) => b.series?.number === sb.number || normalize(b.title) === normalize(sb.title),
-    );
+    group.books.some((b) => b.series?.number === sb.number || normalize(b.title) === normalize(sb.title));
   for (const sb of known) {
     if (!have(sb)) {
       entries.push({
@@ -87,12 +92,16 @@ export function upcomingParts(
   }[],
 ): SeriesBook[] {
   const have = new Set([...group.books.map((b) => b.title), ...known.map((k) => k.title)].map((t) => normalize(t)));
+  // "Court of Thorns and Roses series" is the same series as "A Court of Thorns and Roses"
+  const seriesName = (n: string) => normalize(n.replace(/^(a|an|the)\s+/i, '').replace(/\s+(series|saga)$/i, ''));
   const fits = news
-    .filter((n) => !have.has(normalize(n.title)) && n.series && normalize(n.series.name) === normalize(group.name))
+    .filter((n) => !have.has(normalize(n.title)) && n.series && seriesName(n.series.name) === seriesName(group.name))
     .sort((a, b) => a.publishedDate.localeCompare(b.publishedDate));
-  let next = Math.max(0, ...known.map((k) => k.number), ...group.books.map((b) => b.series?.number ?? 0));
+  const taken = new Set([...known.map((k) => k.number), ...group.books.map((b) => b.series?.number ?? 0)]);
+  let next = Math.max(0, ...taken);
   return fits.map((n) => ({
-    number: n.series?.number ?? ++next,
+    // a number that already belongs to another book of hers is a mistake in the source: it's the next one
+    number: n.series?.number && !taken.has(n.series.number) ? n.series.number : ++next,
     title: n.title,
     status:
       n.upcoming || Date.parse(n.publishedDate.length === 4 ? `${n.publishedDate}-12-31` : n.publishedDate) > Date.now()

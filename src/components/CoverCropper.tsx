@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { findCorners } from '../lib/ai';
 import { warpToCover, type Pt } from '../lib/warp';
 import { Button } from './ui';
+import { CloseIcon } from './Icons';
 
 const DEFAULT: Pt[] = [
   { x: 0.2, y: 0.12 },
@@ -48,7 +49,32 @@ export function CoverCropper({
   const [drag, setDrag] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [area, setArea] = useState({ w: 0, h: 0 });
   const touched = useRef(false);
+  const cancelRef = useRef(onCancel);
+  cancelRef.current = onCancel;
+  const doneRef = useRef(false);
+
+  // Its own history entry: swiping back (or the browser's back button) cancels
+  useEffect(() => {
+    window.history.pushState({ ...window.history.state, snugCrop: true }, '');
+    const onPop = () => {
+      if (!doneRef.current) cancelRef.current();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const cancel = () => window.history.back(); // → popstate → onCancel
+
+  // The photo always fits the free space, so the buttons below stay on screen
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setArea({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -87,6 +113,8 @@ export function CoverCropper({
     // let the button show its state before the (short) heavy work
     setTimeout(() => {
       const { width: w, height: h } = img.canvas;
+      doneRef.current = true; // leaving via "back" below is not a cancel
+      window.history.back();
       onDone(
         warpToCover(
           img.canvas,
@@ -106,21 +134,28 @@ export function CoverCropper({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      <div className="px-5 pt-4 pb-3 text-center text-cream">
+      <div className="relative px-12 pt-4 pb-3 text-center text-cream">
+        <button
+          onClick={cancel}
+          aria-label="Cancel"
+          className="absolute top-3 left-3 rounded-full p-2 text-cream/80 active:bg-white/10"
+        >
+          <CloseIcon />
+        </button>
         <h2 className="font-soft text-xl font-semibold">Your cover</h2>
         <p className="mt-0.5 text-xs text-cream/70">
           {finding ? 'Snug is finding the book…' : (note ?? 'Drag the corners onto the corners of the cover')}
         </p>
       </div>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center px-5">
+      <div ref={areaRef} className="mx-5 flex min-h-0 flex-1 items-center justify-center">
         {img ? (
           <div
             ref={boxRef}
             className="relative touch-none select-none"
             style={{
-              aspectRatio: String(ratio),
-              width: `min(100%, calc((100dvh - 15rem) * ${ratio}))`,
+              width: Math.max(0, Math.min(area.w, area.h * ratio)),
+              height: Math.max(0, Math.min(area.h, area.w / ratio)),
             }}
             onPointerMove={move}
             onPointerUp={() => setDrag(null)}
@@ -175,7 +210,7 @@ export function CoverCropper({
       </div>
 
       <div className="flex gap-3 px-5 pt-4 pb-5">
-        <Button variant="soft" className="flex-1 py-3.5" onClick={onCancel}>
+        <Button variant="soft" className="flex-1 py-3.5" onClick={cancel}>
           Cancel
         </Button>
         <Button className="flex-1 py-3.5" disabled={!img || saving} onClick={save}>

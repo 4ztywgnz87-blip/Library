@@ -13,13 +13,11 @@ const BOARD = 12;
 const GROUP_GAP = 3; // px between two series/authors; books of one series touch
 const MIN_SCALE = 0.72; // books never get smaller than this before a new row is added
 
-
 function hash(s: string) {
   let h = 0;
   for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) | 0;
   return Math.abs(h);
 }
-
 
 function spineStyle(b: Book) {
   const pages = b.pageCount ?? 280 + (hash(b.title) % 240);
@@ -29,6 +27,41 @@ function spineStyle(b: Book) {
   const hasCover = !!(b.customCover || b.coverUrl);
   const color = b.spineColor ?? (hasCover ? '#8b6f5a' : hashColor(b.title));
   return { height, width, color };
+}
+
+/** Splits words into `n` lines as evenly as possible */
+function splitLines(words: string[], n: number): string[] {
+  if (n <= 1 || words.length <= 1) return [words.join(' ')];
+  const total = words.join(' ').length;
+  for (let limit = Math.ceil(total / n); limit <= total; limit++) {
+    const lines: string[] = [];
+    let cur = '';
+    for (const w of words) {
+      const next = cur ? `${cur} ${w}` : w;
+      if (next.length > limit && cur) {
+        lines.push(cur);
+        cur = w;
+      } else cur = next;
+    }
+    lines.push(cur);
+    if (lines.length <= n) return lines;
+  }
+  return [words.join(' ')];
+}
+
+/** The biggest font at which the whole title fits on the spine (length × thickness) */
+function fitTitle(title: string, length: number, thickness: number) {
+  const words = title.split(/\s+/).filter(Boolean);
+  let best = { lines: [title], fontSize: 0 };
+  for (const n of [1, 2, 3]) {
+    if (n > words.length) break;
+    const lines = splitLines(words, n);
+    const longest = Math.max(...lines.map((l) => l.length));
+    // Fraunces semibold is ~0.56em per character; lines sit 1.05em apart
+    const size = Math.min(11, length / (longest * 0.62), thickness / (lines.length * 1.08));
+    if (size > best.fontSize + 0.4) best = { lines, fontSize: size };
+  }
+  return { lines: best.lines, fontSize: Math.max(4, best.fontSize) };
 }
 
 function Spine({
@@ -53,14 +86,11 @@ function Spine({
   const style = hash(book.title + book.id) % 3; // three kinds of spine decoration
   const light = isLight(color);
   const gold = light ? '#8a6a3a' : '#e3c288';
-  // The title runs along the spine. It is turned with a rotation (not vertical writing mode),
-  // which Safari on iPhone renders reliably, also when the title has to be cut off.
-  const textLength = height - 34; // room along the spine
-  // (two lines as soon as the spine is wide enough for them, so fewer titles get cut off)
-  const twoLines = width >= 22 && book.title.length > 12;
-  const charsPerLine = twoLines ? Math.ceil(book.title.length / 2) + 1 : book.title.length;
-  const maxFont = twoLines ? (width - 5) / 2.15 : 11;
-  const fontSize = Math.max(6, Math.min(11, maxFont, textLength / (charsPerLine * 0.56)));
+  // The title runs along the spine, always in full: it is split over one to three lines
+  // (at word breaks) and gets the largest font that fits. It is turned with a rotation (not
+  // vertical writing mode), which Safari on iPhone renders reliably.
+  const textLength = height - 34; // room along the spine, between the decorations at both ends
+  const { lines, fontSize } = fitTitle(book.title, textLength, width - 4);
   const band = <span className="block h-[2px] w-[78%] rounded-full" style={{ background: gold, opacity: 0.8 }} />;
   const rib = <span className="block h-[4px] w-full bg-black/25 shadow-[0_1px_0_rgba(255,255,255,0.15)]" />;
   const ends = (top: boolean) => (
@@ -132,7 +162,13 @@ function Spine({
           textShadow: light ? 'none' : '0 1px 1px rgba(0,0,0,0.35)',
         }}
       >
-        <span className={`overflow-hidden ${twoLines ? 'line-clamp-2' : 'line-clamp-1'}`}>{book.title}</span>
+        <span className="whitespace-nowrap">
+          {lines.map((l, i) => (
+            <span key={i} className="block">
+              {l}
+            </span>
+          ))}
+        </span>
       </span>
       {ends(false)}
     </motion.button>
@@ -202,7 +238,10 @@ function ShelfSection({
 
   return (
     // the shelf above casts a soft shadow onto the back panel, starting right under its board
-    <section className="pt-2" style={{ backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.32), transparent 18px)' }}>
+    <section
+      className="pt-2"
+      style={{ backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.32), transparent 18px)' }}
+    >
       <button
         onClick={() => navigate(`/library?tab=${status}`)}
         className="relative mx-auto mb-2 flex items-center gap-2 rounded-[4px] bg-gradient-to-b from-[#e2c48a] via-[#c9a465] to-[#a9824b] px-5 py-[3px] font-soft text-xs font-semibold text-[#3b2a22] shadow-[0_1px_2px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.45)]"
@@ -237,12 +276,12 @@ function ShelfSection({
           // their foot slides a little to the right, so they get some room on that side.
           // Who leans: sometimes the last book of the shelf, or the book just before a decoration.
           const isLast = i === books.length - 1;
-          const odd = hash(b.id) % 2 === 1;
           const lean =
-            (isLast && !(showDecor && decorAt === books.length) && books.length > 2 && !odd) ||
-            (showDecor && i === decorAt - 1 && !odd);
+            (isLast && !(showDecor && decorAt === books.length) && !(showDecor && i === decorAt) && books.length > 2) ||
+            (showDecor && i === decorAt - 1 && i > 0);
           // (a book right next to the bookend always stands upright: that's what the bookend is for)
-          const footRoom = lean && (!isLast || (showDecor && decorAt === books.length)) ? Math.ceil((row - BOARD) * 0.13) : 0;
+          const footRoom =
+            lean && (!isLast || (showDecor && decorAt === books.length)) ? Math.ceil((row - BOARD) * 0.13) : 0;
           const spine = (
             <div
               key={b.id}
@@ -311,7 +350,12 @@ export default function Shelf() {
 
         {/* crown: a little arched pediment on a layered cornice with dentils */}
         <div className="relative z-10">
-          <svg viewBox="0 0 200 22" className="absolute bottom-full left-1/2 h-5 w-[44%] -translate-x-1/2" preserveAspectRatio="none" aria-hidden>
+          <svg
+            viewBox="0 0 200 22"
+            className="absolute bottom-full left-1/2 h-5 w-[44%] -translate-x-1/2"
+            preserveAspectRatio="none"
+            aria-hidden
+          >
             <defs>
               <linearGradient id="pediment" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0" stopColor="#c08a5d" />
@@ -319,7 +363,13 @@ export default function Shelf() {
               </linearGradient>
             </defs>
             <path d="M0 22C46 22 60 1 100 1s54 21 100 21z" fill="url(#pediment)" />
-            <path d="M14 21C56 20 66 4 100 4s44 16 86 17" stroke="#fff" strokeOpacity="0.18" strokeWidth="1.5" fill="none" />
+            <path
+              d="M14 21C56 20 66 4 100 4s44 16 86 17"
+              stroke="#fff"
+              strokeOpacity="0.18"
+              strokeWidth="1.5"
+              fill="none"
+            />
           </svg>
           <div className="-mx-4 h-2.5 rounded-t-md bg-gradient-to-b from-[#c99466] to-[#a7754d] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" />
           <div className="-mx-3 h-3 bg-gradient-to-b from-[#8b5e3c] to-[#6f4a30]" />
@@ -383,7 +433,12 @@ export default function Shelf() {
 
         {/* base: plinth, a curved apron and little bun feet */}
         <div className="-mx-2 h-3 bg-gradient-to-b from-[#a7754d] to-[#7d5236] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]" />
-        <svg viewBox="0 0 400 24" preserveAspectRatio="none" className="-mx-1 block h-6 w-[calc(100%+0.5rem)]" aria-hidden>
+        <svg
+          viewBox="0 0 400 24"
+          preserveAspectRatio="none"
+          className="-mx-1 block h-6 w-[calc(100%+0.5rem)]"
+          aria-hidden
+        >
           <defs>
             <linearGradient id="apron" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="#7d5236" />

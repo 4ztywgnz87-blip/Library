@@ -66,6 +66,11 @@ export interface Taste {
   /** Spice level she likes (0–5); undefined when we don't know yet */
   spice?: number;
   avg: number;
+  /** Reading habits, also from books she didn't rate: genre → share of what she read (0–1) */
+  habitGenre: Map<string, number>;
+  /** author → how many of their books she read or is reading */
+  habitAuthor: Map<string, number>;
+  favouriteAuthors: Set<string>;
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '');
@@ -120,7 +125,8 @@ export function learnTaste(books: Book[], profile?: ReaderProfile): Taste {
   // the quiz
   for (const t of profile?.lovedTropes ?? []) {
     const trait = TROPE_TO_TRAIT[t];
-    if (trait) liked.set(trait, { weight: (liked.get(trait)?.weight ?? 0) + 1.2, from: liked.get(trait)?.from ?? rated[0] });
+    if (trait)
+      liked.set(trait, { weight: (liked.get(trait)?.weight ?? 0) + 1.2, from: liked.get(trait)?.from ?? rated[0] });
   }
   for (const t of profile?.hatedTropes ?? []) {
     const trait = TROPE_TO_TRAIT[t];
@@ -130,7 +136,20 @@ export function learnTaste(books: Book[], profile?: ReaderProfile): Taste {
   const avgOf = (v: number[]) => v.reduce((s, x) => s + x, 0) / v.length;
   const mean = (m: Map<string, number[]>) =>
     new Map([...m.entries()].map(([k, v]) => [k, Math.max(-2, Math.min(2, v.reduce((s, x) => s + x, 0) / v.length))]));
+  // habits: what she reads (and keeps reading), rated or not
+  const readish = books.filter((b) => b.status === 'read' || b.status === 'reading');
+  const habitGenre = new Map<string, number>();
+  const habitAuthor = new Map<string, number>();
+  for (const b of readish) {
+    for (const g of b.genres) habitGenre.set(g, (habitGenre.get(g) ?? 0) + 1 / readish.length);
+    const a = norm(b.authors[0] ?? '');
+    if (a) habitAuthor.set(a, (habitAuthor.get(a) ?? 0) + 1);
+  }
+
   return {
+    habitGenre,
+    habitAuthor,
+    favouriteAuthors: new Set((profile?.favouriteAuthors ?? []).map(norm)),
     genre: mean(genre),
     author: mean(author),
     liked: new Map([...liked].filter(([, v]) => v.from)),
@@ -139,7 +158,7 @@ export function learnTaste(books: Book[], profile?: ReaderProfile): Taste {
     spice: profile?.completedAt
       ? profile.spice
       : (genre.get('Spicy')?.length ?? 0) > 0
-        ? Math.round(2.5 + Math.max(-2, Math.min(2, avgOf(genre.get('Spicy')!))) )
+        ? Math.round(2.5 + Math.max(-2, Math.min(2, avgOf(genre.get('Spicy')!))))
         : undefined,
     avg,
   };
@@ -180,7 +199,13 @@ const NICE: Record<string, string> = {
 };
 const nice = (t: string) => NICE[t] ?? t;
 
-const PLURAL: Record<string, string> = { Thriller: 'thrillers', Mystery: 'mysteries', Spicy: 'spicy books', 'Young adult': 'young adult books', Historical: 'historical fiction' };
+const PLURAL: Record<string, string> = {
+  Thriller: 'thrillers',
+  Mystery: 'mysteries',
+  Spicy: 'spicy books',
+  'Young adult': 'young adult books',
+  Historical: 'historical fiction',
+};
 const genreWord = (g: string) => PLURAL[g] ?? g.toLowerCase();
 
 const fmt = (r: number) => (r % 1 === 0 ? String(r) : r.toFixed(2).replace(/0$/, ''));
@@ -206,7 +231,11 @@ export function scoreBook(c: Candidate, taste: Taste, books: Book[], wish: { gen
         weight: 6,
         text: `It's the next book after ${c.previous.title}, which you gave ${fmt(r)}★${c.previous.review ? ` (“${c.previous.review}”)` : ''}.`,
       });
-    else reasons.push({ weight: 3, text: `It continues ${c.previous.title}, which you gave ${fmt(r)}★, so maybe not first in line.` });
+    else
+      reasons.push({
+        weight: 3,
+        text: `It continues ${c.previous.title}, which you gave ${fmt(r)}★, so maybe not first in line.`,
+      });
   }
 
   // authors she rated
@@ -221,8 +250,29 @@ export function scoreBook(c: Candidate, taste: Taste, books: Book[], wish: { gen
     if (best && best.rating! <= 2.5) reasons.push({ weight: 1, text: `Heads up: you weren't a fan of ${best.title}.` });
   }
 
+  // favourite authors (from her profile) and authors she keeps reading, rated or not
+  const an = norm(c.author);
+  const readByAuthor = taste.habitAuthor.get(an) ?? 0;
+  if (taste.favouriteAuthors.has(an)) {
+    score += 9;
+    if (aw === undefined) reasons.push({ weight: 3.5, text: `${c.author} is one of your favourite authors.` });
+  } else if (readByAuthor && aw === undefined) {
+    score += Math.min(10, 4 + readByAuthor * 2);
+    reasons.push({
+      weight: 3,
+      text: `You've read ${readByAuthor > 1 ? `${readByAuthor} books` : 'a book'} by ${c.author}${readByAuthor > 2 ? ' already: clearly a favourite' : ''}.`,
+    });
+  }
+
+  // genres she reads a lot (counts books she didn't rate too)
+  const habit = c.genres.map((g) => ({ g, share: taste.habitGenre.get(g) ?? 0 })).sort((a, b) => b.share - a.share)[0];
+  if (habit && habit.share > 0) score += Math.round(Math.min(1, habit.share) * 12);
+  else if (c.genres.length && taste.habitGenre.size >= 3) score -= 5; // not what she usually reads
+
   // things she loves / dislikes (from her reviews, tags and quiz)
-  const hits = c.traits.filter((t) => taste.liked.has(t)).sort((a, b) => taste.liked.get(b)!.weight - taste.liked.get(a)!.weight);
+  const hits = c.traits
+    .filter((t) => taste.liked.has(t))
+    .sort((a, b) => taste.liked.get(b)!.weight - taste.liked.get(a)!.weight);
   const misses = c.traits.filter((t) => taste.disliked.has(t));
   score += Math.min(3, hits.length) * 6 - misses.length * 9;
   if (hits.length) {
@@ -252,7 +302,8 @@ export function scoreBook(c: Candidate, taste: Taste, books: Book[], wish: { gen
   if (c.spice !== undefined && taste.spice !== undefined) score -= Math.max(0, Math.abs(c.spice - taste.spice) - 1) * 5;
 
   // genre fit sentence
-  if (wish.genre && c.genres.includes(wish.genre)) reasons.push({ weight: 1.5, text: `A real ${wish.genre.toLowerCase()} pick.` });
+  if (wish.genre && c.genres.includes(wish.genre))
+    reasons.push({ weight: 1.5, text: `A real ${wish.genre.toLowerCase()} pick.` });
   // dark books are a gamble unless she has shown she likes them
   if (c.traits.includes('dark') && !taste.liked.has('dark') && !taste.disliked.has('dark')) score -= 8;
 
@@ -267,14 +318,36 @@ export function scoreBook(c: Candidate, taste: Taste, books: Book[], wish: { gen
     const best = inGenre[0];
     const worst = inGenre[inGenre.length - 1];
     if (byGenre.w >= 0.25 && best)
-      reasons.push({ weight: 2.5, text: `You rate ${genreWord(byGenre.g)} highly, like ${best.title} (${fmt(best.rating!)}★).` });
+      reasons.push({
+        weight: 2.5,
+        text: `You rate ${genreWord(byGenre.g)} highly, like ${best.title} (${fmt(best.rating!)}★).`,
+      });
     else if (byGenre.w <= -0.5 && worst)
       reasons.push({
         weight: 2.5,
         text: `A long shot: you haven't loved ${genreWord(byGenre.g)} so far (${worst.title} got ${fmt(worst.rating!)}★).`,
       });
+  } else if (habit && habit.share >= 0.2) {
+    const example = books
+      .filter((b) => (b.status === 'read' || b.status === 'reading') && b.genres.includes(habit.g))
+      // a book that's mainly this genre, best rated first
+      .sort(
+        (a, b) =>
+          a.genres.indexOf(habit.g) - b.genres.indexOf(habit.g) ||
+          (b.rating ?? 0) - (a.rating ?? 0) ||
+          a.genres.length - b.genres.length,
+      )[0];
+    reasons.push({
+      weight: 2,
+      text: `You read a lot of ${genreWord(habit.g)}${example ? `, like ${example.title}` : ''}.`,
+    });
   } else if (!reasons.length && c.genres.length) {
-    reasons.push({ weight: 1, text: `Something different for you: you haven't rated any ${genreWord(c.genres[0])} yet.` });
+    reasons.push({
+      weight: 1,
+      text: taste.habitGenre.size
+        ? `Something different: you rarely read ${genreWord(c.genres[0])}.`
+        : `A popular ${genreWord(c.genres[0]).replace(/s$/, '')} pick to start with.`,
+    });
   }
   if (c.blurb) reasons.push({ weight: 0.5, text: c.blurb });
 

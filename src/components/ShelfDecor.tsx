@@ -143,8 +143,8 @@ export function Candle({ className = '' }: { className?: string }) {
       {/* glass jar */}
       <path d="M11 44h38v48a6 6 0 0 1-6 6H17a6 6 0 0 1-6-6z" fill={`url(#${id}glass)`} stroke="#fff" strokeOpacity="0.35" />
       <rect x="10" y="42" width="40" height="4" rx="2" fill="#fff" fillOpacity="0.3" />
-      <rect x="18" y="68" width="24" height="12" rx="2" fill="#c49a5a" fillOpacity="0.85" />
-      <text x="30" y="76.5" textAnchor="middle" fontSize="5.5" fontFamily="Fraunces Variable, serif" fill="#3b2a22">
+      <rect x="17" y="68" width="26" height="12" rx="2" fill="#c49a5a" fillOpacity="0.85" />
+      <text x="30" y="75.8" textAnchor="middle" fontSize="4.3" letterSpacing="0.1" fontFamily="Fraunces Variable, serif" fill="#3b2a22">
         old books
       </text>
     </svg>

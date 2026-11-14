@@ -12,6 +12,8 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Mondays 05:17 UTC: this week's trending list, ready before anyone opens the app
+  "triggers": { "crons": ["17 5 * * 1"] },
   "vars": {
     // "mock" = free canned AI answers (testing), "live" = real Claude calls
     "AI_MODE": "live",

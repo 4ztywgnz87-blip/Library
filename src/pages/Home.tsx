@@ -6,6 +6,7 @@ import { Card } from '../components/ui';
 import { SparkleIcon, ChevronIcon } from '../components/Icons';
 import { EmptyState } from '../components/SleepyCat';
 import { AuthorNewsSection } from '../components/AuthorNews';
+import { TrendingSection } from '../components/Trending';
 import { SeriesCard } from './Series';
 import { groupSeries, seriesProgress } from '../lib/series';
 import { useSeriesParts } from '../lib/seriesTotals';
@@ -59,8 +60,8 @@ export default function Home() {
       {books.length === 0 ? (
         <div className="space-y-4">
           <EmptyState title="Welcome to Snug">
-            Your cosy little library. Tap the <span className="font-medium text-wine">+</span> below to add your
-            first book.
+            Your cosy little library. Tap the <span className="font-medium text-wine">+</span> below to add your first
+            book.
           </EmptyState>
           {!name && <NameCard />}
           <Link to="/quiz" className="block">
@@ -186,6 +187,8 @@ export default function Home() {
 
           <AuthorNewsSection books={books} favourites={profile.favouriteAuthors} />
 
+          <TrendingSection books={books} />
+
           {/* Recently added */}
           <section>
             <div className="mb-3 flex items-baseline justify-between">
@@ -227,7 +230,11 @@ function NameCard() {
           placeholder="What should Snug call you?"
           className="min-w-0 flex-1 rounded-xl border border-sand bg-white px-3 py-2.5 text-[16px] outline-none focus:border-oat"
         />
-        <button type="submit" className="rounded-xl bg-wine px-4 text-sm font-medium text-cream disabled:opacity-50" disabled={!value.trim()}>
+        <button
+          type="submit"
+          className="rounded-xl bg-wine px-4 text-sm font-medium text-cream disabled:opacity-50"
+          disabled={!value.trim()}
+        >
           Save
         </button>
       </form>

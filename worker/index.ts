@@ -1,7 +1,18 @@
 import { Hono, type Context } from 'hono';
 import type { Book, SyncRecord } from '../src/types';
 import type { ReaderProfile, RecommendRequest } from '../src/shared';
-import { AiLimitError, aiStatus, findCoverCorners, fitCheck, identifyCover, recommend, seriesInfo } from './ai';
+import {
+  AiLimitError,
+  aiStatus,
+  findCoverCorners,
+  fitCheck,
+  identifyCover,
+  trending,
+  trendingList,
+  isLive,
+  recommend,
+  seriesInfo,
+} from './ai';
 import { ASSETS } from './assets.gen';
 import { findBookSeries, seriesParts } from './series';
 
@@ -248,6 +259,13 @@ app.post('/ai/identify', async (c) => {
   return aiRoute(c, () => identifyCover(c.env, image, mediaType));
 });
 
+app.get('/ai/trending', async (c) =>
+  aiRoute(c, async () => {
+    const { books, profile } = await loadLibrary(c.env);
+    return trending(c.env, books, profile);
+  }),
+);
+
 app.post('/ai/corners', async (c) => {
   const {
     image,
@@ -343,5 +361,9 @@ export default {
     if (pathname.startsWith('/api/')) return app.fetch(req, env, ctx);
     if (req.method !== 'GET' && req.method !== 'HEAD') return new Response('Method not allowed', { status: 405 });
     return serveStatic(req);
+  },
+  // Every Monday morning: put this week's trending list together in advance, so nobody waits for it
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    if (isLive(env)) ctx.waitUntil(trendingList(env).then(() => undefined));
   },
 } satisfies ExportedHandler<Env>;

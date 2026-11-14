@@ -51,12 +51,20 @@ export default function Add() {
   const [reading, setReading] = useState(false);
   const [recognised, setRecognised] = useState<IdentifyResponse | null>(null);
 
+  // Each photo gets a number; cancelling (or a newer photo) makes an older answer count for nothing
+  const readId = useRef(0);
+  const cancelReading = () => {
+    readId.current++;
+    setReading(false);
+  };
   const readCover = async (file: File) => {
+    const id = ++readId.current;
     setReading(true);
     setRecognised(null);
     setError(null);
     try {
       const result = await identifyCover(await shrinkPhoto(file));
+      if (id !== readId.current) return;
       setRecognised(result);
       const q = result.isbn || [result.title, result.author].filter(Boolean).join(' ');
       if (q) {
@@ -64,9 +72,9 @@ export default function Add() {
         void rememberSearch({ q, kind: 'photo', title: result.title ?? undefined, author: result.author ?? undefined });
       }
     } catch (e) {
-      setError((e as Error).message);
+      if (id === readId.current) setError((e as Error).message);
     } finally {
-      setReading(false);
+      if (id === readId.current) setReading(false);
     }
   };
 
@@ -158,9 +166,26 @@ export default function Add() {
           <CameraIcon width={20} height={20} /> Photo of the cover
         </PhotoInput>
 
-        {reading && <LoadingTea text="Reading the cover…" />}
+        {reading && (
+          <div className="flex flex-col items-center">
+            <LoadingTea text="Reading the cover…" />
+            <Button variant="soft" className="-mt-4 px-5 py-2 text-sm" onClick={cancelReading}>
+              Cancel
+            </Button>
+          </div>
+        )}
         {recognised && (
-          <div className="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm text-cocoa">
+          <div className="relative mt-4 rounded-2xl bg-white/70 py-3 pr-10 pl-4 text-sm text-cocoa">
+            <button
+              aria-label="Dismiss"
+              className="absolute top-2 right-2 p-1.5 text-mocha"
+              onClick={() => {
+                setRecognised(null);
+                setQuery('');
+              }}
+            >
+              <CloseIcon width={16} height={16} />
+            </button>
             {recognised.title ? (
               <>
                 Looks like <span className="font-medium text-ink">{recognised.title}</span>

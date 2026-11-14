@@ -11,6 +11,8 @@ import type {
   RecommendRequest,
   RecommendResponse,
   SeriesResponse,
+  TrendingBook,
+  TrendingResponse,
 } from '../src/shared';
 import { MOCK_BUY_LIST } from './mockBooks';
 import { bookTraits, learnTaste, scoreBook, traitsIn, type Candidate } from './taste';
@@ -176,7 +178,7 @@ export async function findCoverCorners(
     env,
     VISION_MODEL,
     CornersSchema,
-    'You locate the front cover of a book in a photo, so it can be cut out precisely. Give the pixel coordinates of the four corners of the front cover itself (not the spine, not the hand holding it, not the background). If the book is tilted or seen at an angle, give the real corners, so the shape may be a skewed quadrilateral. Be as precise as you can: the corners are where the cover edges meet. If no book cover is visible, set found to false.',
+    'You locate the front cover of a book in a photo, so it can be cut out precisely. Give the pixel coordinates of the four corners of the front cover itself (not the spine, not the hand holding it, not the background). If the book is tilted or seen at an angle, give the real corners, so the shape may be a skewed quadrilateral. Name the corners as they are on the cover itself when it is held upright to read (topLeft is the cover’s own top-left corner, where the title starts), even when the book lies sideways or upside down in the photo: the cut-out is turned upright from these names. Be as precise as you can: the corners are where the cover edges meet. If no book cover is visible, set found to false.',
     [
       {
         type: 'image',
@@ -559,4 +561,100 @@ export async function seriesInfo(env: AiEnv, name: string, author: string): Prom
     ),
   );
   return { books: result?.books ?? [], mock: false };
+}
+
+// ---------- trending: what's popular right now ----------
+
+const TrendingSchema = z.object({
+  books: z.array(
+    z.object({
+      title: z.string(),
+      author: z.string(),
+      genres: z.array(z.string()),
+      buzz: z.string(),
+      blurb: z.string(),
+    }),
+  ),
+});
+type TrendingList = { at: number; books: z.infer<typeof TrendingSchema>['books'] };
+
+const GENRE_NAMES = [
+  'Romantasy',
+  'Fantasy',
+  'Romance',
+  'Spicy',
+  'Thriller',
+  'Mystery',
+  'Fiction',
+  'Historical',
+  'Sci-fi',
+  'Young adult',
+];
+
+/** Monday of this week: the trending list is put together once a week */
+const weekKey = () => {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+};
+
+/** Searches the web (bestseller lists, BookTok, Goodreads) for what's popular now: one paid call a week */
+export async function trendingList(env: AiEnv): Promise<TrendingList> {
+  return cached(env, ['trending', 2, weekKey()], 8, async () => {
+    await spend(env);
+    const params = {
+      model: TIPS_MODEL,
+      max_tokens: 16000,
+      system:
+        "You put together a list of books that are popular RIGHT NOW (this week and this month), for a reader of romance, romantasy, fantasy, spicy books and thrillers (no non-fiction). Search the web for current signals: this week's bestseller lists (New York Times, USA Today, Sunday Times, Dutch charts like Bol.com and the Bestseller 60), what's going viral on BookTok and Bookstagram this month, Goodreads 'popular this month' and the biggest new releases of the last few months. Combine them: a book that shows up in several places ranks higher. Favour books released in the last 12 months or charting now; leave out long-running backlist favourites (like Fourth Wing, A Court of Thorns and Roses, It Ends with Us, Verity) unless they are in a top-10 list this very week. Only real books that are already out (or out within two weeks), in English, with the author's name spelled exactly as on the cover. Give 15 books, most popular first, mostly in the reader's genres plus a few broader fiction hits that are everywhere right now. For each: the exact title (no series info), the author, its genres chosen from this list: " +
+        GENRE_NAMES.join(', ') +
+        ", a short buzz line saying where it's popular now (max 8 words, e.g. '#1 New York Times bestseller this week' or 'Viral on BookTok this month'), and a one-sentence blurb of the story with its main tropes.",
+      messages: [
+        {
+          role: 'user' as const,
+          content: `Today is ${new Date().toISOString().slice(0, 10)}. Which books are trending right now?`,
+        },
+      ],
+      tools: [{ type: 'web_search_20260209' as const, name: 'web_search' as const, max_uses: 6 }],
+      output_config: { effort: 'medium' as const, format: betaZodOutputFormat(TrendingSchema) },
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default' as const,
+    };
+    const messages: Anthropic.Beta.BetaMessageParam[] = [...params.messages];
+    // web search can pause a long turn: continue it (a few times at most)
+    for (let i = 0; i < 4; i++) {
+      const res = await client(env).beta.messages.parse({ ...params, messages });
+      if (res.stop_reason === 'pause_turn') {
+        messages.push({ role: 'assistant', content: res.content });
+        continue;
+      }
+      if (res.stop_reason === 'refusal' || !res.parsed_output) throw new Error('No trending list');
+      return { at: Date.now(), books: res.parsed_output.books };
+    }
+    throw new Error('Trending search did not finish');
+  });
+}
+
+/** What's popular now, each with a match score for her (scored for free by the taste engine) */
+export async function trending(env: AiEnv, books: Book[], profile?: ReaderProfile): Promise<TrendingResponse> {
+  const live = isLive(env);
+  const list: TrendingList = live
+    ? await trendingList(env)
+    : {
+        at: Date.now(),
+        books: MOCK_BUY_LIST.slice(0, 15).map((m) => ({ ...m, buzz: 'Popular on BookTok', blurb: m.blurb ?? '' })),
+      };
+  const taste = learnTaste(books, profile);
+  const scored: TrendingBook[] = list.books.map((b) => {
+    const c: Candidate = {
+      title: b.title,
+      author: b.author,
+      genres: b.genres.filter((g) => GENRE_NAMES.includes(g)),
+      traits: traitsIn(`${b.blurb} ${b.genres.join(' ')}`),
+      blurb: b.blurb,
+    };
+    const s = scoreBook(c, taste, books, {});
+    return { title: b.title, author: b.author, genres: c.genres, buzz: b.buzz, score: s.score, why: s.why };
+  });
+  return { books: scored, updatedAt: list.at, mock: !live };
 }

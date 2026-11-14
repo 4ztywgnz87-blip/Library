@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
@@ -70,7 +70,20 @@ export default function Shop() {
   const ownedKeys = new Set((books ?? []).map((b) => bookKey(b)));
   const notOwned = found.filter((r) => !ownedKeys.has(bookKey(r))).slice(0, 8);
 
-  const check = async (title: string, author: string, picked?: SearchResult) => {
+  // Every check gets a number; cancelling (or starting another) makes older answers count for nothing
+  const runRef = useRef(0);
+  const begin = () => {
+    const my = ++runRef.current;
+    return (next: State) => {
+      if (my === runRef.current) setState(next);
+    };
+  };
+  const cancel = () => {
+    runRef.current++;
+    setState({ kind: 'idle' });
+  };
+
+  const check = async (title: string, author: string, picked?: SearchResult, setState = begin()) => {
     const own = books?.find((b) => bookKey(b) === bookKey({ title, authors: [author] }));
     if (own) return setState({ kind: 'owned', book: own });
     setState({ kind: 'working', text: 'Checking if it fits you…' });
@@ -106,6 +119,7 @@ export default function Shop() {
   };
 
   const fromPhoto = async (file: File) => {
+    const setState = begin();
     setState({ kind: 'working', text: 'Reading the cover…' });
     try {
       const id = await identifyCover(await shrinkPhoto(file));
@@ -114,7 +128,7 @@ export default function Shop() {
           kind: 'error',
           text: "Snug couldn't read that cover. Try again, or type the title.",
         });
-      await check(id.title, id.author ?? '');
+      await check(id.title, id.author ?? '', undefined, setState);
     } catch (e) {
       setState({ kind: 'error', text: (e as Error).message });
     }
@@ -187,7 +201,14 @@ export default function Shop() {
         )}
 
         <div className="mt-6">
-          {state.kind === 'working' && <p className="py-8 text-center text-sm text-cocoa">{state.text}</p>}
+          {state.kind === 'working' && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <p className="text-center text-sm text-cocoa">{state.text}</p>
+              <Button variant="soft" className="px-5 py-2 text-sm" onClick={cancel}>
+                Cancel
+              </Button>
+            </div>
+          )}
           {state.kind === 'error' && <p className="py-4 text-center text-sm text-wine">{state.text}</p>}
           {state.kind === 'owned' && (
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>

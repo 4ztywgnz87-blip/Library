@@ -1,7 +1,15 @@
 import { getMeta, setMeta } from '../db';
 import type { Book } from '../types';
 import { bookKey } from './library';
-import { googleBooks, mapGenres, openLibrarySearch, parseSeries, sameBook, searchBooks } from './bookSearch';
+import {
+  googleBooks,
+  mapGenres,
+  openLibrarySearch,
+  parseSeries,
+  sameBook,
+  searchBooks,
+  seriesFromDescription,
+} from './bookSearch';
 
 export interface AuthorNews {
   title: string;
@@ -114,7 +122,8 @@ async function fromGoogle(author: string): Promise<AuthorNews[]> {
       return {
         title: baseTitle(title),
         author,
-        series,
+        // what the blurb says in so many words beats a (sometimes wrong) number in a subtitle
+        series: seriesFromDescription(v.description) ?? series,
         coverUrl: v.imageLinks?.thumbnail
           ? `${v.imageLinks.thumbnail.replace(/^http:/, 'https:').replace('&edge=curl', '')}&fife=w400`
           : undefined,
@@ -175,7 +184,8 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
         series,
         coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : undefined,
         publishedDate: exactDate(d.publish_date, d.first_publish_year!),
-        upcoming: d.first_publish_year! > year || Date.parse(exactDate(d.publish_date, d.first_publish_year!)) > Date.now(),
+        upcoming:
+          d.first_publish_year! > year || Date.parse(exactDate(d.publish_date, d.first_publish_year!)) > Date.now(),
         genres: mapGenres(d.subject?.slice(0, 20) ?? []),
       };
     });
@@ -183,7 +193,7 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
 
 /** New and upcoming books by an author, from both sources combined (cached for a day) */
 export async function authorNews(author: string): Promise<AuthorNews[]> {
-  const cacheKey = `authorNews5:${author.toLowerCase()}`; // v5: exact dates where known
+  const cacheKey = `authorNews7:${author.toLowerCase()}`; // v7: series from the blurb, also for brand-new books
   const cached = await getMeta<{ at: number; items: AuthorNews[] } | null>(cacheKey, null);
   if (cached && Date.now() - cached.at < DAY) return cached.items;
 
@@ -219,6 +229,40 @@ export async function authorNews(author: string): Promise<AuthorNews[]> {
         r.language !== undefined &&
         (r.language === 'en' || r.language === 'nl'),
     )?.coverUrl;
+  }
+
+  // No series or blurb yet (often brand-new books that only Open Library listed): ask Google
+  // about this very title; its blurb may say "the seventh book in the … series"
+  for (const item of items.filter((i) => !i.series || !i.description).slice(0, 6)) {
+    const res = await googleBooks(
+      new URLSearchParams({
+        q: `intitle:"${item.title}" inauthor:"${item.author}"`,
+        maxResults: '10',
+        printType: 'books',
+      }),
+    ).catch(() => undefined);
+    const json = res
+      ? ((await res.json().catch(() => ({}))) as {
+          items?: { volumeInfo: { title?: string; subtitle?: string; description?: string; publishedDate?: string } }[];
+        })
+      : {};
+    const same = (json.items ?? [])
+      .map((x) => x.volumeInfo)
+      .filter(
+        (v) =>
+          v.title &&
+          bookKey({ title: baseTitle(v.title), authors: [item.author] }) ===
+            bookKey({ title: item.title, authors: [item.author] }),
+      );
+    item.series ??=
+      same.map((v) => seriesFromDescription(v.description)).find(Boolean) ??
+      same.map((v) => parseSeries(v.title!, v.subtitle).series).find(Boolean);
+    item.description ??= same.find((v) => v.description)?.description;
+    // an exact release date beats just a year
+    const exact = same
+      .map((v) => v.publishedDate ?? '')
+      .find((d) => d.length > item.publishedDate.length && d.startsWith(item.publishedDate.slice(0, 4)));
+    if (exact) item.publishedDate = exact;
   }
 
   await setMeta(cacheKey, { at: Date.now(), items });
