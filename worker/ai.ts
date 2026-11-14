@@ -2,19 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import type { Book } from '../src/types';
-import type {
-  FitResponse,
-  CoverCorners,
-  IdentifyResponse,
-  Pick,
-  ReaderProfile,
-  RecommendRequest,
-  RecommendResponse,
-  SeriesResponse,
-} from '../src/shared';
+import type { CoverCorners, IdentifyResponse, ReaderProfile, SeriesResponse } from '../src/shared';
 import { MOCK_BUY_LIST } from './mockBooks';
-import { bookTraits, learnTaste, scoreBook, traitsIn, type Candidate } from './taste';
-import { findBookSeries, seriesParts, type FoundSeries } from './series';
 
 export interface AiEnv {
   DB: D1Database;
@@ -27,7 +16,7 @@ export interface AiEnv {
 // Cover reading is simple: the small, very cheap model is plenty.
 const VISION_MODEL = 'claude-haiku-5-5';
 // Recommendations need taste and book knowledge.
-const TIPS_MODEL = 'claude-sonnet-5-5';
+export const TIPS_MODEL = 'claude-sonnet-5-5';
 
 export class AiLimitError extends Error {}
 
@@ -43,16 +32,27 @@ export async function aiStatus(env: AiEnv) {
   } as const;
 }
 
-/** Counts one paid AI call; refuses once today's limit is reached */
-async function spend(env: AiEnv) {
-  const status = await aiStatus(env);
-  if (status.usedToday >= status.limit) {
-    throw new AiLimitError(`Snug's AI is resting for today (${status.limit} questions). Try again tomorrow!`);
+/** Book analyses have their own (larger) daily allowance: each one is small and happens once per book */
+const ANALYSIS_DAILY_LIMIT = 150;
+export type Usage = { kind: 'question' | 'analysis'; count: number };
+
+/** Counts paid AI work; refuses once today's limit is reached */
+export async function spend(env: AiEnv, usage: Usage = { kind: 'question', count: 1 }) {
+  const day = usage.kind === 'analysis' ? `analysis:${today()}` : today();
+  if (usage.kind === 'analysis') {
+    const row = await env.DB.prepare('SELECT count FROM ai_usage WHERE day = ?').bind(day).first<{ count: number }>();
+    if ((row?.count ?? 0) + usage.count > ANALYSIS_DAILY_LIMIT)
+      throw new AiLimitError('Snug has read enough new books for today. The rest follows tomorrow!');
+  } else {
+    const status = await aiStatus(env);
+    if (status.usedToday >= status.limit) {
+      throw new AiLimitError(`Snug's AI is resting for today (${status.limit} questions). Try again tomorrow!`);
+    }
   }
   await env.DB.prepare(
-    'INSERT INTO ai_usage (day, count) VALUES (?, 1) ON CONFLICT (day) DO UPDATE SET count = count + 1',
+    'INSERT INTO ai_usage (day, count) VALUES (?, ?) ON CONFLICT (day) DO UPDATE SET count = count + excluded.count',
   )
-    .bind(today())
+    .bind(day, usage.count)
     .run();
 }
 
@@ -62,7 +62,7 @@ async function sha(input: string) {
 }
 
 /** Same question within `maxAgeDays` → answer from the cache, no cost */
-async function cached<T>(env: AiEnv, keyParts: unknown, maxAgeDays: number, run: () => Promise<T>): Promise<T> {
+export async function cached<T>(env: AiEnv, keyParts: unknown, maxAgeDays: number, run: () => Promise<T>): Promise<T> {
   const key = await sha(JSON.stringify(keyParts));
   const row = await env.DB.prepare('SELECT value, created_at FROM ai_cache WHERE key = ?')
     .bind(key)
@@ -81,7 +81,7 @@ function client(env: AiEnv) {
 }
 
 /** Runs a structured request; returns null when Claude declines */
-async function ask<T extends z.ZodType>(
+export async function ask<T extends z.ZodType>(
   env: AiEnv,
   model: string,
   schema: T,
@@ -89,8 +89,9 @@ async function ask<T extends z.ZodType>(
   content: Anthropic.Beta.BetaMessageContentParam,
   effort: 'low' | 'medium',
   maxTokens = 8000,
+  usage?: Usage,
 ): Promise<z.infer<T> | null> {
-  await spend(env);
+  await spend(env, usage);
   // On Sonnet, a declined request is retried server-side on a suitable fallback model
   const fallback =
     model === TIPS_MODEL
@@ -255,91 +256,8 @@ Write the "why" in English, 2–3 short sentences, addressed to her ("you"), nam
 Never suggest a book she has already read, already owns, or said "not for me" to (unless asked to pick from her own shelf).
 If a series is involved, make sure the pick is the right next book in reading order.`;
 
-// ---------- her reader portrait: what she loves and why, with evidence ----------
-// Written by Claude from everything she read: ratings, her own words, tags, the quiz and what the
-// books are actually about. Only rewritten when one of those changes (cached by its input).
-
-const PortraitSchema = z.object({
-  summary: z.string(),
-  loves: z.array(z.object({ what: z.string(), evidence: z.string() })),
-  dislikes: z.array(z.object({ what: z.string(), evidence: z.string() })),
-  genres: z.array(z.object({ genre: z.string(), verdict: z.string() })),
-  heatAndTone: z.string(),
-});
-type Portrait = z.infer<typeof PortraitSchema>;
-
-function portraitInput(books: Book[], profile?: ReaderProfile) {
-  const read = books
-    .filter((b) => b.status === 'read' || b.status === 'reading')
-    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-  const line = (b: Book) =>
-    [
-      `- "${b.title}" by ${b.authors.join(', ')}`,
-      b.status === 'reading' ? '(reading now)' : b.rating !== undefined ? `rated ${b.rating}/5` : '(not rated)',
-      b.genres.length ? `[${b.genres.join(', ')}]` : '',
-      b.series ? `(series: ${b.series.name}${b.series.number ? ` #${b.series.number}` : ''})` : '',
-      b.tags.length ? `tags: ${b.tags.join(', ')}` : '',
-      b.review ? `HER WORDS: "${b.review}"` : '',
-      b.description ? `\n  About the book: ${b.description.replace(/\s+/g, ' ').slice(0, 900)}` : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-  return `BOOKS SHE READ\n${read.map(line).join('\n') || '-'}\n\nHER READER QUIZ\n${describeProfile(profile)}`;
-}
-
-async function portrait(env: AiEnv, books: Book[], profile?: ReaderProfile): Promise<Portrait | null> {
-  if (!isLive(env)) return null;
-  const read = books.filter((b) => b.status === 'read' || b.status === 'reading');
-  if (!read.length && !profile?.completedAt) return null;
-  const input = portraitInput(books, profile);
-  return cached(env, ['portrait', 1, input], 365, () =>
-    ask(
-      env,
-      TIPS_MODEL,
-      PortraitSchema,
-      `You study one reader's books to understand her taste precisely, so a recommender can predict how much she will like a new book.
-Use her ratings (relative to her own average), her own words, her tags and quiz, and what each book is really about (premise, tropes, relationship dynamics, setting, tone, pacing, heat level, darkness, ending).
-Look for patterns across books: what her highest-rated books share and what the lower-rated ones lack or have too much of. Unrated books she read still show what she picks up, but weigh them less.
-summary: 3–4 sentences on how she reads.
-loves / dislikes: concrete, specific elements (e.g. "morally grey male lead who falls first", "slow first half", "found family in a war setting"), each with evidence: which of her books and her rating or words.
-genres: for each genre she reads, a one-line verdict based on her ratings.
-heatAndTone: the spice level, darkness and tone she enjoys.
-Never invent evidence; if there is little data, say so and keep it short.`,
-      input,
-      'medium',
-    ),
-  );
-}
-
-function describePortrait(p: Portrait | null) {
-  if (!p) return '';
-  return [
-    `HER TASTE (from her ratings and reviews)\n${p.summary}`,
-    p.loves.length ? `Loves:\n${p.loves.map((l) => `- ${l.what} (${l.evidence})`).join('\n')}` : '',
-    p.dislikes.length ? `Dislikes:\n${p.dislikes.map((l) => `- ${l.what} (${l.evidence})`).join('\n')}` : '',
-    p.genres.length ? `Genres:\n${p.genres.map((g) => `- ${g.genre}: ${g.verdict}`).join('\n')}` : '',
-    `Heat and tone: ${p.heatAndTone}`,
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
-/** How every score is worked out, so scores mean the same everywhere in the app */
-const SCORING_METHOD = `HOW TO SCORE (0–100), the same way every time:
-1. Closest match: find the one or two books she READ that are most like this book in premise, tropes, relationship dynamic, setting, tone and heat. Start from her rating of those: 5★ → 86, 4.5★ → 80, 4★ → 72, 3.5★ → 62, 3★ → 52, 2.5★ or lower → 40. If she read nothing comparable, start at 55.
-2. For each specific element of her "loves" this book clearly has (judging by what the book is about, not its genre label): +3 to +6. For each of her "dislikes" it clearly has: −5 to −12.
-3. Author: she rated this author 4★ or more → +5; 2.5★ or less → −8; one of her favourite authors → +5.
-4. Heat, darkness and length versus what she enjoys: −4 for each clear mismatch.
-5. A later book of a series she hasn't started: −10 (and say she should start with book 1).
-6. Little known yet (announced book, no blurb): judge it on the author and the series — the next part of a series she loves follows her ratings of that series — and don't lower the score for missing details; just say what it's based on.
-Calibrate: 90+ only for a near-certain new favourite; 75–89 a strong match; 60–74 decent; 45–59 a gamble; below 45 probably not for her.
-"why": 2–3 sentences to her ("you"). Explain the MATCH, not the story: name her comparable book(s) with her rating or her own words, and the concrete elements this book shares with them (tropes, dynamic, setting, tone, heat) or that she has asked for. Do not retell or summarise the plot. Ignore which edition, format or language a description comes from: you judge the book itself.
-"headsUp": one short sentence on something in this book she may not like (based on her dislikes), or null.`;
-
-// ---------- scoring a list of books for her (new from her authors) ----------
-
 /** The publisher's blurb from Google Books: the most detailed description we can get for free */
-async function googleDescription(env: AiEnv, title: string, author: string): Promise<string | undefined> {
+export async function googleDescription(env: AiEnv, title: string, author: string): Promise<string | undefined> {
   const params = new URLSearchParams({
     q: `intitle:"${title}" inauthor:"${author}"`,
     maxResults: '8',
@@ -360,137 +278,7 @@ async function googleDescription(env: AiEnv, title: string, author: string): Pro
     .sort((a, b) => b.description!.length - a.description!.length)[0]?.description;
 }
 
-export interface ToScore {
-  title: string;
-  author: string;
-  description?: string;
-  genres?: string[];
-}
-export interface Scored2 {
-  score: number;
-  why: string;
-  headsUp?: string;
-}
-
-const ScoresSchema = z.object({
-  books: z.array(z.object({ title: z.string(), score: z.number(), why: z.string(), headsUp: z.string().nullable() })),
-});
-
-/**
- * Scores books for her with the full picture: her portrait, her rated books and each book's
- * full description. Cached by the books and her portrait, so it's only redone when her taste
- * changes (a new rating or review). Falls back to the free taste engine.
- */
-export async function scoreForHer(env: AiEnv, list: ToScore[], books: Book[], profile?: ReaderProfile) {
-  const out = new Map<string, Scored2>();
-  const free = () => {
-    const out = new Map<string, Scored2>(); // its own map: never overwrites Claude's scores
-    const taste = learnTaste(books, profile);
-    for (const c of list) {
-      const s = scoreBook(
-        {
-          title: c.title,
-          author: c.author,
-          genres: c.genres ?? [],
-          traits: traitsIn(`${c.description ?? ''} ${(c.genres ?? []).join(' ')}`),
-        },
-        taste,
-        books,
-        {},
-      );
-      out.set(key(c.title, c.author), { score: s.score, why: s.why });
-    }
-    return { scores: out, ai: false };
-  };
-  if (!isLive(env) || !list.length) return free();
-  try {
-    const p = await portrait(env, books, profile);
-    const full = await Promise.all(
-      list.map(async (c) => {
-        const d = (await googleDescription(env, c.title, c.author)) ?? c.description;
-        return { ...c, description: d && c.description && c.description.length > d.length ? c.description : d };
-      }),
-    );
-    const rated = books
-      .filter((b) => b.status === 'read' && b.rating !== undefined)
-      .sort((a, b) => b.rating! - a.rating!)
-      .map((b) => `- "${b.title}" by ${b.authors[0] ?? ''}: ${b.rating}/5${b.review ? ` — "${b.review}"` : ''}`)
-      .join('\n');
-    // in groups, so every answer stays well within one reply (and each group is cached on its own)
-    const groups: (typeof full)[] = [];
-    for (let i = 0; i < full.length; i += 9) groups.push(full.slice(i, i + 9));
-    const answers = await Promise.all(
-      groups.map((group) =>
-        cached(env, ['score', 3, group.map((c) => [c.title, c.author]), p, rated, profile?.favouriteAuthors], 30, () =>
-          ask(
-            env,
-            TIPS_MODEL,
-            ScoresSchema,
-            `${SYSTEM_TIPS}\n\n${SCORING_METHOD}`,
-            [
-              describePortrait(p),
-              `HER RATED BOOKS\n${rated || '- none rated yet: go by what she reads and her quiz'}`,
-              `WHAT SHE READS (rated or not)\n${books
-                .filter((b) => b.status === 'read' || b.status === 'reading')
-                .map((b) => `"${b.title}" (${b.authors[0] ?? ''})`)
-                .join(', ')}`,
-              `HER READER QUIZ\n${describeProfile(profile)}`,
-              `BOOKS TO SCORE (use the exact titles)\n${group
-                .map(
-                  (c, i) =>
-                    `${i + 1}. "${c.title}" by ${c.author}${c.genres?.length ? ` [${c.genres.join(', ')}]` : ''}\n   About: ${(c.description ?? 'no description available').replace(/\s+/g, ' ').slice(0, 1600)}`,
-                )
-                .join('\n')}`,
-            ]
-              .filter(Boolean)
-              .join('\n\n'),
-            'medium',
-            16000,
-          ).catch((err) => {
-            if (!(err instanceof AiLimitError)) console.error('scoring group failed', err);
-            return null;
-          }),
-        ),
-      ),
-    );
-    const result = { books: answers.flatMap((a) => a?.books ?? []) };
-    if (!result.books.length) return free();
-    const byTitle = new Map(result.books.map((b) => [key(b.title), b]));
-    for (const c of list) {
-      const r = byTitle.get(key(c.title));
-      if (r)
-        out.set(key(c.title, c.author), { score: clampScore(r.score), why: r.why, headsUp: r.headsUp ?? undefined });
-    }
-    // anything Claude skipped still gets a (free) score
-    if (out.size < list.length) {
-      const rest = free().scores;
-      for (const [k, v] of rest) if (!out.has(k)) out.set(k, v);
-    }
-    return { scores: out, ai: true };
-  } catch (err) {
-    if (err instanceof AiLimitError) return free();
-    console.error('scoring failed', err);
-    return free();
-  }
-}
-
-export const scoreKey = (title: string, author: string) => key(title, author);
-
-// ---------- "What's next?" ----------
-
-const PicksSchema = z.object({
-  picks: z.array(
-    z.object({
-      title: z.string(),
-      author: z.string(),
-      why: z.string(),
-      seriesNote: z.string().nullable(),
-      score: z.number(),
-    }),
-  ),
-});
-
-const clampScore = (n: number) => Math.round(Math.max(0, Math.min(100, n)));
+// ---------- "Something new": books to buy, suggested by Claude, scored by the app ----------
 
 const MOOD_LABELS: Record<string, string> = {
   light: 'light & fun',
@@ -505,258 +293,54 @@ const MOOD_LABELS: Record<string, string> = {
 const key = (title: string, author = '') =>
   `${title.toLowerCase().replace(/[^a-z0-9]/g, '')}|${author.toLowerCase().split(/\s+/).pop() ?? ''}`;
 
-export async function recommend(
+const SuggestSchema = z.object({
+  books: z.array(z.object({ title: z.string(), author: z.string(), genres: z.array(z.string()) })),
+});
+
+/**
+ * Real, published books she doesn't have yet that fit her request. Claude only suggests:
+ * the app works out how well each one fits her (and picks the best three).
+ */
+export async function suggestBooks(
   env: AiEnv,
-  req: RecommendRequest,
+  req: { genre?: string; mood?: string; exclude?: string[] },
   books: Book[],
   profile?: ReaderProfile,
-): Promise<RecommendResponse> {
-  const unread = books.filter((b) => b.status === 'owned');
-  if (req.source === 'shelf' && unread.length === 0) return { picks: [], mock: !isLive(env) };
-
-  if (!isLive(env))
-    return {
-      picks: await inSeriesOrder(mockRecommend(req, books, profile), req.source, books),
-      mock: true,
-    };
-
-  const wish = [
-    req.source === 'shelf'
-      ? 'Pick her next read ONLY from the books under "OWNED BUT NOT READ YET". Use the exact title.'
-      : 'Suggest books to BUY: real, published books she does not have yet. Prefer books available in English or Dutch.',
+): Promise<{ books: { title: string; author: string; genres: string[] }[]; mock: boolean }> {
+  const have = new Set(books.map((b) => key(b.title, b.authors[0])));
+  if (!isLive(env)) {
+    const pool = MOCK_BUY_LIST.filter(
+      (m) => !have.has(key(m.title, m.author)) && !(req.exclude ?? []).some((t) => key(t) === key(m.title)),
+    );
+    return { books: pool.slice(0, 8).map((m) => ({ title: m.title, author: m.author, genres: m.genres })), mock: true };
+  }
+  const ask_ = [
+    'Suggest 7 real, published books to BUY that she does not have yet (not in her library, not on her wishlist, not something she said "not for me" to), available in English or Dutch.',
     req.genre ? `Genre: ${req.genre}.` : 'Any of her genres.',
     req.mood ? `Mood: ${MOOD_LABELS[req.mood] ?? req.mood}.` : '',
-    req.exclude?.length ? `Do not repeat these suggestions: ${req.exclude.join('; ')}.` : '',
-    'Give your 3 best picks (fewer only if there are not enough fitting books), best first.',
-    'For each pick give a match score 0–100: how well it fits her taste (her ratings, her own words in reviews, her quiz) and, if she asked for one, the genre and mood. Be honest: 90+ only for a near-certain favourite.',
-    'Score each pick with the method above. The "why" must be specific to her: name one or two of her books and what she rated or wrote about them, and what this book shares with them; never retell the plot.',
+    req.exclude?.length ? `Not these (already shown): ${req.exclude.join('; ')}.` : '',
+    'Go for books that fit what she loves (look at what she rated highest and what she wrote) and vary them a little. For a series she has not started, suggest book 1. Exact titles and authors.',
   ]
     .filter(Boolean)
     .join('\n');
-
-  const herTaste = describePortrait(await portrait(env, books, profile).catch(() => null));
-  const result = await cached(env, ['recommend', 2, req, books, profile], 1, () =>
-    ask(
-      env,
-      TIPS_MODEL,
-      PicksSchema,
-      SYSTEM_TIPS,
-      `${herTaste}\n\nHER LIBRARY\n${describeLibrary(books)}\n\nHER READER PROFILE\n${describeProfile(profile)}\n\n${SCORING_METHOD}\n\nWHAT SHE ASKS NOW\n${wish}`,
-      'medium',
-    ),
+  const result = await cached(
+    env,
+    ['suggest', 1, req, books.map((b) => [b.title, b.status, b.rating, b.review]), profile],
+    1,
+    () =>
+      ask(
+        env,
+        TIPS_MODEL,
+        SuggestSchema,
+        SYSTEM_TIPS,
+        `HER LIBRARY\n${describeLibrary(books)}\n\nHER READER PROFILE\n${describeProfile(profile)}\n\nWHAT SHE ASKS NOW\n${ask_}`,
+        'medium',
+      ),
   );
-
-  const byKey = new Map(books.map((b) => [key(b.title, b.authors[0]), b]));
-  const picks: Pick[] = (result?.picks ?? []).slice(0, 3).map((p) => {
-    const own = byKey.get(key(p.title, p.author)) ?? books.find((b) => key(b.title) === key(p.title));
-    return {
-      ...p,
-      seriesNote: p.seriesNote ?? undefined,
-      bookId: own?.id,
-      score: clampScore(p.score),
-    };
-  });
-  const fitting = req.source === 'shelf' ? picks.filter((p) => p.bookId) : picks.filter((p) => !p.bookId);
   return {
-    picks: await inSeriesOrder(fitting, req.source, books),
+    books: (result?.books ?? []).filter((b) => !have.has(key(b.title, b.author))).slice(0, 8),
     mock: false,
   };
-}
-
-// ---------- never skip ahead in a series ----------
-
-const sameSeries = (a: { name: string; key?: string }, b: { name: string; key?: string }) =>
-  (a.key && b.key ? a.key === b.key : false) || key(a.name) === key(b.name);
-
-/**
- * Makes sure a tip is never part 2 of a series she hasn't started:
- * - from her shelf: swap to the first part she hasn't read, if she owns it (otherwise drop the tip)
- * - to buy: swap to the first part she doesn't have yet
- * Series come from her library or from Open Library.
- */
-async function inSeriesOrder(picks: Pick[], source: RecommendRequest['source'], books: Book[]): Promise<Pick[]> {
-  const out: Pick[] = [];
-  for (const pick of picks) {
-    const own = pick.bookId ? books.find((b) => b.id === pick.bookId) : undefined;
-    let series: { name: string; number?: number; key?: string } | undefined = own?.series;
-    if (!series?.number) {
-      const found = await findBookSeries(pick.title, pick.author).catch(() => ({}) as FoundSeries);
-      if (found.name && found.number) series = { name: found.name, number: found.number, key: found.key };
-    }
-    const n = series?.number;
-    if (!series || !n || n <= 1) {
-      out.push(pick);
-      continue;
-    }
-    const parts = books.filter((b) => b.series && sameSeries(b.series, series!));
-    const partNo = (k: number) => parts.find((b) => b.series?.number === k);
-
-    if (source === 'shelf') {
-      // first earlier part she hasn't read
-      let k = 1;
-      while (k < n && partNo(k)?.status === 'read') k++;
-      if (k === n) {
-        out.push(pick);
-        continue;
-      }
-      const earlier = partNo(k);
-      if (earlier && (earlier.status === 'owned' || earlier.status === 'reading')) {
-        out.push({
-          title: earlier.title,
-          author: earlier.authors[0] ?? pick.author,
-          bookId: earlier.id,
-          why: `Start with book ${k} of ${series.name} first, it's waiting on your shelf. ${pick.why}`,
-          seriesNote: `${series.name} #${k}`,
-          score: pick.score,
-        });
-      }
-      continue; // she doesn't own the earlier part: not a shelf tip
-    }
-
-    // to buy: the first part she doesn't have yet
-    const has = (k: number) => {
-      const b = partNo(k);
-      return !!b && b.status !== 'wishlist';
-    };
-    let k = 1;
-    while (k < n && has(k)) k++;
-    if (k === n) {
-      out.push(pick);
-      continue;
-    }
-    const list = series.key ? await seriesParts(series.key).catch(() => []) : [];
-    const first = list.find((p) => p.number === k);
-    if (first) {
-      out.push({
-        title: first.title,
-        author: pick.author,
-        why: `It's book ${k} of ${series.name}, so start here! ${pick.why}`,
-        seriesNote: `${series.name} #${k}`,
-        score: pick.score,
-      });
-    }
-  }
-  // no doubles after swapping
-  const seen = new Set<string>();
-  return out.filter((p) => (seen.has(key(p.title)) ? false : (seen.add(key(p.title)), true)));
-}
-
-/**
- * Test-mode tips, still tailored to her: the taste engine learns from her ratings, reviews,
- * tags and quiz, scores every candidate and explains the match in her own terms.
- */
-export function mockRecommend(req: RecommendRequest, books: Book[], profile?: ReaderProfile): Pick[] {
-  const taste = learnTaste(books, profile);
-  const exclude = new Set((req.exclude ?? []).map((t) => key(t)));
-  const notForMe = new Set((profile?.notForMe ?? []).map((t) => key(t.replace(/\s*\(.*\)$/, ''))));
-  const wish = { genre: req.genre, mood: req.mood };
-
-  const candidates =
-    req.source === 'shelf'
-      ? books
-          .filter((b) => b.status === 'owned')
-          .map((b) => ({
-            book: b,
-            c: {
-              title: b.title,
-              author: b.authors[0] ?? '',
-              genres: b.genres,
-              traits: bookTraits(b),
-              previous:
-                b.series?.number && b.series.number > 1
-                  ? books.find(
-                      (x) =>
-                        x.status === 'read' &&
-                        x.series?.number === b.series!.number! - 1 &&
-                        key(x.series.name) === key(b.series!.name),
-                    )
-                  : undefined,
-            } as Candidate,
-          }))
-      : (() => {
-          const have = new Set(books.map((b) => key(b.title, b.authors[0])));
-          return MOCK_BUY_LIST.filter((m) => !have.has(key(m.title, m.author))).map((m) => ({
-            book: undefined,
-            c: m as Candidate,
-          }));
-        })();
-
-  return candidates
-    .filter(({ c }) => !exclude.has(key(c.title)) && !notForMe.has(key(c.title)))
-    .map(({ book, c }) => ({ book, c, ...scoreBook(c, taste, books, wish) }))
-    .filter((x) => !req.genre || x.c.genres.includes(req.genre))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map(({ book, c, score, why }) => ({
-      title: c.title,
-      author: c.author,
-      why,
-      score,
-      bookId: book?.id,
-      seriesNote: book?.series ? `${book.series.name} #${book.series.number ?? '?'}` : undefined,
-    }));
-}
-
-// ---------- "Does this fit me?" ----------
-
-const FitSchema = z.object({
-  verdict: z.enum(['love', 'like', 'maybe', 'skip']),
-  score: z.number(),
-  why: z.string(),
-  seriesNote: z.string().nullable(),
-});
-
-export async function fitCheck(
-  env: AiEnv,
-  book: {
-    title: string;
-    author: string;
-    description?: string;
-    genres?: string[];
-  },
-  books: Book[],
-  profile?: ReaderProfile,
-): Promise<FitResponse> {
-  if (!isLive(env)) {
-    // Test mode: the same taste engine as the tips, so scores mean the same everywhere
-    const taste = learnTaste(books, profile);
-    const traits = traitsIn(`${book.description ?? ''} ${(book.genres ?? []).join(' ')}`);
-    const { score, why } = scoreBook(
-      {
-        title: book.title,
-        author: book.author,
-        genres: book.genres ?? [],
-        traits,
-      },
-      taste,
-      books,
-      {},
-    );
-    const verdict = score >= 85 ? 'love' : score >= 70 ? 'like' : score >= 55 ? 'maybe' : 'skip';
-    return { verdict, score, why, seriesNote: null, mock: true };
-  }
-  const herTaste = describePortrait(await portrait(env, books, profile).catch(() => null));
-  const result = await cached(env, ['fit', 2, book, books, profile], 7, () =>
-    ask(
-      env,
-      TIPS_MODEL,
-      FitSchema,
-      SYSTEM_TIPS,
-      `${herTaste}\n\nHER LIBRARY\n${describeLibrary(books)}\n\nHER READER PROFILE\n${describeProfile(profile)}\n\n${SCORING_METHOD}\n\nShe is in a bookshop holding "${book.title}" by ${book.author}.${
-        book.description ? `\nBlurb: ${book.description.slice(0, 1500)}` : ''
-      }\nHow well does it fit her? verdict: love/like/maybe/skip, score 0–100, why in 2–3 sentences. If it is part of a series, say in seriesNote which book she should start with or buy next given what she owns/read; otherwise null.`,
-      'medium',
-    ),
-  );
-  if (!result)
-    return {
-      verdict: 'maybe',
-      score: 50,
-      why: "Snug couldn't judge this one.",
-      seriesNote: null,
-      mock: false,
-    };
-  return { ...result, score: clampScore(result.score), mock: false };
 }
 
 // ---------- series ----------
@@ -785,23 +369,4 @@ export async function seriesInfo(env: AiEnv, name: string, author: string): Prom
     ),
   );
   return { books: result?.books ?? [], mock: false };
-}
-
-/** Match scores for a list of books (e.g. new books by her favourite authors) */
-export async function scoreList(env: AiEnv, list: ToScore[], books: Book[], profile?: ReaderProfile) {
-  const has = new Set(books.filter((b) => b.status !== 'wishlist').map((b) => key(b.title, b.authors[0])));
-  const { scores, ai } = await scoreForHer(
-    env,
-    list.slice(0, 30).filter((b) => !has.has(key(b.title, b.author))),
-    books,
-    profile,
-  );
-  return {
-    books: list.slice(0, 30).map((b) => ({
-      title: b.title,
-      author: b.author,
-      ...(scores.get(key(b.title, b.author)) ?? { score: 50, why: '' }),
-    })),
-    mock: !ai,
-  };
 }

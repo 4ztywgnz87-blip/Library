@@ -1,3 +1,4 @@
+import type { ReviewInsight } from './taste/vocab';
 export type Status = 'reading' | 'owned' | 'read' | 'wishlist';
 export type Lang = 'en' | 'nl';
 
@@ -62,6 +63,8 @@ export interface Book {
   /** The rating card was saved at least once (also without stars) */
   ratingSaved?: boolean;
   review?: string;
+  /** What Snug read from her review (once per review), for her match scores */
+  reviewInsight?: ReviewInsight;
   tags: string[];
 
   addedAt: number;

@@ -3,12 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { useProfile, updateProfile } from '../lib/profile';
-import { recommend } from '../lib/ai';
+import { suggestBooks } from '../lib/ai';
+import { matchFor, useTaste } from '../lib/taste';
+import { normalize } from '../lib/library';
+import type { Mood } from '../taste/model';
 import { sameBook, searchBooks } from '../lib/bookSearch';
 import { updateBook } from '../lib/library';
 import { quickAdd } from '../lib/quickAdd';
 import { MOODS, type Pick, type RecommendRequest } from '../shared';
-import { GENRES } from '../types';
+import { GENRES, type Book } from '../types';
 import { Cover } from '../components/Cover';
 import { Button, Card, Chip, PageHeader } from '../components/ui';
 import { SparkleIcon } from '../components/Icons';
@@ -40,14 +43,81 @@ export default function Next() {
 
   const unread = (books ?? []).filter((b) => b.status === 'owned').length;
 
+  // Her taste, learned on the device: every tip is scored by the same model as everywhere else
+  const taste = useTaste();
+
   const ask = async (more = false) => {
     setLoading(true);
     setError(null);
     const exclude = more ? [...shown, ...(picks ?? []).map((p) => p.title)] : [];
+    const wish = { mood: mood as Mood | undefined, genre };
     try {
-      const res = await recommend({ source, genre, mood, exclude });
-      setPicks(res.picks);
-      setMock(res.mock);
+      let found: Pick[];
+      if (source === 'shelf') {
+        // from her own shelf: free, nothing leaves the phone
+        const all = books ?? [];
+        const sameSeries = (a: Book, b: Book) =>
+          !!a.series && !!b.series && normalize(a.series.name) === normalize(b.series.name);
+        // never a later part while an earlier one still waits
+        const waiting = (b: Book) =>
+          !!b.series?.number &&
+          all.some(
+            (x) =>
+              x.id !== b.id && sameSeries(x, b) && (x.series?.number ?? 0) < b.series!.number! && x.status !== 'read',
+          );
+        const shelf = all.filter(
+          (b) =>
+            b.status === 'owned' && !exclude.includes(b.title) && (!genre || b.genres.includes(genre)) && !waiting(b),
+        );
+        const scored = await Promise.all(
+          shelf.map(async (b) => ({
+            b,
+            m: await matchFor(
+              taste,
+              {
+                title: b.title,
+                author: b.authors[0] ?? '',
+                description: b.description,
+                genres: b.genres,
+                series: b.series,
+              },
+              wish,
+            ),
+          })),
+        );
+        // books Snug hasn't read yet (offline, or just added) still count, after the scored ones
+        found = scored
+          .sort((a, b) => (b.m?.stars ?? 0) - (a.m?.stars ?? 0))
+          .slice(0, 3)
+          .map(({ b, m }) => ({
+            title: b.title,
+            author: b.authors[0] ?? '',
+            why: m?.why ?? "Snug hasn't looked inside this one yet, so there's no match score for now. It follows soon.",
+            headsUp: m?.headsUp,
+            bookId: b.id,
+            score: m?.score,
+          }));
+        setMock(false);
+      } else {
+        // something new: Claude suggests books, Snug scores them and keeps the best three
+        const res = await suggestBooks({ genre, mood, exclude });
+        const have = new Set((books ?? []).map((b) => normalize(b.title)));
+        const scored = await Promise.all(
+          res.books
+            .filter((b) => !have.has(normalize(b.title)))
+            .map(async (b) => ({
+              b,
+              m: await matchFor(taste, { title: b.title, author: b.author, genres: b.genres }, wish),
+            })),
+        );
+        found = scored
+          .filter((x) => x.m)
+          .sort((a, b) => b.m!.stars - a.m!.stars)
+          .slice(0, 3)
+          .map(({ b, m }) => ({ title: b.title, author: b.author, why: m!.why, headsUp: m!.headsUp, score: m!.score }));
+        setMock(res.mock);
+      }
+      setPicks(found);
       setShown(exclude);
       // bring the tips into view (they appear below the choices)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
@@ -97,7 +167,9 @@ export default function Next() {
               }`}
             >
               <span className="text-2xl">{o.emoji}</span>
-              <span className={`mt-2 block font-soft text-lg leading-tight font-semibold ${source === o.id ? 'text-wine' : ''}`}>
+              <span
+                className={`mt-2 block font-soft text-lg leading-tight font-semibold ${source === o.id ? 'text-wine' : ''}`}
+              >
                 {o.title}
               </span>
               <span className="text-xs text-cocoa">{o.sub}</span>
@@ -122,7 +194,11 @@ export default function Next() {
         <p className="mt-5 mb-2 text-xs tracking-wide text-mocha uppercase">Mood (optional)</p>
         <div className="flex flex-wrap gap-2">
           {MOODS.map((m) => (
-            <Chip key={m.id} active={mood === m.id} onClick={() => (setMood(mood === m.id ? undefined : m.id), reset())}>
+            <Chip
+              key={m.id}
+              active={mood === m.id}
+              onClick={() => (setMood(mood === m.id ? undefined : m.id), reset())}
+            >
               {m.emoji} {m.label}
             </Chip>
           ))}
@@ -171,7 +247,7 @@ export default function Next() {
               </Button>
               {mock && (
                 <p className="max-w-sm text-center text-xs text-mocha">
-                  Test mode: tips come from Snug's own taste guesses (your ratings, reviews and quiz). With the AI on, Claude makes them even more personal.
+                  Test mode: the suggestions are a fixed list of popular books, scored for your taste.
                 </p>
               )}
             </div>
@@ -220,7 +296,9 @@ function PickCard({
           <button
             className="block w-full active:scale-[0.97]"
             onClick={() =>
-              own ? navigate(`/book/${own.id}`) : preview.open({ title: pick.title, author: pick.author, coverUrl: cover })
+              own
+                ? navigate(`/book/${own.id}`)
+                : preview.open({ title: pick.title, author: pick.author, coverUrl: cover })
             }
           >
             <Cover book={own ?? { title: pick.title, authors: [pick.author], coverUrl: cover }} />
@@ -242,6 +320,11 @@ function PickCard({
           </div>
           {pick.seriesNote && <p className="mt-1 text-xs text-mocha">{pick.seriesNote}</p>}
           <p className="mt-2 text-sm leading-relaxed text-ink/90">{pick.why}</p>
+          {pick.headsUp && (
+            <p className="mt-1.5 text-xs leading-relaxed text-cocoa">
+              <span className="font-medium">Heads up:</span> {pick.headsUp}
+            </p>
+          )}
           <div className="mt-3 flex items-center gap-1">
             {source === 'shelf' && own ? (
               <Button

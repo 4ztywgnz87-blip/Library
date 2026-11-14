@@ -53,6 +53,8 @@ export interface Pick {
   /** How well it fits her, 0–100 */
   score?: number;
   seriesNote?: string;
+  /** Something in it she may not like */
+  headsUp?: string;
 }
 
 export interface RecommendResponse {
@@ -78,6 +80,10 @@ export interface FitResponse {
   score: number;
   why: string;
   seriesNote: string | null;
+  /** Something in it she may not like */
+  headsUp?: string;
+  /** Too few of her ratings yet to be sure */
+  earlyGuess?: boolean;
   mock: boolean;
 }
 
@@ -98,12 +104,4 @@ export interface AiStatus {
   mode: 'mock' | 'live';
   usedToday: number;
   limit: number;
-}
-
-export interface ScoredBook {
-  title: string;
-  author: string;
-  score: number;
-  why: string;
-  headsUp?: string;
 }

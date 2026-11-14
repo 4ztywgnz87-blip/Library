@@ -13,6 +13,9 @@ import { ChevronIcon, TrashIcon } from '../components/Icons';
 import { EditionPicker } from '../components/EditionPicker';
 import { ConfirmSheet } from '../components/ConfirmSheet';
 import { lookupSeries, setGenreForSeries } from '../lib/seriesLookup';
+import { useMatches } from '../lib/taste';
+import { profileKey } from '../taste/vocab';
+import { MatchRing, matchLabel } from '../components/MatchRing';
 
 const TAG_SUGGESTIONS = [
   'spicy 🌶️',
@@ -132,6 +135,9 @@ export default function BookDetail() {
               </Button>
             )}
           </Card>
+
+          {/* How well it fits her (books she hasn't read yet) */}
+          {(book.status === 'owned' || book.status === 'wishlist') && <FitForYou book={book} />}
 
           {/* Rating & review */}
           {book.status === 'read' && (
@@ -489,5 +495,39 @@ function Petals({ onDone }: { onDone: () => void }) {
         />
       ))}
     </div>
+  );
+}
+
+/** "How well it fits you": worked out on the device from her ratings, reviews and quiz */
+function FitForYou({ book }: { book: Book }) {
+  const author = book.authors[0] ?? '';
+  const matches = useMatches([
+    { title: book.title, author, description: book.description, genres: book.genres, series: book.series },
+  ]);
+  const m = matches.get(profileKey(book.title, author));
+  if (!m) return null;
+  return (
+    <Card>
+      <p className="mb-3 text-xs tracking-wide text-mocha uppercase">How well it fits you</p>
+      <div className="flex gap-3">
+        <div className="flex flex-col items-center">
+          <MatchRing score={m.score} />
+          <span className="mt-0.5 text-[0.6rem] whitespace-nowrap text-mocha">{matchLabel(m.score)}</span>
+        </div>
+        <div className="min-w-0 text-sm">
+          <p className="leading-relaxed text-ink/90">{m.why}</p>
+          {m.headsUp && (
+            <p className="mt-1.5 text-xs leading-relaxed text-cocoa">
+              <span className="font-medium">Heads up:</span> {m.headsUp}
+            </p>
+          )}
+          {m.confidence === 'early guess' && (
+            <p className="mt-1.5 text-xs text-mocha">
+              An early guess: rate the books you've read and this gets sharper.
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }

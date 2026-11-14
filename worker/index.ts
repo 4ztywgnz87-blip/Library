@@ -1,18 +1,10 @@
 import { Hono, type Context } from 'hono';
 import type { Book, SyncRecord } from '../src/types';
-import type { ReaderProfile, RecommendRequest } from '../src/shared';
-import {
-  AiLimitError,
-  aiStatus,
-  findCoverCorners,
-  fitCheck,
-  identifyCover,
-  recommend,
-  scoreList,
-  seriesInfo,
-} from './ai';
+import type { ReaderProfile } from '../src/shared';
+import { AiLimitError, aiStatus, findCoverCorners, identifyCover, suggestBooks, seriesInfo } from './ai';
 import { ASSETS } from './assets.gen';
 import { findBookSeries, seriesParts } from './series';
+import { bookProfiles, reviewInsight } from './profiles';
 
 export interface Env {
   DB: D1Database;
@@ -257,18 +249,27 @@ app.post('/ai/identify', async (c) => {
   return aiRoute(c, () => identifyCover(c.env, image, mediaType));
 });
 
-app.post('/ai/score', async (c) => {
-  const { books: list = [] } = await c.req.json<{
+// Book analyses (once per book, then stored) and her reviews read into features
+app.post('/profiles', async (c) => {
+  const { books = [] } = await c.req.json<{
     books?: { title: string; author: string; description?: string; genres?: string[] }[];
   }>();
+  const list = books.filter((b) => b.title && b.author).slice(0, 24);
+  return aiRoute(c, () => bookProfiles(c.env, list));
+});
+
+app.post('/review-insight', async (c) => {
+  const body = await c.req.json<Parameters<typeof reviewInsight>[1]>();
+  if (!body.title || !body.review || !body.hash) return c.json({ error: 'Review missing' }, 400);
+  return aiRoute(c, async () => ({ insight: await reviewInsight(c.env, body) }));
+});
+
+// "Something new": Claude suggests books she doesn't have; the app scores them for her
+app.post('/ai/suggest', async (c) => {
+  const req = await c.req.json<{ genre?: string; mood?: string; exclude?: string[] }>();
   return aiRoute(c, async () => {
     const { books, profile } = await loadLibrary(c.env);
-    return scoreList(
-      c.env,
-      list.filter((b) => b.title && b.author),
-      books,
-      profile,
-    );
+    return suggestBooks(c.env, req, books, profile);
   });
 });
 
@@ -287,38 +288,6 @@ app.post('/ai/corners', async (c) => {
   if (!image || image.length > 4_000_000 || !width || !height)
     return c.json({ error: 'Photo missing or too large' }, 400);
   return aiRoute(c, () => findCoverCorners(c.env, image, mediaType, width, height));
-});
-
-app.post('/ai/recommend', async (c) => {
-  const req = await c.req.json<RecommendRequest>();
-  return aiRoute(c, async () => {
-    const { books, profile } = await loadLibrary(c.env);
-    return recommend(c.env, req, books, profile);
-  });
-});
-
-app.post('/ai/fit', async (c) => {
-  const book = await c.req.json<{
-    title?: string;
-    author?: string;
-    description?: string;
-    genres?: string[];
-  }>();
-  if (!book.title || !book.author) return c.json({ error: 'Title and author required' }, 400);
-  return aiRoute(c, async () => {
-    const { books, profile } = await loadLibrary(c.env);
-    return fitCheck(
-      c.env,
-      {
-        title: book.title!,
-        author: book.author!,
-        description: book.description,
-        genres: book.genres,
-      },
-      books,
-      profile,
-    );
-  });
 });
 
 app.post('/ai/series', async (c) => {

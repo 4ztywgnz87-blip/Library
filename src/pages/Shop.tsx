@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
-import { fitCheck, identifyCover } from '../lib/ai';
+import { identifyCover } from '../lib/ai';
+import { matchFor, useTaste } from '../lib/taste';
 import { shrinkPhoto } from '../lib/photo';
 import { sameBook, searchBooks, type SearchResult } from '../lib/bookSearch';
 import { bookKey, normalize } from '../lib/library';
@@ -83,6 +84,36 @@ export default function Shop() {
     setState({ kind: 'idle' });
   };
 
+  // How well it fits her: worked out on the device from her own ratings and reviews
+  const taste = useTaste();
+  const fitCheck = async (b: {
+    title: string;
+    author: string;
+    description?: string;
+    genres?: string[];
+    series?: SearchResult['series'];
+  }): Promise<FitResponse> => {
+    const m = await matchFor(taste, b);
+    if (!m)
+      return {
+        verdict: 'maybe',
+        score: 50,
+        why: "Snug couldn't look into this book right now. Try again in a moment.",
+        seriesNote: null,
+        mock: false,
+      };
+    const verdict = m.score >= 82 ? 'love' : m.score >= 68 ? 'like' : m.score >= 52 ? 'maybe' : 'skip';
+    return {
+      verdict,
+      score: m.score,
+      why: m.why,
+      seriesNote: null,
+      headsUp: m.headsUp,
+      earlyGuess: m.confidence === 'early guess',
+      mock: false,
+    };
+  };
+
   const check = async (title: string, author: string, picked?: SearchResult, setState = begin()) => {
     const own = books?.find((b) => bookKey(b) === bookKey({ title, authors: [author] }));
     if (own) return setState({ kind: 'owned', book: own });
@@ -94,6 +125,7 @@ export default function Shop() {
           author: picked.authors[0] ?? author,
           description: picked.description,
           genres: picked.genres,
+          series: picked.series,
         });
         return setState({ kind: 'fit', book: picked, fit });
       }
@@ -111,6 +143,7 @@ export default function Shop() {
         author: found.authors[0] ?? author,
         description: found.description,
         genres: found.genres,
+        series: found.series,
       });
       setState({ kind: 'fit', book: found, fit });
     } catch (e) {
@@ -294,7 +327,17 @@ function FitCard({ book, fit }: { book: SearchResult; fit: FitResponse }) {
           </div>
         </div>
         <p className="text-sm leading-relaxed">{fit.why}</p>
+        {fit.headsUp && (
+          <p className="rounded-xl bg-linen px-3 py-2 text-sm text-cocoa">
+            <span className="font-medium">Heads up:</span> {fit.headsUp}
+          </p>
+        )}
         {fit.seriesNote && <p className="rounded-xl bg-linen px-3 py-2 text-sm text-cocoa">📚 {fit.seriesNote}</p>}
+        {fit.earlyGuess && (
+          <p className="text-xs text-mocha">
+            An early guess: the more books you rate, the better Snug knows your taste.
+          </p>
+        )}
         <Button
           className="w-full"
           disabled={added}
@@ -307,7 +350,6 @@ function FitCard({ book, fit }: { book: SearchResult; fit: FitResponse }) {
         >
           {added ? 'On your wishlist ✓' : '+ Add to wishlist'}
         </Button>
-        {fit.mock && <p className="text-center text-xs text-mocha">Test mode: a rough guess without AI.</p>}
       </Card>
     </motion.div>
   );

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { TABS, useTabSwipe } from '../lib/swipe';
 import { BooksIcon, HomeIcon, PlusIcon, ShelfIcon, UserIcon } from './Icons';
+import { useTasteUpkeep } from '../lib/taste';
 
 const items = [
   { to: '/', label: 'Home', icon: HomeIcon, end: true },
@@ -13,6 +14,7 @@ const items = [
 ];
 
 export function Layout() {
+  useTasteUpkeep(); // analyses new books and reads new reviews, in the background
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const hideNav = pathname.startsWith('/book/') || pathname === '/quiz';

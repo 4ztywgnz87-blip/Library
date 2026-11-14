@@ -218,3 +218,50 @@ Na elke fase krijgt ze een link om te testen, zodat ze kan meedenken.
 - `AI_MODE=mock`: de AI-functies geven nep-antwoorden, zo kunnen we schermen en flow gratis bijsturen
 - Echte AI-antwoorden testen we pas daarna, met een dagelijkse limiet en vooraf betaald tegoed
 - Antwoorden worden bewaard: dezelfde vraag twee keer stellen kost maar één keer
+
+## 11. Aanbevelingsmodel (match-scores)
+
+**Principe:** de AI leest elk boek en elke review maar één keer. Alle scores rekent de app daarna zelf uit, gratis, op het toestel, en meteen opnieuw bij elke nieuwe score of review.
+
+**1. Boekanalyse (één keer per boek, Claude Sonnet).**
+- Vast vocabulaire in `src/taste/vocab.ts`: 19 schalen (0–5) en ruim 200 tags in 12 groepen.
+  - Schalen: romance, spice, tempo van de romance, angst, banter, humor, duisterheid, geweld, emotie, spanning, twists, mysterie, actie, intriges, worldbuilding, tempo van het plot, trage start, complexiteit en karakterfocus.
+  - Tag-groepen: genre, setting, tropes, type held, type heldin, wezens, thema's, vertelperspectief, einde, plaats in de reeks, doelpubliek en inhoudswaarschuwingen.
+- Daarnaast per boek: vergelijkbare boeken, sfeerwoorden en de reeks.
+- Vaste ijkpunten (bijvoorbeeld spice: Twilight 0 · Fourth Wing 3 · ACOMAF 4) houden de analyses consistent.
+- Opgeslagen in D1 (`book_profiles`), ongeveer 2–3 kB per boek.
+
+**2. Reviewanalyse (één keer per review).**
+- Wat ze goed en slecht vond, in hetzelfde vocabulaire, met sterkte (1–3) en haar eigen woorden als citaat.
+- Bij schalen maakt de analyse onderscheid tussen "genoot ervan", "miste het" en "te veel".
+
+**3. Rekenmodel (`src/taste/model.ts`), vier signalen samen:**
+1. **Meest gelijkende boeken die ze beoordeelde:** tags, schalen, auteur, vergelijkingen en reeks.
+2. **Kenmerken:** welke tags haar scores verklaren, alle tags samen geleerd (ridge-regressie), aangevuld met haar reviews en de quiz.
+   - Klachten wegen zwaarder dan complimenten.
+   - Eén opmerking weegt minder naarmate een kenmerk vaker in haar boeken voorkomt.
+   - Inhoudswaarschuwingen tellen enkel als ze er zelf iets over zei.
+3. **Schalen:**
+   - Haar ideale niveau per schaal, plus wat haar reviews erover zeggen, verankerd aan het niveau van dat boek: "te duister" over een 5/5-duister boek raakt alleen even duistere boeken.
+   - "Te weinig X" geldt enkel voor boeken van dezelfde soort.
+4. **Auteur en reeks.** Een later deel van een reeks die ze niet begon, gaat omlaag, met de tip om bij deel 1 te beginnen.
+
+- Signalen die hetzelfde vertellen, worden niet dubbel geteld.
+- Zachte grenzen naar 5★ en 1★.
+- Weinig gegevens betekent een voorzichtige gok.
+- Elke score krijgt een uitleg met haar boeken en haar woorden, en waar nodig een "heads up".
+
+**Getest** met vier testlezers (romantasy, thriller, romcom, epische fantasy; 142 beoordelingen, 35 reviews). Methode: het model voorspelt telkens één boek dat het niet mocht zien. In 7 rondes kritisch bijgestuurd (`PARAMS` in `model.ts`).
+
+| | gemiddelde fout | juiste rangorde |
+|---|---|---|
+| altijd haar gemiddelde raden | 0,78★ | – |
+| ronde 1 | 0,77★ | 81% |
+| na 7 rondes | **0,43★** | **85%** |
+
+- Instellingen afgesteld op drie lezers en gecontroleerd op een vierde die het model niet zag. Afstellingen die daar slechter werden, zijn niet overgenomen.
+- Grensgevallen getest: alleen de quiz, drie beoordelingen, gelezen maar niets beoordeeld.
+
+**Kosten:**
+- ongeveer $0,01 per nieuw boek en $0,002 per review;
+- de scores zelf zijn altijd gratis.

@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import type { Book } from '../types';
 import type { AuthorNews } from '../lib/authors';
-import type { ScoredBook } from '../shared';
-import { keyOf, useAuthorNews, useHave, useScores } from '../lib/discover';
+import { profileKey } from '../taste/vocab';
+import { useMatches, type Match } from '../lib/taste';
+import { keyOf, useAuthorNews, useHave } from '../lib/discover';
 import { BookPreview, type PreviewBook } from './BookPreview';
 import { DiscoverCard, SoonBadge, formatDate } from './Discover';
 import { useHistoryModal } from '../lib/modal';
 
-export const newsPreview = (i: AuthorNews, cover?: string, s?: ScoredBook): PreviewBook => ({
+export const newsPreview = (i: AuthorNews, cover?: string, s?: Match): PreviewBook => ({
   title: i.title,
   author: i.author,
   coverUrl: cover ?? i.coverUrl,
@@ -24,10 +25,21 @@ export function useScoredNews(books: Book[] | undefined, favourites: string[]) {
   const items = useAuthorNews(books, favourites);
   const have = useHave(books);
   const toScore = (items ?? []).filter((i) => !have.has(keyOf(i))).slice(0, 30);
-  const scores = useScores(
-    books,
-    toScore.map((i) => ({ title: i.title, author: i.author, description: i.description, genres: i.genres })),
+  const matches = useMatches(
+    toScore.map((i) => ({
+      title: i.title,
+      author: i.author,
+      description: i.description,
+      genres: i.genres,
+      series: i.series,
+    })),
   );
+  // keyed like the rest of the news list
+  const scores = new Map<string, Match>();
+  for (const i of toScore) {
+    const m = matches.get(profileKey(i.title, i.author));
+    if (m) scores.set(keyOf(i), m);
+  }
   return { items, have, scores };
 }
 
