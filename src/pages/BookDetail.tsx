@@ -385,7 +385,7 @@ function SeriesCard({ book }: { book: Book }) {
       series: name.trim()
         ? {
             name: name.trim(),
-            number: num ? Number(num) : undefined,
+            number: num && Number.isFinite(Number(num)) ? Number(num) : undefined,
             // keep the link to the full series list if only the number changed
             key: name.trim() === book.series?.name ? book.series?.key : undefined,
           }
@@ -436,7 +436,8 @@ function SeriesCard({ book }: { book: Book }) {
             />
             <input
               value={num}
-              onChange={(e) => setNum(e.target.value.replace(/[^\d.]/g, ''))}
+              // 4.5 or 4,5 for an in-between story (a novella between book 4 and 5)
+              onChange={(e) => setNum(e.target.value.replace(',', '.').replace(/[^\d.]/g, ''))}
               placeholder="#"
               inputMode="decimal"
               className="w-16 rounded-xl border border-sand bg-white px-3 py-2 text-center text-[16px] outline-none focus:border-oat"

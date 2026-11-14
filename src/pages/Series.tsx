@@ -200,7 +200,7 @@ export function SeriesDetail() {
               {e.kind === 'mine' ? (
                 <Link to={`/book/${e.book.id}`}>
                   <Card className="flex items-center gap-4 py-3">
-                    <span className="w-6 text-center font-soft text-lg text-mocha">{e.number ?? '·'}</span>
+                    <SeriesNumber n={e.number} />
                     <Cover book={e.book} className="w-12 shrink-0" rounded="rounded" />
                     <div className="min-w-0 flex-1">
                       <p className="leading-snug font-medium">{e.book.title}</p>
@@ -215,14 +215,16 @@ export function SeriesDetail() {
                 </Link>
               ) : (
                 <div className="flex items-center gap-4 rounded-[var(--radius-card)] border-2 border-dashed border-sand px-4 py-3">
-                  <span className="w-6 text-center font-soft text-lg text-mocha">{e.number}</span>
+                  <SeriesNumber n={e.number} />
                   <MissingCover title={e.title} author={group.author} coverUrl={e.coverUrl} />
                   <div className="min-w-0 flex-1">
                     <p className="leading-snug font-medium text-cocoa">{e.title ?? `Book ${e.number}`}</p>
                     <p className="text-xs text-wine">
                       {e.announced
                         ? `Coming soon${e.releaseDate ? ` · ${formatRelease(e.releaseDate)}` : ''}`
-                        : 'Not in your library'}
+                        : Number.isInteger(e.number)
+                          ? 'Not in your library'
+                          : 'Extra story · not in your library'}
                     </p>
                   </div>
                   <Button
@@ -305,5 +307,13 @@ function MissingCover({ title, author, coverUrl }: { title?: string; author: str
       className="w-12 shrink-0 opacity-80"
       rounded="rounded"
     />
+  );
+}
+
+/** The number in front of a part: 4.5 (an in-between story) is a bit smaller so it fits */
+function SeriesNumber({ n }: { n?: number }) {
+  const extra = n !== undefined && !Number.isInteger(n);
+  return (
+    <span className={`w-7 shrink-0 text-center font-soft text-mocha ${extra ? 'text-sm' : 'text-lg'}`}>{n ?? '·'}</span>
   );
 }

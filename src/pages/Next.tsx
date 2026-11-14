@@ -63,7 +63,12 @@ export default function Next() {
           !!b.series?.number &&
           all.some(
             (x) =>
-              x.id !== b.id && sameSeries(x, b) && (x.series?.number ?? 0) < b.series!.number! && x.status !== 'read',
+              x.id !== b.id &&
+              sameSeries(x, b) &&
+              (x.series?.number ?? 0) < b.series!.number! &&
+              // an in-between story (4.5) is optional: it doesn't hold up book 5
+              Number.isInteger(x.series?.number ?? 0) &&
+              x.status !== 'read',
           );
         const shelf = all.filter(
           (b) =>
@@ -92,7 +97,8 @@ export default function Next() {
           .map(({ b, m }) => ({
             title: b.title,
             author: b.authors[0] ?? '',
-            why: m?.why ?? "Snug hasn't looked inside this one yet, so there's no match score for now. It follows soon.",
+            why:
+              m?.why ?? "Snug hasn't looked inside this one yet, so there's no match score for now. It follows soon.",
             headsUp: m?.headsUp,
             bookId: b.id,
             score: m?.score,

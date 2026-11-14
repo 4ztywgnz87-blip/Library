@@ -114,8 +114,11 @@ export function upcomingParts(
 
 /** How far she is in a series, counting the parts that exist (when known), not just the ones she has */
 export function seriesProgress(group: SeriesGroup, known: SeriesBook[] = []) {
-  const published = known.filter((k) => k.status === 'published');
   const ownNumbers = new Set(group.books.map((b) => b.series?.number).filter((n): n is number => n !== undefined));
+  // in-between stories (4.5) are extras: they only count when she has them
+  const published = known.filter(
+    (k) => k.status === 'published' && (Number.isInteger(k.number) || ownNumbers.has(k.number)),
+  );
   const missing = [
     ...new Set([...group.missing, ...published.map((k) => k.number).filter((n) => !ownNumbers.has(n))]),
   ].sort((a, b) => a - b);
