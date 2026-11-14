@@ -10,7 +10,8 @@
     "typecheck": "tsc -b",
     "db:migrate:local": "wrangler d1 migrations apply snug --local",
     "db:migrate:remote": "wrangler d1 migrations apply snug --remote",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "taste-check": "tsx scripts/taste-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
@@ -32,6 +33,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "tailwindcss": "^4.3.5",
+    "tsx": "^4.21.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vite-plugin-pwa": "^2.0.0",

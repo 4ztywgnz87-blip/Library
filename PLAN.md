@@ -265,3 +265,8 @@ Na elke fase krijgt ze een link om te testen, zodat ze kan meedenken.
 **Kosten:**
 - ongeveer $0,01 per nieuw boek en $0,002 per review;
 - de scores zelf zijn altijd gratis.
+
+**Test op haar eigen smaak:** `npm run taste-check` doet dezelfde test op haar echte bibliotheek.
+- Werkwijze: telkens één beoordeeld boek (en de review ervan) weglaten, laten voorspellen en vergelijken met haar eigen score.
+- Uitvoer: de gemiddelde fout, hoeveel boeken binnen een halve ster vallen, de juiste volgorde, en de grootste missers met uitleg.
+- Gebruikt geen AI en verandert niets.
