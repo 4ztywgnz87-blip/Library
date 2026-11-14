@@ -190,66 +190,78 @@ export function SeriesDetail() {
         </p>
 
         <ol className="mt-6 space-y-3">
-          {entries.map((e, i) => (
-            <motion.li
-              key={e.kind === 'mine' ? e.book.id : `m${e.number}`}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.04 }}
-            >
-              {e.kind === 'mine' ? (
-                <Link to={`/book/${e.book.id}`}>
-                  <Card className="flex items-center gap-4 py-3">
+          {entries.map((e, i) => {
+            // an in-between story (4.5) sits indented under the book before it: in order, but optional
+            const extra = e.number !== undefined && !Number.isInteger(e.number);
+            return (
+              <motion.li
+                key={e.kind === 'mine' ? e.book.id : `m${e.number}`}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.04 }}
+                className={extra ? 'relative ml-8' : undefined}
+              >
+                {extra && (
+                  <span
+                    aria-hidden
+                    className="absolute -top-3 -left-5 h-[calc(50%+0.75rem)] w-4 rounded-bl-xl border-b-2 border-l-2 border-sand"
+                  />
+                )}
+                {e.kind === 'mine' ? (
+                  <Link to={`/book/${e.book.id}`}>
+                    <Card className="flex items-center gap-4 py-3">
+                      <SeriesNumber n={e.number} />
+                      <Cover book={e.book} className="w-12 shrink-0" rounded="rounded" />
+                      <div className="min-w-0 flex-1">
+                        <p className="leading-snug font-medium">{e.book.title}</p>
+                        <p className="mt-0.5 text-xs text-cocoa">
+                          {extra && 'Extra story · '}
+                          {STATUSES.find((s) => s.id === e.book.status)?.label}
+                          {e.book.language === 'nl' ? ' · 🇳🇱' : ''}
+                        </p>
+                        {e.book.rating !== undefined && <StarsDisplay value={e.book.rating} size={12} />}
+                      </div>
+                      {e.book.status === 'read' && <span className="text-lg text-sage">✓</span>}
+                    </Card>
+                  </Link>
+                ) : (
+                  <div className="flex items-center gap-4 rounded-[var(--radius-card)] border-2 border-dashed border-sand px-4 py-3">
                     <SeriesNumber n={e.number} />
-                    <Cover book={e.book} className="w-12 shrink-0" rounded="rounded" />
+                    <MissingCover title={e.title} author={group.author} coverUrl={e.coverUrl} />
                     <div className="min-w-0 flex-1">
-                      <p className="leading-snug font-medium">{e.book.title}</p>
-                      <p className="mt-0.5 text-xs text-cocoa">
-                        {STATUSES.find((s) => s.id === e.book.status)?.label}
-                        {e.book.language === 'nl' ? ' · 🇳🇱' : ''}
+                      <p className="leading-snug font-medium text-cocoa">{e.title ?? `Book ${e.number}`}</p>
+                      <p className="text-xs text-wine">
+                        {e.announced
+                          ? `Coming soon${e.releaseDate ? ` · ${formatRelease(e.releaseDate)}` : ''}`
+                          : Number.isInteger(e.number)
+                            ? 'Not in your library'
+                            : 'Extra story · not in your library'}
                       </p>
-                      {e.book.rating !== undefined && <StarsDisplay value={e.book.rating} size={12} />}
                     </div>
-                    {e.book.status === 'read' && <span className="text-lg text-sage">✓</span>}
-                  </Card>
-                </Link>
-              ) : (
-                <div className="flex items-center gap-4 rounded-[var(--radius-card)] border-2 border-dashed border-sand px-4 py-3">
-                  <SeriesNumber n={e.number} />
-                  <MissingCover title={e.title} author={group.author} coverUrl={e.coverUrl} />
-                  <div className="min-w-0 flex-1">
-                    <p className="leading-snug font-medium text-cocoa">{e.title ?? `Book ${e.number}`}</p>
-                    <p className="text-xs text-wine">
-                      {e.announced
-                        ? `Coming soon${e.releaseDate ? ` · ${formatRelease(e.releaseDate)}` : ''}`
-                        : Number.isInteger(e.number)
-                          ? 'Not in your library'
-                          : 'Extra story · not in your library'}
-                    </p>
+                    <Button
+                      variant="soft"
+                      className="shrink-0 px-3 py-2 text-xs"
+                      disabled={adding === e.number}
+                      onClick={async () => {
+                        if (!e.title) {
+                          navigate(`/add?q=${encodeURIComponent(`${group.name} ${group.author}`)}`);
+                          return;
+                        }
+                        setAdding(e.number);
+                        await quickAdd(e.title, group.author, 'wishlist', {
+                          series: { name: group.name, number: e.number },
+                          coverUrl: e.coverUrl,
+                        });
+                        setAdding(null);
+                      }}
+                    >
+                      {adding === e.number ? 'Adding…' : e.title ? '+ Wishlist' : 'Find it'}
+                    </Button>
                   </div>
-                  <Button
-                    variant="soft"
-                    className="shrink-0 px-3 py-2 text-xs"
-                    disabled={adding === e.number}
-                    onClick={async () => {
-                      if (!e.title) {
-                        navigate(`/add?q=${encodeURIComponent(`${group.name} ${group.author}`)}`);
-                        return;
-                      }
-                      setAdding(e.number);
-                      await quickAdd(e.title, group.author, 'wishlist', {
-                        series: { name: group.name, number: e.number },
-                        coverUrl: e.coverUrl,
-                      });
-                      setAdding(null);
-                    }}
-                  >
-                    {adding === e.number ? 'Adding…' : e.title ? '+ Wishlist' : 'Find it'}
-                  </Button>
-                </div>
-              )}
-            </motion.li>
-          ))}
+                )}
+              </motion.li>
+            );
+          })}
         </ol>
 
         {mock && (
