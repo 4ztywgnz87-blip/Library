@@ -11,6 +11,7 @@ import {
   trendingList,
   isLive,
   recommend,
+  scoreList,
   seriesInfo,
 } from './ai';
 import { ASSETS } from './assets.gen';
@@ -266,6 +267,21 @@ app.get('/ai/trending', async (c) =>
   }),
 );
 
+app.post('/ai/score', async (c) => {
+  const { books: list = [] } = await c.req.json<{
+    books?: { title: string; author: string; description?: string; genres?: string[] }[];
+  }>();
+  return aiRoute(c, async () => {
+    const { books, profile } = await loadLibrary(c.env);
+    return scoreList(
+      c.env,
+      list.filter((b) => b.title && b.author),
+      books,
+      profile,
+    );
+  });
+});
+
 app.post('/ai/corners', async (c) => {
   const {
     image,
@@ -364,6 +380,13 @@ export default {
   },
   // Every Monday morning: put this week's trending list together in advance, so nobody waits for it
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
-    if (isLive(env)) ctx.waitUntil(trendingList(env).then(() => undefined));
+    if (!isLive(env)) return;
+    // the list, and right away the scores for her (so Home opens with everything ready)
+    ctx.waitUntil(
+      trendingList(env)
+        .then(() => loadLibrary(env))
+        .then(({ books, profile }) => trending(env, books, profile))
+        .then(() => undefined),
+    );
   },
 } satisfies ExportedHandler<Env>;

@@ -29,7 +29,11 @@ export function SeriesCard({ group, known }: { group: SeriesGroup; known?: Serie
             <div
               key={b.id}
               className="absolute top-0 left-0 w-12"
-              style={{ zIndex: 10 - i, transform: `translateX(${i * 7}px) rotate(${i * 4}deg)`, transformOrigin: 'bottom left' }}
+              style={{
+                zIndex: 10 - i,
+                transform: `translateX(${i * 7}px) rotate(${i * 4}deg)`,
+                transformOrigin: 'bottom left',
+              }}
             >
               <Cover book={b} rounded="rounded" />
             </div>
@@ -66,6 +70,9 @@ export function SeriesList() {
   const groups = useMemo(() => groupSeries(books ?? []), [books]);
   const parts = useSeriesParts(groups);
   if (!books) return null;
+  const wishOnly = (g: (typeof groups)[number]) => g.books.every((b) => b.status === 'wishlist');
+  const mine = groups.filter((g) => !wishOnly(g));
+  const dreams = groups.filter(wishOnly);
   return (
     <div>
       <PageHeader back title="My series" />
@@ -75,7 +82,21 @@ export function SeriesList() {
             Books that are part of a series show up here, with the parts you still miss.
           </EmptyState>
         ) : (
-          groups.map((g) => <SeriesCard key={g.name} group={g} known={parts[g.name]} />)
+          <>
+            {mine.map((g) => (
+              <SeriesCard key={g.name} group={g} known={parts[g.name]} />
+            ))}
+            {/* series she only dreams of so far: every book still on her wishlist */}
+            {dreams.length > 0 && (
+              <>
+                <h2 className="pt-5 text-xl">On your wishlist</h2>
+                <p className="-mt-2 text-xs text-mocha">Series you haven't started yet</p>
+                {dreams.map((g) => (
+                  <SeriesCard key={g.name} group={g} known={parts[g.name]} />
+                ))}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -97,7 +118,10 @@ export function SeriesDetail() {
   // Announced books by the author, to add upcoming parts ("Coming …") that aren't listed yet
   const [news, setNews] = useState<AuthorNews[]>([]);
   useEffect(() => {
-    if (group?.author) authorNews(group.author).then(setNews).catch(() => {});
+    if (group?.author)
+      authorNews(group.author)
+        .then(setNews)
+        .catch(() => {});
   }, [group?.author]);
 
   // Full list of the series: from Open Library (free) when we know the series there,
@@ -228,8 +252,8 @@ export function SeriesDetail() {
 
         {mock && (
           <p className="mt-6 text-center text-xs text-mocha">
-            Test mode: Snug shows gaps in your numbering. With the AI on, it also knows every book in the series and
-            new announcements.
+            Test mode: Snug shows gaps in your numbering. With the AI on, it also knows every book in the series and new
+            announcements.
           </p>
         )}
       </div>
@@ -241,7 +265,10 @@ function formatRelease(d: string) {
   if (/^\d{4}$/.test(d)) return d; // only the year is known
   const t = Date.parse(d.length === 7 ? `${d}-01` : d);
   if (Number.isNaN(t)) return d;
-  return new Date(t).toLocaleDateString('en-GB', d.length === 7 ? { month: 'long', year: 'numeric' } : { day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date(t).toLocaleDateString(
+    'en-GB',
+    d.length === 7 ? { month: 'long', year: 'numeric' } : { day: 'numeric', month: 'long', year: 'numeric' },
+  );
 }
 
 /** Cover of a part she doesn't have: from the series data, or looked up (exactly this book only) */
@@ -253,7 +280,9 @@ function MissingCover({ title, author, coverUrl }: { title?: string; author: str
     let cancelled = false;
     searchBooks(`${title} ${author}`)
       .then((r) => {
-        const match = sameBook(r, title, author).find((x) => x.coverUrl && x.language !== undefined && ['en', 'nl'].includes(x.language));
+        const match = sameBook(r, title, author).find(
+          (x) => x.coverUrl && x.language !== undefined && ['en', 'nl'].includes(x.language),
+        );
         if (!cancelled && match) setCover(match.coverUrl);
       })
       .catch(() => {});
@@ -264,9 +293,17 @@ function MissingCover({ title, author, coverUrl }: { title?: string; author: str
 
   if (!title) {
     return (
-      <div className="flex aspect-[2/3] w-12 shrink-0 items-center justify-center rounded bg-linen text-lg text-mocha">?</div>
+      <div className="flex aspect-[2/3] w-12 shrink-0 items-center justify-center rounded bg-linen text-lg text-mocha">
+        ?
+      </div>
     );
   }
   // slightly faded: she doesn't have it (yet)
-  return <Cover book={{ title, authors: [author], coverUrl: cover }} className="w-12 shrink-0 opacity-80" rounded="rounded" />;
+  return (
+    <Cover
+      book={{ title, authors: [author], coverUrl: cover }}
+      className="w-12 shrink-0 opacity-80"
+      rounded="rounded"
+    />
+  );
 }

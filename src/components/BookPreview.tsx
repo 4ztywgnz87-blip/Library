@@ -21,7 +21,9 @@ export interface PreviewBook {
   series?: { name: string; number?: number };
   isbn13?: string;
   /** How well it fits her (from Trending) */
-  match?: { score: number; why: string; buzz?: string };
+  match?: { score: number; why: string; buzz?: string; headsUp?: string };
+  /** Why it's popular right now (Trending) */
+  buzz?: string;
 }
 
 function when(d?: string, upcoming?: boolean) {
@@ -124,6 +126,11 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
               <div className="min-w-0 text-sm">
                 {book.match.buzz && <p className="text-xs font-medium text-wine">🔥 {book.match.buzz}</p>}
                 <p className="mt-0.5 leading-relaxed text-ink/90">{book.match.why}</p>
+                {book.match.headsUp && (
+                  <p className="mt-1.5 text-xs leading-relaxed text-cocoa">
+                    <span className="font-medium">Heads up:</span> {book.match.headsUp}
+                  </p>
+                )}
               </div>
             </div>
           )}

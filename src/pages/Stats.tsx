@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
+import { Link } from 'react-router-dom';
 import { useBooks } from '../lib/hooks';
 import type { Book } from '../types';
 import { Card, Chip, PageHeader } from '../components/ui';
@@ -7,15 +8,29 @@ import { EmptyState } from '../components/SleepyCat';
 import { formatRating } from '../components/Stars';
 
 const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
-function Tile({ value, label }: { value: string | number; label: string }) {
-  return (
-    <Card className="text-center">
-      <div className="font-soft text-3xl font-semibold text-ink">{value}</div>
+function Tile({ value, label, to }: { value: string | number; label: string; to?: string }) {
+  const card = (
+    <Card className={`h-full text-center ${to ? 'transition-transform active:scale-[0.97]' : ''}`}>
+      <div className={`font-soft text-3xl font-semibold ${to ? 'text-wine' : 'text-ink'}`}>{value}</div>
       <div className="mt-1 text-xs leading-tight text-cocoa">{label}</div>
     </Card>
   );
+  return to ? <Link to={to}>{card}</Link> : card;
 }
 
 /** Books finished per month: one series, so one colour and no legend */
@@ -101,9 +116,11 @@ export default function Stats() {
 
   if (!books) return null;
 
-  const inYear = year === 'all' ? read : read.filter((b) => b.finishedAt && new Date(b.finishedAt).getFullYear() === year);
-  const months = Array.from({ length: 12 }, (_, m) =>
-    inYear.filter((b) => b.finishedAt && new Date(b.finishedAt).getMonth() === m).length,
+  const inYear =
+    year === 'all' ? read : read.filter((b) => b.finishedAt && new Date(b.finishedAt).getFullYear() === year);
+  const months = Array.from(
+    { length: 12 },
+    (_, m) => inYear.filter((b) => b.finishedAt && new Date(b.finishedAt).getMonth() === m).length,
   );
   const pages = inYear.reduce((s, b) => s + (b.pageCount ?? 0), 0);
   const rated = inYear.filter((b) => b.rating !== undefined);
@@ -132,13 +149,22 @@ export default function Stats() {
         </div>
 
         {inYear.length === 0 ? (
-          <EmptyState title="Nothing finished yet">Mark a book as read and your year starts filling up here.</EmptyState>
+          <EmptyState title="Nothing finished yet">
+            Mark a book as read and your year starts filling up here.
+          </EmptyState>
         ) : (
           <>
             <div className="grid grid-cols-3 gap-3">
-              <Tile value={inYear.length} label={inYear.length === 1 ? 'book read' : 'books read'} />
+              <Tile
+                value={inYear.length}
+                label={inYear.length === 1 ? 'book read' : 'books read'}
+                to={year === 'all' ? '/library?tab=read' : `/library?tab=read&year=${year}`}
+              />
               <Tile value={pages ? pages.toLocaleString('en-GB') : '–'} label="pages" />
-              <Tile value={avg !== undefined ? `${formatRating(Math.round(avg * 4) / 4)}★` : '–'} label="average rating" />
+              <Tile
+                value={avg !== undefined ? `${formatRating(Math.round(avg * 4) / 4)}★` : '–'}
+                label="average rating"
+              />
             </div>
 
             {year !== 'all' && (
@@ -170,7 +196,9 @@ export default function Stats() {
 
             {favourite && (
               <Card className="bg-blush/50 text-center">
-                <p className="text-xs tracking-wide text-wine uppercase">Highest rated {year === 'all' ? 'ever' : `in ${year}`}</p>
+                <p className="text-xs tracking-wide text-wine uppercase">
+                  Highest rated {year === 'all' ? 'ever' : `in ${year}`}
+                </p>
                 <p className="mt-1 font-soft text-2xl font-semibold">{favourite.title}</p>
                 <p className="text-sm text-cocoa">
                   {favourite.authors[0]} · {formatRating(favourite.rating!)}★

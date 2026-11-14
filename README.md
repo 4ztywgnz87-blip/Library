@@ -50,6 +50,19 @@ series lists (Claude Sonnet 5.5, with server-side refusal fallback). Code: `work
 
 Answers are cached in D1 (`ai_cache`), so the same question twice only costs once.
 
+How match scores work (`worker/ai.ts`):
+
+1. **Reader portrait**: Claude reads everything she read (ratings, her reviews, tags, quiz and each
+   book's description) and writes down what she loves and dislikes, with evidence. Redone only when
+   that input changes (a new rating, review or finished book).
+2. **Scoring**: books are scored against the portrait with a fixed method (closest book she rated →
+   start score, then plus/minus for loved/disliked elements, author, heat, series position), using
+   each book's full publisher blurb. Cached until her taste changes.
+3. Without the AI (test mode, daily limit), the free taste engine in `worker/taste.ts` scores instead.
+
+**Trending now**: once a week (Monday 05:17 UTC, a Cloudflare cron) Claude searches the web for
+what's popular (bestseller lists, BookTok, Goodreads) and the list is scored for her.
+
 `AI_DAILY_LIMIT` caps the number of AI calls per day. Use prepaid credit without auto-reload in the
 Anthropic Console, so costs can never exceed what's loaded.
 

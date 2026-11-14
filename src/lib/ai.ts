@@ -7,7 +7,9 @@ import type {
   RecommendResponse,
   SeriesResponse,
   TrendingResponse,
+  ScoredBook,
 } from '../shared';
+import type { Book } from '../types';
 import { syncNow } from './sync';
 import { getMeta, setMeta } from '../db';
 
@@ -64,19 +66,61 @@ export async function aiStatus(): Promise<AiStatus | null> {
   }
 }
 
-/** What's popular right now, scored for her. Kept for half a day, so Home opens instantly */
-export async function trending(): Promise<TrendingResponse | null> {
-  const saved = await getMeta<{ at: number; data: TrendingResponse } | null>('trending', null);
-  if (saved && Date.now() - saved.at < 12 * 3_600_000) return saved.data;
+/**
+ * A fingerprint of what tells Snug her taste: ratings, reviews and what she has read. When it
+ * changes (a new rating, a finished book), the match scores are worked out again.
+ */
+export function tasteFingerprint(books: Book[], profile?: { completedAt?: number; favouriteAuthors?: string[] }) {
+  const parts = books
+    .filter((b) => b.status === 'read' || b.status === 'reading')
+    .map((b) => `${b.id}:${b.status}:${b.rating ?? ''}:${b.review ?? ''}:${b.tags.join(',')}`)
+    .sort()
+    .join('|');
+  const text = `${parts}#${profile?.completedAt ?? ''}#${(profile?.favouriteAuthors ?? []).join(',')}`;
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (Math.imul(31, h) + text.charCodeAt(i)) | 0;
+  return String(h);
+}
+
+/** What's popular right now, scored for her. Kept until her taste changes (or half a day) */
+export async function trending(fingerprint: string): Promise<TrendingResponse | null> {
+  const saved = await getMeta<{ at: number; fp?: string; data: TrendingResponse } | null>('trending', null);
+  if (saved && saved.fp === fingerprint && Date.now() - saved.at < 12 * 3_600_000) return saved.data;
   if (!navigator.onLine) return saved?.data ?? null;
   try {
     await syncNow(); // the scores use her latest ratings
     const res = await fetch('/api/ai/trending');
     if (!res.ok) return saved?.data ?? null;
     const data = (await res.json()) as TrendingResponse;
-    await setMeta('trending', { at: Date.now(), data });
+    await setMeta('trending', { at: Date.now(), fp: fingerprint, data });
     return data;
   } catch {
     return saved?.data ?? null;
+  }
+}
+
+/** Match scores for a list of books (kept per list until her taste changes) */
+export async function scoreBooks(
+  list: { title: string; author: string; description?: string; genres?: string[] }[],
+  fingerprint: string,
+): Promise<ScoredBook[] | null> {
+  if (!list.length) return [];
+  const id = `scores:${fingerprint}:${list.map((b) => `${b.title}|${b.author}`).join('#')}`;
+  const saved = await getMeta<ScoredBook[] | null>(id, null);
+  if (saved) return saved;
+  if (!navigator.onLine) return null;
+  try {
+    await syncNow();
+    const res = await fetch('/api/ai/score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ books: list.map((b) => ({ ...b, description: b.description?.slice(0, 2000) })) }),
+    });
+    if (!res.ok) return null;
+    const { books } = (await res.json()) as { books: ScoredBook[] };
+    await setMeta(id, books);
+    return books;
+  } catch {
+    return null;
   }
 }

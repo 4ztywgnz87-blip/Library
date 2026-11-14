@@ -37,7 +37,6 @@ export default function Home() {
     (b) => b.status === 'read' && b.finishedAt && new Date(b.finishedAt).getFullYear() === year,
   ).length;
   const unread = books.filter((b) => b.status === 'owned').length;
-  const recent = [...books].sort((a, b) => b.addedAt - a.addedAt).slice(0, 12);
   // Series worth a nudge: something missing, or the next part is waiting on the shelf
   const series = groupSeries(books);
   // Series she's busy with (or still has parts of to read), the ones she's furthest in first
@@ -153,19 +152,21 @@ export default function Home() {
             </Link>
           )}
 
-          {/* Little stats */}
-          <Link to="/stats" className="grid grid-cols-3 gap-3" aria-label="See my reading stats">
+          {/* Little stats: each opens its own list */}
+          <div className="grid grid-cols-3 gap-3">
             {[
-              { n: readThisYear, label: `read in ${year}` },
-              { n: unread, label: 'waiting on the shelf' },
-              { n: books.filter((b) => b.status === 'wishlist').length, label: 'on the wishlist' },
+              { n: readThisYear, label: `read in ${year}`, to: '/stats' },
+              { n: unread, label: 'waiting on the shelf', to: '/library?tab=owned' },
+              { n: books.filter((b) => b.status === 'wishlist').length, label: 'on the wishlist', to: '/wishlist' },
             ].map((s) => (
-              <Card key={s.label} className="text-center">
-                <div className="font-soft text-3xl font-semibold text-wine">{s.n}</div>
-                <div className="mt-1 text-xs leading-tight text-cocoa">{s.label}</div>
-              </Card>
+              <Link key={s.label} to={s.to}>
+                <Card className="h-full text-center transition-transform active:scale-[0.97]">
+                  <div className="font-soft text-3xl font-semibold text-wine">{s.n}</div>
+                  <div className="mt-1 text-xs leading-tight text-cocoa">{s.label}</div>
+                </Card>
+              </Link>
             ))}
-          </Link>
+          </div>
 
           {/* Series */}
           {seriesToShow.length > 0 && (
@@ -188,24 +189,6 @@ export default function Home() {
           <AuthorNewsSection books={books} favourites={profile.favouriteAuthors} />
 
           <TrendingSection books={books} />
-
-          {/* Recently added */}
-          <section>
-            <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-xl">Recently added</h2>
-              <Link to="/library" className="text-sm text-wine">
-                See all
-              </Link>
-            </div>
-            <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-4">
-              {recent.map((b) => (
-                <Link key={b.id} to={`/book/${b.id}`} className="w-24 shrink-0 sm:w-28">
-                  <Cover book={b} />
-                  <p className="mt-2 line-clamp-2 text-xs leading-snug text-cocoa">{b.title}</p>
-                </Link>
-              ))}
-            </div>
-          </section>
         </div>
       )}
     </div>

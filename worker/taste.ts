@@ -349,7 +349,6 @@ export function scoreBook(c: Candidate, taste: Taste, books: Book[], wish: { gen
         : `A popular ${genreWord(c.genres[0]).replace(/s$/, '')} pick to start with.`,
     });
   }
-  if (c.blurb) reasons.push({ weight: 0.5, text: c.blurb });
 
   const why = reasons
     .sort((a, b) => b.weight - a.weight)

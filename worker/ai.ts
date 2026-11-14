@@ -23,6 +23,7 @@ export interface AiEnv {
   AI_MODE?: string;
   AI_DAILY_LIMIT?: string;
   ANTHROPIC_API_KEY?: string;
+  GOOGLE_BOOKS_KEY?: string;
 }
 
 // Cover reading is simple: the small, very cheap model is plenty.
@@ -70,6 +71,7 @@ async function cached<T>(env: AiEnv, keyParts: unknown, maxAgeDays: number, run:
     .first<{ value: string; created_at: number }>();
   if (row && Date.now() - row.created_at < maxAgeDays * 86_400_000) return JSON.parse(row.value) as T;
   const value = await run();
+  if (value === null || value === undefined) return value; // never remember a failed answer
   await env.DB.prepare('INSERT OR REPLACE INTO ai_cache (key, value, created_at) VALUES (?, ?, ?)')
     .bind(key, JSON.stringify(value), Date.now())
     .run();
@@ -88,6 +90,7 @@ async function ask<T extends z.ZodType>(
   system: string,
   content: Anthropic.Beta.BetaMessageContentParam,
   effort: 'low' | 'medium',
+  maxTokens = 8000,
 ): Promise<z.infer<T> | null> {
   await spend(env);
   // On Sonnet, a declined request is retried server-side on a suitable fallback model
@@ -100,7 +103,7 @@ async function ask<T extends z.ZodType>(
       : {};
   const response = await client(env).beta.messages.parse({
     model,
-    max_tokens: 8000,
+    max_tokens: maxTokens,
     system,
     messages: [{ role: 'user', content }],
     output_config: { effort, format: betaZodOutputFormat(schema) },
@@ -254,6 +257,227 @@ Write the "why" in English, 2–3 short sentences, addressed to her ("you"), nam
 Never suggest a book she has already read, already owns, or said "not for me" to (unless asked to pick from her own shelf).
 If a series is involved, make sure the pick is the right next book in reading order.`;
 
+// ---------- her reader portrait: what she loves and why, with evidence ----------
+// Written by Claude from everything she read: ratings, her own words, tags, the quiz and what the
+// books are actually about. Only rewritten when one of those changes (cached by its input).
+
+const PortraitSchema = z.object({
+  summary: z.string(),
+  loves: z.array(z.object({ what: z.string(), evidence: z.string() })),
+  dislikes: z.array(z.object({ what: z.string(), evidence: z.string() })),
+  genres: z.array(z.object({ genre: z.string(), verdict: z.string() })),
+  heatAndTone: z.string(),
+});
+type Portrait = z.infer<typeof PortraitSchema>;
+
+function portraitInput(books: Book[], profile?: ReaderProfile) {
+  const read = books
+    .filter((b) => b.status === 'read' || b.status === 'reading')
+    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+  const line = (b: Book) =>
+    [
+      `- "${b.title}" by ${b.authors.join(', ')}`,
+      b.status === 'reading' ? '(reading now)' : b.rating !== undefined ? `rated ${b.rating}/5` : '(not rated)',
+      b.genres.length ? `[${b.genres.join(', ')}]` : '',
+      b.series ? `(series: ${b.series.name}${b.series.number ? ` #${b.series.number}` : ''})` : '',
+      b.tags.length ? `tags: ${b.tags.join(', ')}` : '',
+      b.review ? `HER WORDS: "${b.review}"` : '',
+      b.description ? `\n  About the book: ${b.description.replace(/\s+/g, ' ').slice(0, 900)}` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  return `BOOKS SHE READ\n${read.map(line).join('\n') || '-'}\n\nHER READER QUIZ\n${describeProfile(profile)}`;
+}
+
+async function portrait(env: AiEnv, books: Book[], profile?: ReaderProfile): Promise<Portrait | null> {
+  if (!isLive(env)) return null;
+  const read = books.filter((b) => b.status === 'read' || b.status === 'reading');
+  if (!read.length && !profile?.completedAt) return null;
+  const input = portraitInput(books, profile);
+  return cached(env, ['portrait', 1, input], 365, () =>
+    ask(
+      env,
+      TIPS_MODEL,
+      PortraitSchema,
+      `You study one reader's books to understand her taste precisely, so a recommender can predict how much she will like a new book.
+Use her ratings (relative to her own average), her own words, her tags and quiz, and what each book is really about (premise, tropes, relationship dynamics, setting, tone, pacing, heat level, darkness, ending).
+Look for patterns across books: what her highest-rated books share and what the lower-rated ones lack or have too much of. Unrated books she read still show what she picks up, but weigh them less.
+summary: 3–4 sentences on how she reads.
+loves / dislikes: concrete, specific elements (e.g. "morally grey male lead who falls first", "slow first half", "found family in a war setting"), each with evidence: which of her books and her rating or words.
+genres: for each genre she reads, a one-line verdict based on her ratings.
+heatAndTone: the spice level, darkness and tone she enjoys.
+Never invent evidence; if there is little data, say so and keep it short.`,
+      input,
+      'medium',
+    ),
+  );
+}
+
+function describePortrait(p: Portrait | null) {
+  if (!p) return '';
+  return [
+    `HER TASTE (from her ratings and reviews)\n${p.summary}`,
+    p.loves.length ? `Loves:\n${p.loves.map((l) => `- ${l.what} (${l.evidence})`).join('\n')}` : '',
+    p.dislikes.length ? `Dislikes:\n${p.dislikes.map((l) => `- ${l.what} (${l.evidence})`).join('\n')}` : '',
+    p.genres.length ? `Genres:\n${p.genres.map((g) => `- ${g.genre}: ${g.verdict}`).join('\n')}` : '',
+    `Heat and tone: ${p.heatAndTone}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** How every score is worked out, so scores mean the same everywhere in the app */
+const SCORING_METHOD = `HOW TO SCORE (0–100), the same way every time:
+1. Closest match: find the one or two books she READ that are most like this book in premise, tropes, relationship dynamic, setting, tone and heat. Start from her rating of those: 5★ → 86, 4.5★ → 80, 4★ → 72, 3.5★ → 62, 3★ → 52, 2.5★ or lower → 40. If she read nothing comparable, start at 55.
+2. For each specific element of her "loves" this book clearly has (judging by what the book is about, not its genre label): +3 to +6. For each of her "dislikes" it clearly has: −5 to −12.
+3. Author: she rated this author 4★ or more → +5; 2.5★ or less → −8; one of her favourite authors → +5.
+4. Heat, darkness and length versus what she enjoys: −4 for each clear mismatch.
+5. A later book of a series she hasn't started: −10 (and say she should start with book 1).
+6. Little known yet (announced book, no blurb): judge it on the author and the series — the next part of a series she loves follows her ratings of that series — and don't lower the score for missing details; just say what it's based on.
+Calibrate: 90+ only for a near-certain new favourite; 75–89 a strong match; 60–74 decent; 45–59 a gamble; below 45 probably not for her.
+"why": 2–3 sentences to her ("you"). Explain the MATCH, not the story: name her comparable book(s) with her rating or her own words, and the concrete elements this book shares with them (tropes, dynamic, setting, tone, heat) or that she has asked for. Do not retell or summarise the plot. Ignore which edition, format or language a description comes from: you judge the book itself.
+"headsUp": one short sentence on something in this book she may not like (based on her dislikes), or null.`;
+
+// ---------- scoring a list of books for her (trending, new from her authors) ----------
+
+/** The publisher's blurb from Google Books: the most detailed description we can get for free */
+async function googleDescription(env: AiEnv, title: string, author: string): Promise<string | undefined> {
+  const params = new URLSearchParams({
+    q: `intitle:"${title}" inauthor:"${author}"`,
+    maxResults: '8',
+    printType: 'books',
+  });
+  if (env.GOOGLE_BOOKS_KEY) params.set('key', env.GOOGLE_BOOKS_KEY);
+  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`, {
+    cf: { cacheTtl: 604_800, cacheEverything: true },
+  }).catch(() => undefined);
+  if (!res?.ok) return undefined;
+  const json = (await res.json().catch(() => ({}))) as {
+    items?: { volumeInfo: { title?: string; description?: string } }[];
+  };
+  const want = key(title);
+  return (json.items ?? [])
+    .map((i) => i.volumeInfo)
+    .filter((v) => v.description && key(v.title ?? '').startsWith(want.split('|')[0]))
+    .sort((a, b) => b.description!.length - a.description!.length)[0]?.description;
+}
+
+export interface ToScore {
+  title: string;
+  author: string;
+  description?: string;
+  genres?: string[];
+}
+export interface Scored2 {
+  score: number;
+  why: string;
+  headsUp?: string;
+}
+
+const ScoresSchema = z.object({
+  books: z.array(z.object({ title: z.string(), score: z.number(), why: z.string(), headsUp: z.string().nullable() })),
+});
+
+/**
+ * Scores books for her with the full picture: her portrait, her rated books and each book's
+ * full description. Cached by the books and her portrait, so it's only redone when her taste
+ * changes (a new rating or review). Falls back to the free taste engine.
+ */
+export async function scoreForHer(env: AiEnv, list: ToScore[], books: Book[], profile?: ReaderProfile) {
+  const out = new Map<string, Scored2>();
+  const free = () => {
+    const out = new Map<string, Scored2>(); // its own map: never overwrites Claude's scores
+    const taste = learnTaste(books, profile);
+    for (const c of list) {
+      const s = scoreBook(
+        {
+          title: c.title,
+          author: c.author,
+          genres: c.genres ?? [],
+          traits: traitsIn(`${c.description ?? ''} ${(c.genres ?? []).join(' ')}`),
+        },
+        taste,
+        books,
+        {},
+      );
+      out.set(key(c.title, c.author), { score: s.score, why: s.why });
+    }
+    return { scores: out, ai: false };
+  };
+  if (!isLive(env) || !list.length) return free();
+  try {
+    const p = await portrait(env, books, profile);
+    const full = await Promise.all(
+      list.map(async (c) => {
+        const d = (await googleDescription(env, c.title, c.author)) ?? c.description;
+        return { ...c, description: d && c.description && c.description.length > d.length ? c.description : d };
+      }),
+    );
+    const rated = books
+      .filter((b) => b.status === 'read' && b.rating !== undefined)
+      .sort((a, b) => b.rating! - a.rating!)
+      .map((b) => `- "${b.title}" by ${b.authors[0] ?? ''}: ${b.rating}/5${b.review ? ` — "${b.review}"` : ''}`)
+      .join('\n');
+    // in groups, so every answer stays well within one reply (and each group is cached on its own)
+    const groups: (typeof full)[] = [];
+    for (let i = 0; i < full.length; i += 9) groups.push(full.slice(i, i + 9));
+    const answers = await Promise.all(
+      groups.map((group) =>
+        cached(env, ['score', 3, group.map((c) => [c.title, c.author]), p, rated, profile?.favouriteAuthors], 30, () =>
+          ask(
+            env,
+            TIPS_MODEL,
+            ScoresSchema,
+            `${SYSTEM_TIPS}\n\n${SCORING_METHOD}`,
+            [
+              describePortrait(p),
+              `HER RATED BOOKS\n${rated || '- none rated yet: go by what she reads and her quiz'}`,
+              `WHAT SHE READS (rated or not)\n${books
+                .filter((b) => b.status === 'read' || b.status === 'reading')
+                .map((b) => `"${b.title}" (${b.authors[0] ?? ''})`)
+                .join(', ')}`,
+              `HER READER QUIZ\n${describeProfile(profile)}`,
+              `BOOKS TO SCORE (use the exact titles)\n${group
+                .map(
+                  (c, i) =>
+                    `${i + 1}. "${c.title}" by ${c.author}${c.genres?.length ? ` [${c.genres.join(', ')}]` : ''}\n   About: ${(c.description ?? 'no description available').replace(/\s+/g, ' ').slice(0, 1600)}`,
+                )
+                .join('\n')}`,
+            ]
+              .filter(Boolean)
+              .join('\n\n'),
+            'medium',
+            16000,
+          ).catch((err) => {
+            if (!(err instanceof AiLimitError)) console.error('scoring group failed', err);
+            return null;
+          }),
+        ),
+      ),
+    );
+    const result = { books: answers.flatMap((a) => a?.books ?? []) };
+    if (!result.books.length) return free();
+    const byTitle = new Map(result.books.map((b) => [key(b.title), b]));
+    for (const c of list) {
+      const r = byTitle.get(key(c.title));
+      if (r)
+        out.set(key(c.title, c.author), { score: clampScore(r.score), why: r.why, headsUp: r.headsUp ?? undefined });
+    }
+    // anything Claude skipped still gets a (free) score
+    if (out.size < list.length) {
+      const rest = free().scores;
+      for (const [k, v] of rest) if (!out.has(k)) out.set(k, v);
+    }
+    return { scores: out, ai: true };
+  } catch (err) {
+    if (err instanceof AiLimitError) return free();
+    console.error('scoring failed', err);
+    return free();
+  }
+}
+
+export const scoreKey = (title: string, author: string) => key(title, author);
+
 // ---------- "What's next?" ----------
 
 const PicksSchema = z.object({
@@ -307,18 +531,19 @@ export async function recommend(
     req.exclude?.length ? `Do not repeat these suggestions: ${req.exclude.join('; ')}.` : '',
     'Give your 3 best picks (fewer only if there are not enough fitting books), best first.',
     'For each pick give a match score 0–100: how well it fits her taste (her ratings, her own words in reviews, her quiz) and, if she asked for one, the genre and mood. Be honest: 90+ only for a near-certain favourite.',
-    'The "why" must be specific to her: name one or two of her books and what she rated or wrote about them.',
+    'Score each pick with the method above. The "why" must be specific to her: name one or two of her books and what she rated or wrote about them, and what this book shares with them; never retell the plot.',
   ]
     .filter(Boolean)
     .join('\n');
 
-  const result = await cached(env, ['recommend', req, books, profile], 1, () =>
+  const herTaste = describePortrait(await portrait(env, books, profile).catch(() => null));
+  const result = await cached(env, ['recommend', 2, req, books, profile], 1, () =>
     ask(
       env,
       TIPS_MODEL,
       PicksSchema,
       SYSTEM_TIPS,
-      `HER LIBRARY\n${describeLibrary(books)}\n\nHER READER PROFILE\n${describeProfile(profile)}\n\nWHAT SHE ASKS NOW\n${wish}`,
+      `${herTaste}\n\nHER LIBRARY\n${describeLibrary(books)}\n\nHER READER PROFILE\n${describeProfile(profile)}\n\n${SCORING_METHOD}\n\nWHAT SHE ASKS NOW\n${wish}`,
       'medium',
     ),
   );
@@ -512,13 +737,14 @@ export async function fitCheck(
     const verdict = score >= 85 ? 'love' : score >= 70 ? 'like' : score >= 55 ? 'maybe' : 'skip';
     return { verdict, score, why, seriesNote: null, mock: true };
   }
-  const result = await cached(env, ['fit', book, books, profile], 7, () =>
+  const herTaste = describePortrait(await portrait(env, books, profile).catch(() => null));
+  const result = await cached(env, ['fit', 2, book, books, profile], 7, () =>
     ask(
       env,
       TIPS_MODEL,
       FitSchema,
       SYSTEM_TIPS,
-      `HER LIBRARY\n${describeLibrary(books)}\n\nHER READER PROFILE\n${describeProfile(profile)}\n\nShe is in a bookshop holding "${book.title}" by ${book.author}.${
+      `${herTaste}\n\nHER LIBRARY\n${describeLibrary(books)}\n\nHER READER PROFILE\n${describeProfile(profile)}\n\n${SCORING_METHOD}\n\nShe is in a bookshop holding "${book.title}" by ${book.author}.${
         book.description ? `\nBlurb: ${book.description.slice(0, 1500)}` : ''
       }\nHow well does it fit her? verdict: love/like/maybe/skip, score 0–100, why in 2–3 sentences. If it is part of a series, say in seriesNote which book she should start with or buy next given what she owns/read; otherwise null.`,
       'medium',
@@ -600,13 +826,13 @@ const weekKey = () => {
 
 /** Searches the web (bestseller lists, BookTok, Goodreads) for what's popular now: one paid call a week */
 export async function trendingList(env: AiEnv): Promise<TrendingList> {
-  return cached(env, ['trending', 2, weekKey()], 8, async () => {
+  return cached(env, ['trending', 3, weekKey()], 8, async () => {
     await spend(env);
     const params = {
       model: TIPS_MODEL,
       max_tokens: 16000,
       system:
-        "You put together a list of books that are popular RIGHT NOW (this week and this month), for a reader of romance, romantasy, fantasy, spicy books and thrillers (no non-fiction). Search the web for current signals: this week's bestseller lists (New York Times, USA Today, Sunday Times, Dutch charts like Bol.com and the Bestseller 60), what's going viral on BookTok and Bookstagram this month, Goodreads 'popular this month' and the biggest new releases of the last few months. Combine them: a book that shows up in several places ranks higher. Favour books released in the last 12 months or charting now; leave out long-running backlist favourites (like Fourth Wing, A Court of Thorns and Roses, It Ends with Us, Verity) unless they are in a top-10 list this very week. Only real books that are already out (or out within two weeks), in English, with the author's name spelled exactly as on the cover. Give 15 books, most popular first, mostly in the reader's genres plus a few broader fiction hits that are everywhere right now. For each: the exact title (no series info), the author, its genres chosen from this list: " +
+        "You put together a list of books that are popular RIGHT NOW (this week and this month), for a reader of romance, romantasy, fantasy, spicy books and thrillers (no non-fiction). Search the web for current signals: this week's bestseller lists (New York Times, USA Today, Sunday Times, Dutch charts like Bol.com and the Bestseller 60), what's going viral on BookTok and Bookstagram this month, Goodreads 'popular this month' and the biggest new releases of the last few months. Combine them: a book that shows up in several places ranks higher. Favour books released in the last 12 months or charting now; leave out long-running backlist favourites (like Fourth Wing, A Court of Thorns and Roses, It Ends with Us, Verity) unless they are in a top-10 list this very week. Only real books that are already out (or out within two weeks), in English, with the author's name spelled exactly as on the cover. Give 25 books, most popular first, mostly in the reader's genres plus a few broader fiction hits that are everywhere right now. For each: the exact title (no series info), the author, its genres chosen from this list: " +
         GENRE_NAMES.join(', ') +
         ", a short buzz line saying where it's popular now (max 8 words, e.g. '#1 New York Times bestseller this week' or 'Viral on BookTok this month'), and a one-sentence blurb of the story with its main tropes.",
       messages: [
@@ -635,26 +861,61 @@ export async function trendingList(env: AiEnv): Promise<TrendingList> {
   });
 }
 
-/** What's popular now, each with a match score for her (scored for free by the taste engine) */
+/** What's popular now, each with a match score for her (worked out from her whole library) */
 export async function trending(env: AiEnv, books: Book[], profile?: ReaderProfile): Promise<TrendingResponse> {
   const live = isLive(env);
   const list: TrendingList = live
     ? await trendingList(env)
     : {
         at: Date.now(),
-        books: MOCK_BUY_LIST.slice(0, 15).map((m) => ({ ...m, buzz: 'Popular on BookTok', blurb: m.blurb ?? '' })),
+        books: MOCK_BUY_LIST.slice(0, 25).map((m) => ({ ...m, buzz: 'Popular on BookTok', blurb: m.blurb ?? '' })),
       };
-  const taste = learnTaste(books, profile);
-  const scored: TrendingBook[] = list.books.map((b) => {
-    const c: Candidate = {
+  const toScore = list.books.map((b) => ({
+    title: b.title,
+    author: b.author,
+    genres: b.genres.filter((g) => GENRE_NAMES.includes(g)),
+    description: b.blurb,
+  }));
+  // books she has (read, reading or on her shelf) need no score; wishlist books do
+  const has = new Map(books.filter((b) => b.status !== 'wishlist').map((b) => [key(b.title, b.authors[0]), b.status]));
+  const { scores } = await scoreForHer(
+    env,
+    toScore.filter((b) => !has.has(key(b.title, b.author))),
+    books,
+    profile,
+  );
+  const out: TrendingBook[] = toScore.map((b, i) => {
+    const s = scores.get(key(b.title, b.author));
+    return {
       title: b.title,
       author: b.author,
-      genres: b.genres.filter((g) => GENRE_NAMES.includes(g)),
-      traits: traitsIn(`${b.blurb} ${b.genres.join(' ')}`),
-      blurb: b.blurb,
+      genres: b.genres,
+      buzz: list.books[i].buzz,
+      score: s?.score ?? 50,
+      why: s?.why ?? '',
+      headsUp: s?.headsUp,
+      rank: i + 1,
+      have: has.get(key(b.title, b.author)) as TrendingBook['have'],
     };
-    const s = scoreBook(c, taste, books, {});
-    return { title: b.title, author: b.author, genres: c.genres, buzz: b.buzz, score: s.score, why: s.why };
   });
-  return { books: scored, updatedAt: list.at, mock: !live };
+  return { books: out, updatedAt: list.at, mock: !live };
+}
+
+/** Match scores for a list of books (e.g. new books by her favourite authors) */
+export async function scoreList(env: AiEnv, list: ToScore[], books: Book[], profile?: ReaderProfile) {
+  const has = new Set(books.filter((b) => b.status !== 'wishlist').map((b) => key(b.title, b.authors[0])));
+  const { scores, ai } = await scoreForHer(
+    env,
+    list.slice(0, 30).filter((b) => !has.has(key(b.title, b.author))),
+    books,
+    profile,
+  );
+  return {
+    books: list.slice(0, 30).map((b) => ({
+      title: b.title,
+      author: b.author,
+      ...(scores.get(key(b.title, b.author)) ?? { score: 50, why: '' }),
+    })),
+    mock: !ai,
+  };
 }

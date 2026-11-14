@@ -41,6 +41,8 @@ export default function Library() {
   const books = useBooks();
   const [params, setParams] = useSearchParams();
   const tab = (params.get('tab') as Status | 'all') || 'all';
+  // from the stats: only the books she finished in this year
+  const year = Number(params.get('year')) || undefined;
   const [query, setQuery] = useState('');
   const [genre, setGenre] = useState<string | null>(null);
   const [lang, setLang] = useState<'all' | 'en' | 'nl'>('all');
@@ -68,12 +70,13 @@ export default function Library() {
     const filtered = books.filter(
       (b) =>
         (tab === 'all' || b.status === tab) &&
+        (!year || (b.status === 'read' && !!b.finishedAt && new Date(b.finishedAt).getFullYear() === year)) &&
         (!genre || b.genres.includes(genre)) &&
         (lang === 'all' || b.language === lang) &&
         (!q || normalize([b.title, ...b.authors, b.series?.name ?? ''].join(' ')).includes(q)),
     );
     return sortBooks(filtered, sort);
-  }, [books, tab, query, genre, lang, sort]);
+  }, [books, tab, year, query, genre, lang, sort]);
 
   const filtersActive = !!genre || lang !== 'all';
 
@@ -83,20 +86,20 @@ export default function Library() {
       <div className="mx-auto max-w-5xl px-4 pt-4">
         {/* Search + filters */}
         <div className="mb-3 flex items-center gap-2">
-        <div className="relative flex-1">
-          <SearchIcon className="absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-mocha" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search title, author or series"
-            className="w-full rounded-full border border-sand bg-white/70 py-3 pr-10 pl-11 text-[16px] outline-none placeholder:text-mocha focus:border-oat focus:bg-white"
-          />
-          {query && (
-            <button onClick={() => setQuery('')} className="absolute top-1/2 right-3 -translate-y-1/2 p-1 text-mocha">
-              <CloseIcon width={18} height={18} />
-            </button>
-          )}
-        </div>
+          <div className="relative flex-1">
+            <SearchIcon className="absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-mocha" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search title, author or series"
+              className="w-full rounded-full border border-sand bg-white/70 py-3 pr-10 pl-11 text-[16px] outline-none placeholder:text-mocha focus:border-oat focus:bg-white"
+            />
+            {query && (
+              <button onClick={() => setQuery('')} className="absolute top-1/2 right-3 -translate-y-1/2 p-1 text-mocha">
+                <CloseIcon width={18} height={18} />
+              </button>
+            )}
+          </div>
           <button
             onClick={() => setShowFilters((f) => !f)}
             className={`relative shrink-0 rounded-full border p-3 ${
@@ -121,6 +124,16 @@ export default function Library() {
           ))}
         </div>
 
+        {year && (
+          <div className="-mt-1 mb-3">
+            <button
+              onClick={() => setParams({ tab: 'read' })}
+              className="inline-flex items-center gap-1.5 rounded-full bg-wine px-3 py-1.5 text-xs text-cream"
+            >
+              Finished in {year} · {visible.length} <CloseIcon width={14} height={14} />
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <AnimatePresence>
