@@ -60,9 +60,6 @@ How match scores work (`worker/ai.ts`):
    each book's full publisher blurb. Cached until her taste changes.
 3. Without the AI (test mode, daily limit), the free taste engine in `worker/taste.ts` scores instead.
 
-**Trending now**: once a week (Monday 05:17 UTC, a Cloudflare cron) Claude searches the web for
-what's popular (bestseller lists, BookTok, Goodreads) and the list is scored for her.
-
 `AI_DAILY_LIMIT` caps the number of AI calls per day. Use prepaid credit without auto-reload in the
 Anthropic Console, so costs can never exceed what's loaded.
 

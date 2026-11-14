@@ -6,7 +6,6 @@ import { Card } from '../components/ui';
 import { SparkleIcon, ChevronIcon } from '../components/Icons';
 import { EmptyState } from '../components/SleepyCat';
 import { AuthorNewsSection } from '../components/AuthorNews';
-import { TrendingSection } from '../components/Trending';
 import { SeriesCard } from './Series';
 import { groupSeries, seriesProgress } from '../lib/series';
 import { useSeriesParts } from '../lib/seriesTotals';
@@ -187,8 +186,6 @@ export default function Home() {
           )}
 
           <AuthorNewsSection books={books} favourites={profile.favouriteAuthors} />
-
-          <TrendingSection books={books} />
         </div>
       )}
     </div>

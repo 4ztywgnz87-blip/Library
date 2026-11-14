@@ -50,7 +50,7 @@ export function DiscoverCard({ item, onOpen }: { item: Item; onOpen: (cover?: st
   );
 }
 
-/** A row for the full lists (Trending, New from your authors) */
+/** A row for the full list of new books by her authors */
 export function DiscoverRow({
   item,
   why,

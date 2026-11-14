@@ -100,30 +100,6 @@ export interface AiStatus {
   limit: number;
 }
 
-/** A book that's popular right now (bestseller lists, BookTok, Goodreads), scored for her */
-export interface TrendingBook {
-  title: string;
-  author: string;
-  genres: string[];
-  /** Why it's popular, in a few words: "Huge on BookTok", "#1 NYT bestseller" */
-  buzz: string;
-  score: number;
-  why: string;
-  /** Something she may not like about it */
-  headsUp?: string;
-  /** Place in the popularity list (1 = most popular) */
-  rank: number;
-  /** She already has it: read, reading or on her shelf (then the score means nothing) */
-  have?: 'read' | 'reading' | 'owned';
-}
-
-export interface TrendingResponse {
-  books: TrendingBook[];
-  /** When the list was put together (it's refreshed once a week) */
-  updatedAt: number;
-  mock: boolean;
-}
-
 export interface ScoredBook {
   title: string;
   author: string;

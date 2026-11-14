@@ -6,7 +6,6 @@ import type {
   RecommendRequest,
   RecommendResponse,
   SeriesResponse,
-  TrendingResponse,
   ScoredBook,
 } from '../shared';
 import type { Book } from '../types';
@@ -80,23 +79,6 @@ export function tasteFingerprint(books: Book[], profile?: { completedAt?: number
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (Math.imul(31, h) + text.charCodeAt(i)) | 0;
   return String(h);
-}
-
-/** What's popular right now, scored for her. Kept until her taste changes (or half a day) */
-export async function trending(fingerprint: string): Promise<TrendingResponse | null> {
-  const saved = await getMeta<{ at: number; fp?: string; data: TrendingResponse } | null>('trending', null);
-  if (saved && saved.fp === fingerprint && Date.now() - saved.at < 12 * 3_600_000) return saved.data;
-  if (!navigator.onLine) return saved?.data ?? null;
-  try {
-    await syncNow(); // the scores use her latest ratings
-    const res = await fetch('/api/ai/trending');
-    if (!res.ok) return saved?.data ?? null;
-    const data = (await res.json()) as TrendingResponse;
-    await setMeta('trending', { at: Date.now(), fp: fingerprint, data });
-    return data;
-  } catch {
-    return saved?.data ?? null;
-  }
 }
 
 /** Match scores for a list of books (kept per list until her taste changes) */

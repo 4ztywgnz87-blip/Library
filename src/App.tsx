@@ -13,7 +13,6 @@ import Shop from './pages/Shop';
 import Quiz from './pages/Quiz';
 import Stats from './pages/Stats';
 import Wishlist from './pages/Wishlist';
-import TrendingPage from './pages/TrendingPage';
 import NewBooksPage from './pages/NewBooksPage';
 import { startBackgroundSync } from './lib/sync';
 import { backfillSeries, harmonizeSeriesGenres } from './lib/seriesLookup';
@@ -46,7 +45,6 @@ export default function App() {
           <Route path="quiz" element={<Quiz />} />
           <Route path="stats" element={<Stats />} />
           <Route path="wishlist" element={<Wishlist />} />
-          <Route path="trending" element={<TrendingPage />} />
           <Route path="new-books" element={<NewBooksPage />} />
           <Route path="*" element={<Home />} />
         </Route>

@@ -11,8 +11,6 @@ import type {
   RecommendRequest,
   RecommendResponse,
   SeriesResponse,
-  TrendingBook,
-  TrendingResponse,
 } from '../src/shared';
 import { MOCK_BUY_LIST } from './mockBooks';
 import { bookTraits, learnTaste, scoreBook, traitsIn, type Candidate } from './taste';
@@ -338,7 +336,7 @@ Calibrate: 90+ only for a near-certain new favourite; 75–89 a strong match; 60
 "why": 2–3 sentences to her ("you"). Explain the MATCH, not the story: name her comparable book(s) with her rating or her own words, and the concrete elements this book shares with them (tropes, dynamic, setting, tone, heat) or that she has asked for. Do not retell or summarise the plot. Ignore which edition, format or language a description comes from: you judge the book itself.
 "headsUp": one short sentence on something in this book she may not like (based on her dislikes), or null.`;
 
-// ---------- scoring a list of books for her (trending, new from her authors) ----------
+// ---------- scoring a list of books for her (new from her authors) ----------
 
 /** The publisher's blurb from Google Books: the most detailed description we can get for free */
 async function googleDescription(env: AiEnv, title: string, author: string): Promise<string | undefined> {
@@ -787,118 +785,6 @@ export async function seriesInfo(env: AiEnv, name: string, author: string): Prom
     ),
   );
   return { books: result?.books ?? [], mock: false };
-}
-
-// ---------- trending: what's popular right now ----------
-
-const TrendingSchema = z.object({
-  books: z.array(
-    z.object({
-      title: z.string(),
-      author: z.string(),
-      genres: z.array(z.string()),
-      buzz: z.string(),
-      blurb: z.string(),
-    }),
-  ),
-});
-type TrendingList = { at: number; books: z.infer<typeof TrendingSchema>['books'] };
-
-const GENRE_NAMES = [
-  'Romantasy',
-  'Fantasy',
-  'Romance',
-  'Spicy',
-  'Thriller',
-  'Mystery',
-  'Fiction',
-  'Historical',
-  'Sci-fi',
-  'Young adult',
-];
-
-/** Monday of this week: the trending list is put together once a week */
-const weekKey = () => {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
-  return d.toISOString().slice(0, 10);
-};
-
-/** Searches the web (bestseller lists, BookTok, Goodreads) for what's popular now: one paid call a week */
-export async function trendingList(env: AiEnv): Promise<TrendingList> {
-  return cached(env, ['trending', 3, weekKey()], 8, async () => {
-    await spend(env);
-    const params = {
-      model: TIPS_MODEL,
-      max_tokens: 16000,
-      system:
-        "You put together a list of books that are popular RIGHT NOW (this week and this month), for a reader of romance, romantasy, fantasy, spicy books and thrillers (no non-fiction). Search the web for current signals: this week's bestseller lists (New York Times, USA Today, Sunday Times, Dutch charts like Bol.com and the Bestseller 60), what's going viral on BookTok and Bookstagram this month, Goodreads 'popular this month' and the biggest new releases of the last few months. Combine them: a book that shows up in several places ranks higher. Favour books released in the last 12 months or charting now; leave out long-running backlist favourites (like Fourth Wing, A Court of Thorns and Roses, It Ends with Us, Verity) unless they are in a top-10 list this very week. Only real books that are already out (or out within two weeks), in English, with the author's name spelled exactly as on the cover. Give 25 books, most popular first, mostly in the reader's genres plus a few broader fiction hits that are everywhere right now. For each: the exact title (no series info), the author, its genres chosen from this list: " +
-        GENRE_NAMES.join(', ') +
-        ", a short buzz line saying where it's popular now (max 8 words, e.g. '#1 New York Times bestseller this week' or 'Viral on BookTok this month'), and a one-sentence blurb of the story with its main tropes.",
-      messages: [
-        {
-          role: 'user' as const,
-          content: `Today is ${new Date().toISOString().slice(0, 10)}. Which books are trending right now?`,
-        },
-      ],
-      tools: [{ type: 'web_search_20260209' as const, name: 'web_search' as const, max_uses: 6 }],
-      output_config: { effort: 'medium' as const, format: betaZodOutputFormat(TrendingSchema) },
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default' as const,
-    };
-    const messages: Anthropic.Beta.BetaMessageParam[] = [...params.messages];
-    // web search can pause a long turn: continue it (a few times at most)
-    for (let i = 0; i < 4; i++) {
-      const res = await client(env).beta.messages.parse({ ...params, messages });
-      if (res.stop_reason === 'pause_turn') {
-        messages.push({ role: 'assistant', content: res.content });
-        continue;
-      }
-      if (res.stop_reason === 'refusal' || !res.parsed_output) throw new Error('No trending list');
-      return { at: Date.now(), books: res.parsed_output.books };
-    }
-    throw new Error('Trending search did not finish');
-  });
-}
-
-/** What's popular now, each with a match score for her (worked out from her whole library) */
-export async function trending(env: AiEnv, books: Book[], profile?: ReaderProfile): Promise<TrendingResponse> {
-  const live = isLive(env);
-  const list: TrendingList = live
-    ? await trendingList(env)
-    : {
-        at: Date.now(),
-        books: MOCK_BUY_LIST.slice(0, 25).map((m) => ({ ...m, buzz: 'Popular on BookTok', blurb: m.blurb ?? '' })),
-      };
-  const toScore = list.books.map((b) => ({
-    title: b.title,
-    author: b.author,
-    genres: b.genres.filter((g) => GENRE_NAMES.includes(g)),
-    description: b.blurb,
-  }));
-  // books she has (read, reading or on her shelf) need no score; wishlist books do
-  const has = new Map(books.filter((b) => b.status !== 'wishlist').map((b) => [key(b.title, b.authors[0]), b.status]));
-  const { scores } = await scoreForHer(
-    env,
-    toScore.filter((b) => !has.has(key(b.title, b.author))),
-    books,
-    profile,
-  );
-  const out: TrendingBook[] = toScore.map((b, i) => {
-    const s = scores.get(key(b.title, b.author));
-    return {
-      title: b.title,
-      author: b.author,
-      genres: b.genres,
-      buzz: list.books[i].buzz,
-      score: s?.score ?? 50,
-      why: s?.why ?? '',
-      headsUp: s?.headsUp,
-      rank: i + 1,
-      have: has.get(key(b.title, b.author)) as TrendingBook['have'],
-    };
-  });
-  return { books: out, updatedAt: list.at, mock: !live };
 }
 
 /** Match scores for a list of books (e.g. new books by her favourite authors) */

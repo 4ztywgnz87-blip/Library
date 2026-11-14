@@ -1,26 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Book } from '../types';
-import type { ScoredBook, TrendingResponse } from '../shared';
+import type { ScoredBook } from '../shared';
 import { authorNews, followedAuthors, type AuthorNews } from './authors';
-import { scoreBooks, tasteFingerprint, trending } from './ai';
+import { scoreBooks, tasteFingerprint } from './ai';
 import { useProfile } from './profile';
 import { bookKey } from './library';
-
-/** Trending list (undefined while loading, null when unavailable) */
-export function useTrending(books: Book[] | undefined) {
-  const profile = useProfile();
-  const fp = books ? tasteFingerprint(books, profile) : undefined;
-  const [data, setData] = useState<TrendingResponse | null | undefined>(undefined);
-  useEffect(() => {
-    if (fp === undefined) return;
-    let alive = true;
-    trending(fp).then((d) => alive && setData(d));
-    return () => {
-      alive = false;
-    };
-  }, [fp]);
-  return data;
-}
 
 /** New and upcoming books by the authors she follows, newest first (undefined while loading) */
 export function useAuthorNews(books: Book[] | undefined, favourites: string[]) {
