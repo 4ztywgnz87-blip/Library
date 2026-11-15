@@ -202,8 +202,8 @@ Mijn vorige schatting (€2–5) was te laag voor Opus.
 | **4. Vragenlijst + aanbevelingen** | profielquiz, *What's next?*, winkelmodus | ✅ online (AI in testmodus) |
 | **5. Boekenkast** | geanimeerde kast met decoratie | ✅ online |
 | **Extra** | statistieken ("My reading") | ✅ online |
-| **6. Afwerking** | echte AI aanzetten, testen op iPhone, iPad en Mac, bijsturen | volgende stap |
-| Later | deelbare wenslijst, seizoensdecoratie | |
+| **6. Afwerking** | echte AI aanzetten, testen op iPhone, iPad en Mac, bijsturen | ✅ online (AI live) |
+| **Extra** | leesstreak, deelbare wenslijst, Wrapped, uitlenen, seizoensdecoratie, auteurs & genres | ✅ online (zie §12) |
 
 Na elke fase krijgt ze een link om te testen, zodat ze kan meedenken.
 
@@ -275,3 +275,140 @@ Na elke fase krijgt ze een link om te testen, zodat ze kan meedenken.
 Afgesteld met een geneste test (de afstelling zag het voorspelde boek nooit): gemiddelde fout 0,47★ → 0,38★,
 binnen een halve ster 56% → 64–68%, juiste volgorde 67% → 76%. Haar reviews en de lijst-eigenschappen
 (spanning, humor, donker…) wegen nu zwaarder dan tropen, reeksgemiddelde en "lijkt op".
+
+
+## 12. Stand van zaken en overdracht (15 november 2026)
+
+Alles staat gecommit, gepusht (branch `claude/exciting-newton-7dg99s`) en gedeployed op
+https://snug.snugshelf.workers.dev. Dit hoofdstuk is genoeg om in een nieuwe sessie verder te werken.
+
+### 12.1 Wat er nu in de app zit (bovenop §2)
+- **Leesstreak** (`/streak`, `src/lib/streak.ts`, `src/components/Streak.tsx`, `src/pages/StreakPage.tsx`)
+  - Dagelijkse log: welk boek, tot welke pagina, notitie, "uitgelezen" (→ rating geven).
+  - Kalender met pillen, paginavoortgang, bladwijzerlint, "that's N pages" op Home.
+  - Een boek uitlezen telt ook als leesdag.
+  - Haar streak werd in D1 op 210 dagen gezet: import tot 2026-11-14, plus een log op 2026-11-15
+    (A Court of Splintered Harmony p. 248).
+- **Deelbare wenslijst** (`/w/kels`, `src/pages/Wishlist.tsx`, `src/pages/SharedWishlist.tsx`)
+  - Gevers melden zich aan met e-mail en reserveren stil.
+  - Enkel boeken mét koop-link worden gedeeld. Share waarschuwt voor boeken zonder link.
+  - ⋯-menu om reservaties te resetten. Kelsey kan kijken zonder spoilers.
+  - Reservaties blijven behouden als de link verandert.
+- **Wrapped** (`/wrapped`)
+  - Story-slides met een persona-kaart en een streak-slide (langste en huidige streak).
+  - Ingedrukt houden pauzeert, naar beneden vegen sluit. Een deelbare afbeelding toont geen cadeaus en geen persona.
+  - Op Home pas vanaf 1 december. Het huidige jaar staat onder Me enkel in december.
+- **Uitlenen** (`src/lib/lending.ts`, `src/components/Lending.tsx`, `src/pages/Lent.tsx`)
+  - Uitlenen aan iemand, een pagina "Lent out", geschiedenis en een deelbare lijst.
+  - Bevestigen vóór "terug". "Put back on loan" zet een lening terug. Titels linken naar het boek.
+- **Auteurs & genres** (Me → aparte knop, `src/pages/AuthorsGenres.tsx`)
+  - Eén lijst gevolgde auteurs met favoriet-knop en "stop following", plus een lijst "Not following" met "Follow again".
+  - Een naam opent de bibliotheek, gefilterd op die auteur.
+  - Automatisch gevolgd: auteurs met ≥ 2 boeken of één boek met ≥ 4,5★. Maximum 30 auteurs.
+  - Extra genres, waaronder "Literature", en eigen genres.
+- **New from your authors** (`src/lib/authors.ts`)
+  - Venster: 1 jaar terug tot 2,5 jaar vooruit.
+  - Enkel Engelse en Nederlandse boeken. Boeken zonder gekende taal worden ook weggelaten, zelfs toekomstige.
+  - Geen nieuwe edities of herdrukken: die worden gecontroleerd op de vroegste Google-datum.
+  - "Witch" en "The Witch" tellen als hetzelfde boek. Onzinnige datums vallen weg. Cache-sleutel `authorNews11`.
+- **Reeksen** (`src/lib/seriesGoogle.ts`, `src/lib/seriesLookup.ts`, `worker/ai.ts`)
+  - Eerst gratis: Open Library en Google (titels en boxsets).
+  - Pas als dat niets oplevert: AI, één keer per reeks, met web search en 180 dagen cache op de server.
+  - De lijst wordt op het toestel bewaard.
+- **Covers** (`src/lib/coverCache.ts`, `src/components/Cover.tsx`)
+  - Reservecovers via ISBN (Open Library), herkenning van lege 1×1-afbeeldingen, een proxy en geheugencache.
+  - Ontbrekende covers worden aangevuld.
+  - Buitenlandse edities worden niet getoond. Buitenlandse flapteksten worden hersteld.
+- **Bibliotheek**
+  - Onthoudt het tabblad, de sortering (zonder te verspringen) en de scrollpositie.
+  - Filter "Owned" toont alles behalve de wenslijst.
+  - Een pijl naar boven verschijnt als ze ver naar beneden staat.
+  - Andere pagina's openen bovenaan; "terug" zet de scrollpositie terug.
+- **Kast** (`src/pages/Shelf.tsx`, `src/components/ShelfDecor.tsx`)
+  - Een boog met een gouden plaatje toont het aantal boeken (zonder wenslijst) en linkt naar Owned.
+  - Boekbreedtes 0,88–1,14. Nieuwe boeken animeren maar één keer.
+  - Dagelijks wisselende decoratie: minstens 2 stukken, op eender welke plank, zoals de globe (snel draaien bij tik) en een schilderij.
+  - De kat heeft stemmingen: tevreden na het lezen, één oog open na 17u.
+- **Toetsenbord en sheets** (`src/lib/keyboard.ts`)
+  - Sheets blijven onderaan plakken; de achtergrond scrollt niet mee.
+  - Invoervelden zijn 16px, zodat iOS niet inzoomt.
+- **AI-pauzeknop** (Me → AiPauseCard, D1-tabel `settings`, sleutel `ai_paused`)
+  - Zet boekanalyses, reviewanalyses en de reeks-AI stil, bijvoorbeeld tijdens het massaal toevoegen.
+  - Gelezen boeken zonder score worden nooit geanalyseerd.
+- **Bewust weggehaald op vraag:** prijs- en kastwaarde-functie, animatie op de plusknop.
+
+### 12.2 Wat kost geld (AI, Claude Sonnet 5.5)
+| Functie | Wanneer | Kost |
+|---|---|---|
+| Boekanalyse | 1× per nieuw boek (niet tijdens de pauze, niet voor gelezen boeken zonder score) | ± $0,01 |
+| Reviewanalyse | 1× per nieuwe of gewijzigde review | ± $0,002 |
+| Reekslijst | enkel als Open Library en Google niets vinden, 1× per reeks | ± $0,02–0,05 |
+| Cover-foto | per foto (Haiku) | < $0,001 |
+
+Gratis zijn: zoeken, ISBN, covers, Open Library en Google, *New from your authors* en alle match-scores (die worden op het toestel berekend).
+
+Limieten in `worker/ai.ts`:
+- analyses: 150 per dag (`ANALYSIS_DAILY_LIMIT`, teller `analysis:YYYY-MM-DD` in `ai_usage`);
+- andere vragen: 40 per dag (`AI_DAILY_LIMIT`).
+
+### 12.3 Smaakmodel: test op haar echte data (november 2026)
+- **Methode:** telkens één van haar 25 beoordeelde boeken weglaten (score én review), laten voorspellen en vergelijken.
+- **Afstelling:** `PARAMS` in `src/taste/model.ts` is daarop afgesteld, gecontroleerd met een geneste test.
+
+| | gemiddelde fout | binnen ½★ | juiste volgorde |
+|---|---|---|---|
+| altijd haar gemiddelde raden | 0,57★ | – | – |
+| oud model | 0,47★ | 56% | 67% |
+| afgesteld (eerlijke geneste schatting) | **0,38★** | 64–68% | **76%** |
+
+- **Wat elk deel bijdraagt:**
+
+  | Wat het model mag gebruiken | Gemiddelde fout |
+  |---|---|
+  | Alles | 0,37★ |
+  | Zonder reviews | 0,40★ |
+  | Zonder quiz | 0,38★ |
+  | Alleen scores | 0,42★ |
+
+- **Leercurve:**
+
+  | Aantal beoordeelde boeken | Gemiddelde fout |
+  |---|---|
+  | 3 | 0,55★ |
+  | 6 | 0,46★ |
+  | 10 | 0,44★ |
+  | 15 | 0,41★ |
+  | 20 | 0,39★ |
+  | 24 | 0,37★ |
+
+  De grootste winst zit in de eerste 10–15 boeken.
+- **Klachten in reviews:**
+  - In haar 25 reviews staan 85 complimenten, maar slechts 2 klachten (ACOFAS "middle of a series", ACOTAR trage start) en 7 keer "dit miste ik".
+  - Met en zonder klachten is de fout gelijk (0,37★). Ook 2–4× zwaarder wegen veranderde niets: er zijn nog te weinig klachten om uit te leren.
+  - De winst van reviews komt nu volledig uit de complimenten.
+  - Klachten wegen per opmerking al ± 3× zwaarder dan complimenten (`reviewDislike` 0,5 vs `reviewLike` 0,15) en sturen de "heads up"-waarschuwingen.
+- **Grootste missers** zijn boeken die ze lager scoorde: The Housemaid Is Watching, ACOTAR, Regretting You, ACOFAS, Flawless. Haar scores liggen bijna allemaal tussen 4 en 5 (gemiddeld 4,3).
+- **Advies aan Kelsey:** ook oudere en minder goede boeken scoren, en bij een minder goed boek één concreet zinnetje schrijven over wat stoorde ("te traag in het midden", "te veel drama").
+- **Volgende stap:** na 15–20 extra beoordeelde boeken, waarvan ± 10 minder goede met een klacht, de test opnieuw doen. Dan bekijken of klachten zwaarder mogen wegen.
+- **Testbestanden:**
+  - `npm run taste-check` voert de test uit; gebruikt geen AI en verandert niets.
+  - De scripts in de scratchpad (`loo.ts`, `nested.ts`, `curve.ts`, `neg.ts`) gaan verloren met de sessie. Opnieuw opbouwen kan uit een export van haar records: boeken, `book_profiles` en het profiel.
+
+### 12.4 Werkwijze
+- **Deploy:**
+  - Commando: `npm run build && CLOUDFLARE_API_TOKEN=proxy-injected WRANGLER_SEND_METRICS=false npx wrangler deploy`.
+  - Bij Cloudflare-fout 971 (rate limit): een paar minuten wachten en opnieuw proberen.
+- **D1 op afstand:** `npx wrangler d1 execute snug --remote --command "…"`. Migraties 0001–0009 zijn toegepast.
+- **Sync:** de tabel `records` (soorten book, profile en day) werkt met last-write-wins op `updatedAt`.
+  Schrijf enkel rechtstreeks in haar records als daarom gevraagd wordt: zo worden haar niet-gesynchroniseerde wijzigingen niet overschreven.
+- **Testen:** Playwright tegen `npx wrangler dev --port 8787`, of de Vite-dev-server (5173) om modules in de browser te testen.
+- **Regels:**
+  - Geen login (bewuste keuze).
+  - Geen e-mailadressen of sleutels in de repo; sleutels gaan via `wrangler secret put`.
+  - De app is in het Engels; overleg gebeurt in het Nederlands.
+
+### 12.5 Open punten en voorstellen
+- De smaaktest opnieuw doen na meer beoordelingen (zie §12.3).
+- Optioneel: aangekondigde boeken zonder taalcode maar met een Engelse titel toch tonen. Nu vallen echte nieuwe boeken van bv. Nicci French of Lucy Score weg.
+- E-mailverificatie voor wenslijst-gevers, pas als er een eigen domein komt.
+- De README-sectie "How match scores work" beschrijft nog het oude AI-portret. Het werkelijke model staat in §11 en §12.3.
