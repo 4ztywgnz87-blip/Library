@@ -19,6 +19,7 @@ import { MatchRing, matchLabel } from '../components/MatchRing';
 import { BookmarkRibbon, LogSheet, PageProgress, PagesEditor } from '../components/Streak';
 import { PageConfetti, PartyConfetti } from '../components/PageConfetti';
 import { coverSrc } from '../lib/coverCache';
+import { LendCard } from '../components/Lending';
 import { dayKey, logReading, useDays } from '../lib/streak';
 
 const TAG_SUGGESTIONS = [
@@ -213,6 +214,9 @@ export default function BookDetail() {
             />
             {book.status === 'wishlist' && <BuyLink book={book} />}
           </Card>
+
+          {/* Lending (books she has, not the wishlist) */}
+          {book.status !== 'wishlist' && <LendCard book={book} />}
 
           {/* Genres */}
           <Card>

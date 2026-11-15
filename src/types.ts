@@ -65,6 +65,10 @@ export interface Book {
   review?: string;
   /** Marked as finished from her reading log (so taking that day off the log undoes it) */
   finishedVia?: 'log';
+  /** Lent out right now: to whom, and since when */
+  lent?: { to: string; since: number };
+  /** Earlier loans of this book (returned) */
+  loans?: { to: string; since: number; returnedAt: number }[];
   /** Last time Snug looked for a cover for this book and found none */
   coverTriedAt?: number;
   /** Where to buy exactly this edition (shown on her shared wishlist) */

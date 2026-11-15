@@ -5,6 +5,7 @@ import { useMeta } from '../lib/hooks';
 import { syncNow } from '../lib/sync';
 import { Card } from '../components/ui';
 import { FavouriteAuthorsCard } from '../components/FavouriteAuthors';
+import { useLending } from '../lib/lending';
 import { Link } from 'react-router-dom';
 import { updateProfile, useProfile } from '../lib/profile';
 
@@ -45,6 +46,8 @@ export default function Profile() {
             </div>
           </Card>
         </Link>
+
+        <LentLink />
 
         <FavouriteAuthorsCard />
 
@@ -112,5 +115,25 @@ export default function Profile() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** "Lent out": how many books are out on loan right now */
+function LentLink() {
+  const { out } = useLending();
+  return (
+    <Link to="/lent" className="block">
+      <Card className="flex items-center gap-3">
+        <span className="text-2xl">📦</span>
+        <div className="flex-1">
+          <p className="font-soft text-lg">Lent out</p>
+          <p className="text-sm text-cocoa">
+            {out.length
+              ? `${out.length} book${out.length === 1 ? ' is' : 's are'} out on loan.`
+              : 'Who has which book?'}
+          </p>
+        </div>
+      </Card>
+    </Link>
   );
 }

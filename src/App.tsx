@@ -15,6 +15,7 @@ import Stats from './pages/Stats';
 import Wishlist from './pages/Wishlist';
 import NewBooksPage from './pages/NewBooksPage';
 import StreakPage from './pages/StreakPage';
+import Lent from './pages/Lent';
 import SharedWishlist from './pages/SharedWishlist';
 import Wrapped from './pages/Wrapped';
 import { startBackgroundSync } from './lib/sync';
@@ -65,6 +66,7 @@ function MainApp() {
           <Route path="wishlist" element={<Wishlist />} />
           <Route path="new-books" element={<NewBooksPage />} />
           <Route path="streak" element={<StreakPage />} />
+          <Route path="lent" element={<Lent />} />
           <Route path="*" element={<Home />} />
         </Route>
       </Routes>
