@@ -1,7 +1,7 @@
 import { db } from '../db';
 import type { Book, SeriesInfo } from '../types';
 import { normalize, updateBook } from './library';
-import { mapGenres, mergeGenres } from './bookSearch';
+import { findDescription, looksForeign, mapGenres, mergeGenres } from './bookSearch';
 
 /** First words of a title, e.g. "a court of" for "A Court of Mist and Fury" */
 export const titleStart = (t: string, words = 3) => normalize(t).split(' ').slice(0, words).join(' ');
@@ -173,5 +173,15 @@ export async function setGenreForSeries(book: Book, genre: string, on: boolean) 
     const has = b.genres.includes(genre);
     if (on && !has) await updateBook(b.id, { genres: [...b.genres, genre] });
     if (!on && has) await updateBook(b.id, { genres: b.genres.filter((g) => g !== genre) });
+  }
+}
+
+/** A blurb in another language than English or Dutch (from a foreign edition) is replaced by a proper one, or removed */
+export async function repairDescriptions(max = 10) {
+  if (!navigator.onLine) return;
+  const bad = (await db.books.filter((b) => !b.deleted && looksForeign(b.description)).toArray()).slice(0, max);
+  for (const b of bad) {
+    const description = await findDescription({ title: b.title, authors: b.authors, olKey: b.olKey });
+    await updateBook(b.id, { description });
   }
 }

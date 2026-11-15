@@ -121,6 +121,27 @@ export function guessLang(text: string): Lang | undefined {
   return undefined;
 }
 
+const COMMON_WORDS = new Set(
+  (
+    'the of and to in is you it we my your with from for on at by an as his her she he they their them was were are be been has have had not but or if so what who when where which that this there then than into out up about after before over under again never always one two all new more most only some any can will would could should do did does just like love'.split(
+      ' ',
+    ) as string[]
+  ).concat(
+    'de het een van en ik je jij niet wat zijn haar hij zij wij ons voor met naar uit op bij als maar nooit altijd dat die dit deze er ook nog wel dan toen zo of te om aan ze hem hen was waren is wordt worden heeft hebben zou kan moet komt'.split(
+      ' ',
+    ),
+  ),
+);
+
+/** Is this text in some other language than English or Dutch (e.g. a Hungarian edition's blurb)? */
+export function looksForeign(text?: string) {
+  if (!text) return false;
+  const words = text.toLowerCase().match(/[\p{L}']+/gu) ?? [];
+  if (words.length < 15) return false;
+  const known = words.filter((w) => COMMON_WORDS.has(w)).length;
+  return known / words.length < 0.12;
+}
+
 // ---------- Google Books ----------
 
 interface GoogleVolume {
@@ -171,35 +192,40 @@ export async function googleBooks(params: URLSearchParams, signal?: AbortSignal)
 async function searchGoogle(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
   const res = await googleBooks(new URLSearchParams({ q: query, maxResults: '20', printType: 'books' }), signal);
   const json = (await res.json()) as { items?: GoogleVolume[] };
-  return (json.items ?? [])
-    .filter((v) => v.volumeInfo.title && v.volumeInfo.authors?.length)
-    .map((v, index) => {
-      const info = v.volumeInfo;
-      const { title, series } = parseSeries(info.title!, info.subtitle);
-      // the language of this edition, as the store lists it
-      const lang =
-        info.language === 'nl' || info.language === 'en'
-          ? info.language
-          : guessLang(`${info.title} ${info.subtitle ?? ''}`);
-      const r: SearchResult = {
-        source: 'google' as const,
-        title,
-        subtitle: info.subtitle,
-        authors: info.authors!,
-        coverUrl: googleCover(v),
-        description: stripHtml(info.description),
-        genres: mapGenres(info.categories ?? []),
-        pageCount: info.pageCount || undefined,
-        publishedDate: info.publishedDate,
-        isbn13: info.industryIdentifiers?.find((i) => i.type === 'ISBN_13')?.identifier,
-        googleId: v.id,
-        series,
-        language: lang,
-      };
-      // Google has no popularity number; its own order is the best signal
-      popularity.set(r, Math.max(0, 30 - index * 1.5));
-      return r;
-    });
+  return (
+    (json.items ?? [])
+      .filter((v) => v.volumeInfo.title && v.volumeInfo.authors?.length)
+      // she only reads English and Dutch: foreign editions bring foreign blurbs and covers
+      .filter((v) => !v.volumeInfo.language || v.volumeInfo.language === 'en' || v.volumeInfo.language === 'nl')
+      .filter((v) => !looksForeign(stripHtml(v.volumeInfo.description)))
+      .map((v, index) => {
+        const info = v.volumeInfo;
+        const { title, series } = parseSeries(info.title!, info.subtitle);
+        // the language of this edition, as the store lists it
+        const lang =
+          info.language === 'nl' || info.language === 'en'
+            ? info.language
+            : guessLang(`${info.title} ${info.subtitle ?? ''}`);
+        const r: SearchResult = {
+          source: 'google' as const,
+          title,
+          subtitle: info.subtitle,
+          authors: info.authors!,
+          coverUrl: googleCover(v),
+          description: stripHtml(info.description),
+          genres: mapGenres(info.categories ?? []),
+          pageCount: info.pageCount || undefined,
+          publishedDate: info.publishedDate,
+          isbn13: info.industryIdentifiers?.find((i) => i.type === 'ISBN_13')?.identifier,
+          googleId: v.id,
+          series,
+          language: lang,
+        };
+        // Google has no popularity number; its own order is the best signal
+        popularity.set(r, Math.max(0, 30 - index * 1.5));
+        return r;
+      })
+  );
 }
 
 // ---------- Open Library ----------
@@ -378,4 +404,36 @@ export function sameBook(results: SearchResult[], title: string, author: string)
       (bookKey(r) === want || normalize(r.title).startsWith(normalize(title))) &&
       (!surname || normalize(r.authors.join(' ')).includes(surname)),
   );
+}
+
+/**
+ * A blurb for a search result that came without one: Open Library first, then Google Books.
+ * Blurbs in other languages (a Hungarian edition's) are skipped.
+ */
+export async function findDescription(
+  r: Pick<SearchResult, 'title' | 'authors' | 'olKey'>,
+): Promise<string | undefined> {
+  if (r.olKey) {
+    const d = await fetchOpenLibraryDescription(r.olKey).catch(() => undefined);
+    if (d && !looksForeign(d)) return d;
+  }
+  try {
+    const res = await googleBooks(
+      new URLSearchParams({
+        q: `intitle:${r.title} inauthor:${r.authors[0] ?? ''}`,
+        maxResults: '8',
+        printType: 'books',
+      }),
+    );
+    const items = ((await res.json()) as { items?: GoogleVolume[] }).items ?? [];
+    for (const v of items) {
+      const lang = v.volumeInfo.language;
+      if (lang && lang !== 'en' && lang !== 'nl') continue;
+      const d = stripHtml(v.volumeInfo.description);
+      if (d && d.length > 60 && !looksForeign(d)) return d;
+    }
+  } catch {
+    // no blurb: that's fine
+  }
+  return undefined;
 }

@@ -18,7 +18,7 @@ import StreakPage from './pages/StreakPage';
 import SharedWishlist from './pages/SharedWishlist';
 import Wrapped from './pages/Wrapped';
 import { startBackgroundSync } from './lib/sync';
-import { backfillSeries, harmonizeSeriesGenres } from './lib/seriesLookup';
+import { backfillSeries, harmonizeSeriesGenres, repairDescriptions } from './lib/seriesLookup';
 
 export default function App() {
   // a shared wishlist link: show only that, without syncing her library into a guest's browser
@@ -31,7 +31,13 @@ function MainApp() {
   useEffect(() => {
     const stop = startBackgroundSync();
     // fill in series for older books in the background, once the app has settled
-    const t = setTimeout(() => void backfillSeries().then(harmonizeSeriesGenres), 4000);
+    const t = setTimeout(
+      () =>
+        void backfillSeries()
+          .then(harmonizeSeriesGenres)
+          .then(() => repairDescriptions()),
+      4000,
+    );
     return () => {
       stop();
       clearTimeout(t);

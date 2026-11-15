@@ -356,18 +356,62 @@ const SeriesSchema = z.object({
   ),
 });
 
+/**
+ * Asks with Claude's web search switched on, so lists of books come from real pages instead of
+ * memory. Returns the text answer, or null when web search isn't available (then the caller falls back).
+ */
+async function askWithSearch(env: AiEnv, system: string, content: string, usage: Usage): Promise<string | null> {
+  await spend(env, usage);
+  try {
+    const response = await client(env).messages.create({
+      model: TIPS_MODEL,
+      max_tokens: 4000,
+      system,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+      messages: [{ role: 'user', content }],
+    });
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('');
+    return text || null;
+  } catch (err) {
+    console.error('web search failed', err);
+    return null;
+  }
+}
+
+const SERIES_RULES =
+  'List the main numbered books of the series in reading order, with their original (English) titles. Include a book as "announced" only if it has been officially announced by the author or publisher, with its release date (YYYY-MM-DD or YYYY-MM) if known. Leave out novellas without a whole number unless they are commonly read in order. Titles must be exact: never invent or "fix" a title. If you do not know the series, return an empty list.';
+
 export async function seriesInfo(env: AiEnv, name: string, author: string): Promise<SeriesResponse> {
   if (!isLive(env)) return { books: [], mock: true };
-  const result = await cached(env, ['series', name.toLowerCase(), author.toLowerCase()], 14, () =>
-    ask(
+  const result = await cached(env, ['series2', name.toLowerCase(), author.toLowerCase()], 14, async () => {
+    // first choice: look it up on the web (accurate titles, and the newest releases)
+    const text = await askWithSearch(
+      env,
+      `You look up book series on the web (Goodreads, the author's site, publishers). ${SERIES_RULES} Reply with ONLY a JSON object, no other text: {"books":[{"number":1,"title":"...","status":"published","releaseDate":null}]} where status is "published" or "announced".`,
+      `Series: "${name}" by ${author}.`,
+      { kind: 'question', count: 1 },
+    );
+    if (text) {
+      const json = text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1);
+      try {
+        const parsed = SeriesSchema.safeParse(JSON.parse(json));
+        if (parsed.success && parsed.data.books.length) return parsed.data;
+      } catch {
+        // not valid JSON: use the memory-based answer below
+      }
+    }
+    return ask(
       env,
       TIPS_MODEL,
       SeriesSchema,
-      'You know book series well. List the main numbered books of the series in reading order. Include a book as "announced" only if it has been officially announced by the author or publisher, with its release date (YYYY-MM-DD or YYYY-MM) if known. Leave out novellas without a whole number unless they are commonly read in order. If you do not know the series, return an empty list.',
+      `You know book series well. ${SERIES_RULES}`,
       `Series: "${name}" by ${author}.`,
       'low',
-    ),
-  );
+    );
+  });
   return { books: result?.books ?? [], mock: false };
 }
 

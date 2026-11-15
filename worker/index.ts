@@ -265,11 +265,12 @@ app.post('/ai/identify', async (c) => {
 
 // Book analyses (once per book, then stored) and her reviews read into features
 app.post('/profiles', async (c) => {
-  const { books = [] } = await c.req.json<{
+  const { books = [], lookupOnly = false } = await c.req.json<{
     books?: { title: string; author: string; description?: string; genres?: string[] }[];
+    lookupOnly?: boolean;
   }>();
   const list = books.filter((b) => b.title && b.author).slice(0, 24);
-  return aiRoute(c, () => bookProfiles(c.env, list));
+  return aiRoute(c, () => bookProfiles(c.env, list, lookupOnly));
 });
 
 app.post('/review-insight', async (c) => {

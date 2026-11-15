@@ -3,7 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { searchBooks, fetchOpenLibraryDescription, type SearchResult } from '../lib/bookSearch';
+import { searchBooks, fetchOpenLibraryDescription, findDescription, type SearchResult } from '../lib/bookSearch';
+import { useMatches } from '../lib/taste';
+import { profileKey } from '../taste/vocab';
+import { MatchRing, matchLabel } from '../components/MatchRing';
 import { bookKey, newId, saveBook } from '../lib/library';
 import { useBooks } from '../lib/hooks';
 import { STATUSES, type Lang, type Status } from '../types';
@@ -30,6 +33,22 @@ export default function Add() {
   const [picked, setPickedState] = useState<SearchResult | null>(null);
   const books = useBooks();
   const inputRef = useRef<HTMLInputElement>(null);
+  // a match score next to every result Snug already knows (free: nothing new is analysed for a search)
+  const resultMatches = useMatches(
+    useMemo(
+      () =>
+        results.map((r) => ({
+          title: r.title,
+          author: r.authors[0] ?? '',
+          description: r.description,
+          genres: r.genres,
+          series: r.series,
+        })),
+      [results],
+    ),
+    {},
+    { free: true },
+  );
   // The scanner and the add-sheet get their own history entry (?m=…), so swiping back on the
   // iPhone closes them instead of leaving the Add screen
   const modal = params.get('m');
@@ -300,6 +319,10 @@ export default function Add() {
                         </span>
                       )}
                     </div>
+                    {(() => {
+                      const m = resultMatches.get(profileKey(r.title, r.authors[0] ?? ''));
+                      return m ? <MatchRing score={m.score} size={40} /> : null;
+                    })()}
                   </button>
                 </li>
               );
@@ -355,11 +378,40 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
   // Most books added as "read" were finished a while ago; only "this year" counts in this year's stats
   const [finished, setFinished] = useState<'this' | 'earlier'>('earlier');
   const [saving, setSaving] = useState(false);
+  // the blurb is right here, so she can read what the book is about before choosing
+  const [blurb, setBlurb] = useState(result.description);
+  const [lookingBlurb, setLookingBlurb] = useState(!result.description);
+  const [openBlurb, setOpenBlurb] = useState(false);
+  useEffect(() => {
+    if (result.description) return;
+    let alive = true;
+    void findDescription(result)
+      .then((d) => alive && setBlurb(d))
+      .finally(() => alive && setLookingBlurb(false));
+    return () => {
+      alive = false;
+    };
+  }, [result]);
+  // and how well it fits her (this one book is analysed now, once, if Snug hasn't seen it yet)
+  const fitList = useMemo(
+    () => [
+      {
+        title: result.title,
+        author: result.authors[0] ?? '',
+        description: blurb,
+        genres: result.genres,
+        series: result.series,
+      },
+    ],
+    [result, blurb],
+  );
+  const fit = useMatches(fitList).get(profileKey(result.title, result.authors[0] ?? ''));
 
   const add = async () => {
     setSaving(true);
     const { source: _s, language: _l, ...data } = result;
-    const description = data.description ?? (data.olKey ? await fetchOpenLibraryDescription(data.olKey) : undefined);
+    const description =
+      blurb ?? data.description ?? (data.olKey ? await fetchOpenLibraryDescription(data.olKey) : undefined);
     const now = Date.now();
     const book = await saveBook({
       ...data,
@@ -390,7 +442,7 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
       />
       <motion.div
         style={lift}
-        className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto max-w-lg rounded-t-[1.75rem] bg-cream shadow-2xl md:bottom-8 md:rounded-[1.75rem]"
+        className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[92dvh] max-w-lg overflow-y-auto rounded-t-[1.75rem] bg-cream shadow-2xl md:bottom-8 md:rounded-[1.75rem]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -417,6 +469,42 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
               )}
             </div>
           </div>
+
+          {fit && (
+            <div className="flex gap-3 rounded-2xl bg-white/70 p-3">
+              <div className="flex flex-col items-center">
+                <MatchRing score={fit.score} />
+                <span className="mt-0.5 text-[0.6rem] whitespace-nowrap text-mocha">{matchLabel(fit.score)}</span>
+              </div>
+              <div className="min-w-0 text-sm">
+                <p className="leading-relaxed text-ink/90 select-text">{fit.why}</p>
+                {fit.headsUp && (
+                  <p className="mt-1.5 text-xs leading-relaxed text-cocoa">
+                    <span className="font-medium">Heads up:</span> {fit.headsUp}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {blurb ? (
+            <div>
+              <p className={`text-sm leading-relaxed text-ink/90 select-text ${openBlurb ? '' : 'line-clamp-5'}`}>
+                {blurb}
+              </p>
+              {blurb.length > 280 && (
+                <button className="mt-1 text-sm text-wine" onClick={() => setOpenBlurb(!openBlurb)}>
+                  {openBlurb ? 'Show less' : 'Read more'}
+                </button>
+              )}
+            </div>
+          ) : lookingBlurb ? (
+            <div className="space-y-2" aria-label="Loading description">
+              {[100, 95, 98, 70].map((w, i) => (
+                <div key={i} className="h-3 animate-pulse rounded-full bg-sand/70" style={{ width: `${w}%` }} />
+              ))}
+            </div>
+          ) : null}
 
           {existingId && (
             <div className="rounded-2xl bg-blush px-4 py-3 text-sm text-wine">

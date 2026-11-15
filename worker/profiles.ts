@@ -108,12 +108,14 @@ function guessProfile(b: { title: string; author: string; genres?: string[] }): 
 export async function bookProfiles(
   env: AiEnv,
   books: { title: string; author: string; description?: string; genres?: string[] }[],
+  /** only hand back analyses that already exist (free): nothing new is analysed */
+  lookupOnly = false,
 ): Promise<{ profiles: Record<string, BookProfile>; pending: number }> {
   const wanted = new Map(books.map((b) => [profileKey(b.title, b.author), b]));
   const have = await stored(env, [...wanted.keys()]);
   const out: Record<string, BookProfile> = Object.fromEntries(have);
   const missing = [...wanted.entries()].filter(([k]) => !have.has(k));
-  if (!missing.length) return { profiles: out, pending: 0 };
+  if (!missing.length || lookupOnly) return { profiles: out, pending: 0 };
 
   if (!isLive(env)) {
     for (const [k, b] of missing) out[k] = guessProfile(b);

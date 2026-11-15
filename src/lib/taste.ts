@@ -28,7 +28,11 @@ export interface ToProfile {
 const inFlight = new Map<string, Promise<void>>();
 
 /** Analyses for these books: from the device, else from Snug's server (which analyses new ones once) */
-export async function getProfiles(list: ToProfile[]): Promise<Map<string, BookProfile>> {
+export async function getProfiles(
+  list: ToProfile[],
+  /** only fetch analyses that already exist (free): nothing new is analysed */
+  lookupOnly = false,
+): Promise<Map<string, BookProfile>> {
   const keys = [...new Set(list.map((b) => profileKey(b.title, b.author)))];
   const local = await db.profiles.bulkGet(keys);
   const out = new Map<string, BookProfile>();
@@ -42,9 +46,10 @@ export async function getProfiles(list: ToProfile[]): Promise<Map<string, BookPr
   // the same book asked for twice at once is only fetched once
   const waits: Promise<void>[] = [];
   const fresh: ToProfile[] = [];
+  // a look-up only and a real analysis of the same book are different jobs
+  const fk = (b: ToProfile) => (lookupOnly ? 'lo:' : '') + profileKey(b.title, b.author);
   for (const b of missing) {
-    const k = profileKey(b.title, b.author);
-    const w = inFlight.get(k);
+    const w = inFlight.get(fk(b));
     if (w) waits.push(w);
     else fresh.push(b);
   }
@@ -54,6 +59,7 @@ export async function getProfiles(list: ToProfile[]): Promise<Map<string, BookPr
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        lookupOnly,
         books: chunk.map((b) => ({ ...b, description: b.description?.replace(/<[^>]+>/g, ' ').slice(0, 2500) })),
       }),
     })
@@ -62,8 +68,8 @@ export async function getProfiles(list: ToProfile[]): Promise<Map<string, BookPr
         await db.profiles.bulkPut(Object.entries(profiles).map(([key, profile]) => ({ key, profile })));
       })
       .catch(() => {})
-      .finally(() => chunk.forEach((b) => inFlight.delete(profileKey(b.title, b.author))));
-    chunk.forEach((b) => inFlight.set(profileKey(b.title, b.author), job));
+      .finally(() => chunk.forEach((b) => inFlight.delete(fk(b))));
+    chunk.forEach((b) => inFlight.set(fk(b), job));
     waits.push(job);
   }
   await Promise.all(waits);
@@ -178,6 +184,8 @@ export type Match = Prediction;
 export function useMatches(
   list: (ToProfile & { series?: Candidate['series'] })[],
   wish: { mood?: Mood; genre?: string } = {},
+  /** `free`: only score books Snug already knows (no new analysis, so searching stays free) */
+  opts: { free?: boolean } = {},
 ) {
   const t = useTaste();
   const listKey = list.map((b) => `${b.title}|${b.author}`).join('#');
@@ -185,7 +193,7 @@ export function useMatches(
   useEffect(() => {
     if (!list.length) return;
     let alive = true;
-    getProfiles(list).finally(() => alive && setReady(true));
+    getProfiles(list, !!opts.free).finally(() => alive && setReady(true));
     return () => {
       alive = false;
     };
