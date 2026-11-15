@@ -34,6 +34,8 @@ import {
 /** Something that stands on a shelf */
 interface DecorItem {
   key: string;
+  /** assigned to this shelf (not one that the other shelf had no room for) */
+  own?: boolean;
   el: ReactNode;
   /** natural width in px, so its spot on the shelf is exactly that wide */
   width: number;
@@ -213,23 +215,19 @@ function Spine({
 }
 
 /**
- * Which decorations stand on the shelves today: decided by the date, so it changes from day to day.
- * Every shelf always keeps at least one (so never fewer than two in total); the others come and go.
+ * Which decorations stand on the shelves today: decided by the date, so it changes from day to day,
+ * and never fewer than two. Each one can stand on either shelf.
  */
 function decorToday(forced: string | null): Set<string> {
-  const shelves = [
-    ['candle', 'painting'],
-    ['mug', 'globe'],
-  ];
-  if (forced) return new Set(forced === 'all' ? shelves.flat() : forced.split(','));
+  const pool = ['candle', 'painting', 'mug', 'globe'];
+  if (forced) return new Set(forced === 'all' ? pool : forced.split(','));
   const day = dayKey();
   const roll = (k: string) => hash(`${day}|${k}`) % 100;
-  const on: string[] = [];
-  for (const shelf of shelves) {
-    const picked = shelf.filter((k) => roll(k) < 60);
-    // each shelf keeps at least one (that makes two in total, at the very least)
-    if (!picked.length) picked.push([...shelf].sort((a, b) => roll(a) - roll(b))[0]);
-    on.push(...picked);
+  const on = pool.filter((k) => roll(k) < 62);
+  // never fewer than two
+  for (const k of [...pool].sort((x, y) => roll(x) - roll(y))) {
+    if (on.length >= 2) break;
+    if (!on.includes(k)) on.push(k);
   }
   return new Set(on);
 }
@@ -240,6 +238,7 @@ function ShelfSection({
   books,
   decors,
   reserve,
+  onDropped,
   startDelay,
   entrance,
   seen,
@@ -250,6 +249,8 @@ function ShelfSection({
   decors: DecorItem[];
   /** width kept free for decoration, so the books keep the same size whatever stands there today */
   reserve: number;
+  /** tells which decorations had no room on this shelf, so the other shelf can take them */
+  onDropped: (keys: string[]) => void;
   startDelay: number;
   entrance: boolean;
   /** books she has already seen here: they don't animate in again */
@@ -295,6 +296,13 @@ function ShelfSection({
     k === 0 && boundaries.length ? boundaries[hash(status) % boundaries.length] : books.length,
   );
   const atSet = new Set(ats);
+  const droppedKey = decors
+    .filter((d) => !shown.includes(d) && d.own)
+    .map((d) => d.key)
+    .join(',');
+  useEffect(() => {
+    onDropped(droppedKey ? droppedKey.split(',') : []);
+  }, [droppedKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const decorEl = (d: DecorItem, mid: boolean) => (
     // in the middle of the shelf a bookend keeps the books after it upright
     <div
@@ -480,6 +488,7 @@ export default function Shelf() {
   // the books slide onto the shelf once per visit; coming back, nothing moves
   const bookCount = (books ?? []).filter((b) => b.status !== 'wishlist').length;
   const firstVisit = useFirstVisit('shelf');
+  const [dropped, setDropped] = useState<Record<string, string[]>>({});
   const seenBefore = useSeenIds(
     'shelf',
     (books ?? []).map((b) => b.id),
@@ -509,10 +518,16 @@ export default function Shelf() {
     globe: { key: 'globe', el: <Globe className="h-[72px] w-[50px]" />, width: 50 },
   };
   const today = decorToday(new URLSearchParams(location.search).get('decor'));
-  const decors: Partial<Record<Status, DecorItem[]>> = {
-    owned: ['candle', 'painting'].filter((k) => today.has(k)).map((k) => all[k]),
-    read: ['mug', 'globe'].filter((k) => today.has(k)).map((k) => all[k]),
-  };
+  // each decoration stands on either shelf (decided by the day); what has no room moves to the other one
+  const day = dayKey();
+  const assigned: Record<'owned' | 'read', string[]> = { owned: [], read: [] };
+  for (const k of ['candle', 'painting', 'mug', 'globe'])
+    if (today.has(k)) assigned[hash(`${day}|${k}|shelf`) % 2 ? 'read' : 'owned'].push(k);
+  const list = (shelf: 'owned' | 'read', other: 'owned' | 'read'): DecorItem[] => [
+    ...assigned[shelf].map((k) => ({ ...all[k], own: true })),
+    ...(dropped[other] ?? []).filter((k) => !assigned[shelf].includes(k)).map((k) => all[k]),
+  ];
+  const decors: Partial<Record<Status, DecorItem[]>> = { owned: list('owned', 'read'), read: list('read', 'owned') };
 
   return (
     <div>
@@ -562,11 +577,11 @@ export default function Shelf() {
             </svg>
             {/* a little brass plate in the arch: how many books she has (the wishlist doesn't count) */}
             <Link
-              to="/library"
+              to="/library?tab=have"
               aria-label={`${bookCount} books in your library`}
-              className="absolute bottom-[6px] left-1/2 -translate-x-1/2 rounded-[3px] bg-gradient-to-b from-[#e2c48a] via-[#c9a465] to-[#a9824b] px-2.5 py-[2px] font-soft text-[10px] leading-none font-semibold whitespace-nowrap text-[#3b2a22] shadow-[0_1px_2px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.45)]"
+              className="absolute bottom-[6px] left-1/2 -translate-x-1/2 rounded-[3px] bg-gradient-to-b from-[#e2c48a] via-[#c9a465] to-[#a9824b] px-3.5 py-[2px] font-soft text-[12px] leading-none font-semibold whitespace-nowrap text-[#3b2a22] shadow-[0_1px_2px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.45)]"
             >
-              {bookCount} {bookCount === 1 ? 'book' : 'books'}
+              {bookCount}
             </Link>
           </div>
           <div className="-mx-4 h-2.5 rounded-t-md bg-gradient-to-b from-[#c99466] to-[#a7754d] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" />
@@ -632,6 +647,9 @@ export default function Shelf() {
                 books={shelf.books}
                 decors={decors[shelf.status] ?? []}
                 reserve={shelf.status === 'owned' ? 48 : 68}
+                onDropped={(keys) =>
+                  setDropped((d) => (d[shelf.status]?.join() === keys.join() ? d : { ...d, [shelf.status]: keys }))
+                }
                 startDelay={i * 0.15}
                 entrance={firstVisit}
                 seen={seenBefore}

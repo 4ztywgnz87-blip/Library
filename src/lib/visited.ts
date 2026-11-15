@@ -26,3 +26,6 @@ export function useSeenIds(page: string, ids: string[]) {
   }, [page, key]); // eslint-disable-line react-hooks/exhaustive-deps
   return before;
 }
+
+/** The Library as she left it: which tab/filter, and how far she had scrolled */
+export const libraryMemory = { search: '', y: 0 };

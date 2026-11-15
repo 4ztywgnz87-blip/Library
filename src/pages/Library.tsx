@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
-import { useFirstVisit } from '../lib/visited';
+import { libraryMemory, useFirstVisit } from '../lib/visited';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
@@ -46,16 +46,35 @@ let lastSort: { v: Sort | null } | undefined;
 export default function Library() {
   const books = useBooks();
   const [params, setParams] = useSearchParams();
-  const tab = (params.get('tab') as Status | 'all') || 'all';
+  // "have" = everything she owns (all but the wishlist)
+  const tab = (params.get('tab') as Status | 'all' | 'have') || 'all';
   // from the stats: only the books she finished in this year
   const year = Number(params.get('year')) || undefined;
   // from the authors list: only this author's books
   const authorFilter = params.get('author') || undefined;
   const firstVisit = useFirstVisit('library');
+  // Coming back to the Library (without asking for something specific) shows it as she left it
+  const target = useRef({ search: window.location.search || libraryMemory.search, y: libraryMemory.y });
+  useEffect(() => {
+    if (!window.location.search && libraryMemory.search)
+      setParams(new URLSearchParams(libraryMemory.search), { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const search = window.location.search;
+  const mounted = useRef(false);
+  useEffect(() => {
+    // (the first run, when the saved view is still being put back, must not overwrite it)
+    if (!mounted.current) {
+      mounted.current = true;
+      if (!search && target.current.search) return;
+    }
+    libraryMemory.search = search;
+  }, [search]);
   // an arrow back to the top, once she has scrolled a long way down
   const [farDown, setFarDown] = useState(false);
   useEffect(() => {
-    const onScroll = () => setFarDown(window.scrollY > 900);
+    const onScroll = () => {
+      setFarDown(window.scrollY > 900);
+    };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -83,6 +102,7 @@ export default function Library() {
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: books?.length ?? 0 };
     for (const b of books ?? []) c[b.status] = (c[b.status] ?? 0) + 1;
+    c.have = (books?.length ?? 0) - (c.wishlist ?? 0);
     return c;
   }, [books]);
 
@@ -97,7 +117,7 @@ export default function Library() {
     const q = normalize(query);
     const filtered = books.filter(
       (b) =>
-        (tab === 'all' || b.status === tab) &&
+        (tab === 'all' || (tab === 'have' ? b.status !== 'wishlist' : b.status === tab)) &&
         (!year || (b.status === 'read' && !!b.finishedAt && new Date(b.finishedAt).getFullYear() === year)) &&
         (!authorFilter || normalize(b.authors.join(' ')).includes(normalize(authorFilter))) &&
         (!genre || b.genres.includes(genre)) &&
@@ -108,6 +128,17 @@ export default function Library() {
   }, [books, sortReady, tab, year, authorFilter, query, genre, lang, sort]);
 
   const filtersActive = !!genre || lang !== 'all';
+
+  // ...and scrolled back to where she was
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || !visible.length || search !== target.current.search) return;
+    restored.current = true;
+    const y = target.current.y;
+    if (!y) return;
+    setTimeout(() => window.scrollTo(0, y), 30);
+    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+  }, [visible.length, search]);
 
   return (
     <div>
@@ -145,6 +176,9 @@ export default function Library() {
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-3">
           <Chip active={tab === 'all'} onClick={() => setParams({})}>
             All <span className="opacity-60">{counts.all}</span>
+          </Chip>
+          <Chip active={tab === 'have'} onClick={() => setParams({ tab: 'have' })}>
+            Owned <span className="opacity-60">{counts.have ?? 0}</span>
           </Chip>
           {STATUSES.map((s) => (
             <Chip key={s.id} active={tab === s.id} onClick={() => setParams({ tab: s.id })}>

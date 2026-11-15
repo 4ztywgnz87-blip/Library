@@ -1,5 +1,5 @@
-import { useId, useState, type ReactNode } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { AnimatePresence, animate, motion, useMotionValue } from 'motion/react';
 import { CatHat, SEASON_LIGHTS, type Season } from './Seasonal';
 
 /** A terracotta pot with a leafy plant that sways gently */
@@ -815,7 +815,24 @@ export function HangingPlant({ className = '' }: { className?: string }) {
  */
 export function Globe({ className = '' }: { className?: string }) {
   const id = useId();
-  // one pattern of land, 40 wide; two copies side by side make it loop without a seam
+  // The land's position: it drifts slowly all the time; a tap sends it round quickly, then it settles
+  // back into the slow drift from wherever it stopped (the pattern repeats every 40, so there's no jump)
+  const x = useMotionValue(0);
+  const drift = useRef<{ stop: () => void } | null>(null);
+  const startDrift = () => {
+    const from = x.get() % 40;
+    x.set(from);
+    drift.current = animate(x, from - 40, { duration: 30, ease: 'linear', onComplete: startDrift });
+  };
+  useEffect(() => {
+    startDrift();
+    return () => drift.current?.stop();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const spin = () => {
+    drift.current?.stop();
+    drift.current = animate(x, x.get() - 200, { duration: 1.6, ease: [0.15, 0.7, 0.3, 1], onComplete: startDrift });
+  };
+  // one pattern of land, 40 wide; copies side by side make it loop without a seam
   const land = (
     <>
       <path d="M4 22c4-5 10-5 13-1 2 3-1 6 1 9 2 3-1 7-5 7-4 0-8-3-9-7 0-3-2-5 0-8z" fill="#8f9e7f" />
@@ -825,7 +842,14 @@ export function Globe({ className = '' }: { className?: string }) {
     </>
   );
   return (
-    <svg viewBox="0 0 50 72" className={className} aria-hidden>
+    <svg
+      viewBox="0 0 50 72"
+      className={className}
+      role="button"
+      aria-label="Spin the globe"
+      onClick={spin}
+      style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+    >
       <defs>
         <clipPath id={`${id}clip`}>
           <circle cx="25" cy="30" r="17.5" />
@@ -849,11 +873,7 @@ export function Globe({ className = '' }: { className?: string }) {
       {/* the sphere with its turning land */}
       <circle cx="25" cy="30" r="17.5" fill={`url(#${id}sea)`} />
       <g clipPath={`url(#${id}clip)`}>
-        <motion.g
-          initial={{ x: 0 }}
-          animate={{ x: -40 }}
-          transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
-        >
+        <motion.g style={{ x }}>
           <g transform="translate(-5 0)">{land}</g>
           <g transform="translate(35 0)">{land}</g>
           <g transform="translate(75 0)">{land}</g>

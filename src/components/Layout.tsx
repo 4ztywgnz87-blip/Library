@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { TABS, useTabSwipe } from '../lib/swipe';
+import { libraryMemory } from '../lib/visited';
 import { BooksIcon, HomeIcon, PlusIcon, ShelfIcon, UserIcon } from './Icons';
 import { useTasteUpkeep } from '../lib/taste';
 
@@ -27,14 +28,20 @@ export function Layout() {
     history.scrollRestoration = 'manual';
   }, []);
   const currentKey = useRef(location.key);
+  const currentPath = useRef(pathname);
   useEffect(() => {
     // (the key is a ref: the scroll to the top of a new page must not be stored under the page we just left)
-    const onScroll = () => positions.current.set(currentKey.current, window.scrollY);
+    const onScroll = () => {
+      positions.current.set(currentKey.current, window.scrollY);
+      // the Library remembers where she was, also when she comes back through the menu
+      if (currentPath.current === '/library') libraryMemory.y = window.scrollY;
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
   useLayoutEffect(() => {
     currentKey.current = location.key;
+    currentPath.current = pathname;
     const samePage = lastPath.current === pathname;
     lastPath.current = pathname;
     if (navType === 'POP') {
