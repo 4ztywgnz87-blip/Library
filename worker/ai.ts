@@ -370,3 +370,43 @@ export async function seriesInfo(env: AiEnv, name: string, author: string): Prom
   );
   return { books: result?.books ?? [], mock: false };
 }
+
+// ---------- which series is this book in? (when Open Library doesn't know) ----------
+
+const BookSeriesSchema = z.object({
+  // listed first on purpose: writing out the whole series in order, before choosing a number, avoids slips
+  order: z.array(z.string()),
+  series: z.string().nullable(),
+  number: z.number().nullable(),
+  /** true only when sure about the exact position (the series itself can be certain while the number isn't) */
+  numberSure: z.boolean(),
+  confident: z.boolean(),
+});
+
+/**
+ * Open Library only knows the original English editions, so translations (a Dutch "Het Pumpkin Spice
+ * Café") and lesser known books come back without a series. Claude knows these: it gives the series
+ * under its usual English name, and says when it isn't sure (then nothing is filled in).
+ */
+export async function bookSeries(
+  env: AiEnv,
+  title: string,
+  author: string,
+  known: string[] = [],
+): Promise<{ name?: string; number?: number }> {
+  if (!isLive(env)) return {};
+  const result = await cached(env, ['bookseries4', title.toLowerCase(), author.toLowerCase()], 90, () =>
+    ask(
+      env,
+      TIPS_MODEL,
+      BookSeriesSchema,
+      "You know published book series very well, in English and in translation. Say which series the book belongs to, using the series name as it is known in the original language (usually English, as on Goodreads), and its number in that series (a decimal like 4.5 for a novella in between). The title may be a translation, e.g. a Dutch edition: identify the original book. First write out, in the order field, the original titles of the books in that series in reading order (a novella in between is marked like 4.5 Title); then give the number of this book by finding its place in that list. If a series name is listed as already in the reader's library and it is the same series, use exactly that spelling. If the book is a standalone, or you are not sure, set series to null and confident to false. Never guess.",
+      `Title: "${title}"\nAuthor: ${author}${known.length ? `\nSeries by this author already in the library: ${known.join('; ')}` : ''}`,
+      'medium',
+      3000,
+      { kind: 'analysis', count: 1 },
+    ),
+  );
+  if (!result?.confident || !result.series) return {};
+  return { name: result.series.trim(), number: result.numberSure ? (result.number ?? undefined) : undefined };
+}

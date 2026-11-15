@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import type { Book, SyncRecord } from '../src/types';
 import type { ReaderProfile } from '../src/shared';
-import { AiLimitError, aiStatus, findCoverCorners, identifyCover, suggestBooks, seriesInfo } from './ai';
+import { AiLimitError, aiStatus, bookSeries, findCoverCorners, identifyCover, suggestBooks, seriesInfo } from './ai';
 import { ASSETS } from './assets.gen';
 import { findBookSeries, seriesParts } from './series';
 import { bookProfiles, reviewInsight } from './profiles';
@@ -138,6 +138,20 @@ app.get('/editions', async (c) => {
 app.get('/book-series', async (c) =>
   c.json(await findBookSeries(c.req.query('title') ?? '', c.req.query('author') ?? '')),
 );
+
+/** Series via Claude, for books Open Library doesn't know (translations, lesser known books) */
+app.get('/ai/book-series', async (c) => {
+  const title = c.req.query('title') ?? '';
+  const author = c.req.query('author') ?? '';
+  if (!title || !author) return c.json({});
+  const known = (c.req.query('known') ?? '').split('|').filter(Boolean).slice(0, 12);
+  try {
+    return c.json(await bookSeries(c.env, title, author, known));
+  } catch (err) {
+    if (!(err instanceof AiLimitError)) console.error('series AI error', err);
+    return c.json({}); // not now: the app asks again another day
+  }
+});
 
 /** All books of a series in reading order */
 app.get('/series-books', async (c) => c.json({ books: await seriesParts(c.req.query('key') ?? '') }));

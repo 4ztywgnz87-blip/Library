@@ -41,6 +41,34 @@ async function guessSeriesFromLibrary(book: Pick<Book, 'id' | 'title' | 'authors
   return { name: series.name, number: max ? max + 1 : undefined, key };
 }
 
+/**
+ * Last resort: Claude (once per book, remembered on the server). Open Library mostly doesn't know
+ * translated editions or lesser known books. The author's series she already has are passed along,
+ * so the same series keeps the same spelling.
+ */
+async function askSeries(book: Pick<Book, 'id' | 'title' | 'authors'>): Promise<SeriesInfo | undefined> {
+  const author = book.authors[0] ?? '';
+  if (!author) return undefined;
+  const mine = await db.books
+    .filter((b) => !b.deleted && b.id !== book.id && !!b.series && normalize(b.authors[0] ?? '') === normalize(author))
+    .toArray();
+  const known = [...new Set(mine.map((b) => b.series!.name))];
+  const params = new URLSearchParams({ title: book.title, author, known: known.join('|') });
+  try {
+    const res = await fetch(`/api/ai/book-series?${params}`);
+    if (!res.ok) return undefined;
+    const found = (await res.json()) as { name?: string; number?: number };
+    if (!found.name) return undefined;
+    // a number another part of the series already has can't be right: better none than a wrong one
+    const taken = mine.some(
+      (b) => normalize(b.series!.name) === normalize(found.name!) && b.series!.number === found.number,
+    );
+    return { name: found.name, number: taken ? undefined : found.number };
+  } catch {
+    return undefined;
+  }
+}
+
 /** Genres the other parts of the same series already have */
 async function seriesGenres(book: Pick<Book, 'id'>, series?: SeriesInfo): Promise<string[]> {
   if (!series) return [];
@@ -66,6 +94,7 @@ export async function lookupSeries(
       ? { name: found.name, number: found.number, key: found.key }
       : undefined;
     if (!series) series = await guessSeriesFromLibrary(book);
+    if (!series) series = await askSeries(book);
 
     const current = await db.books.get(book.id);
     if (!current) return undefined;
@@ -90,7 +119,7 @@ export async function lookupSeries(
 }
 
 /** Bump to look up older books again when the lookup gets smarter */
-const LOOKUP_VERSION = 3;
+const LOOKUP_VERSION = 4;
 
 let running = false;
 
