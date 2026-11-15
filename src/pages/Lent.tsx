@@ -3,12 +3,15 @@ import { Link } from 'react-router-dom';
 import { Cover } from '../components/Cover';
 import { Button, Card, PageHeader } from '../components/ui';
 import { EmptyState } from '../components/SleepyCat';
-import { ago, dateLabel, returnBook, useLending } from '../lib/lending';
+import { ConfirmSheet } from '../components/ConfirmSheet';
+import type { Book } from '../types';
+import { ago, dateLabel, restoreLoan, returnBook, useLending } from '../lib/lending';
 
 /** Every book that is out on loan, per person, with a list she can send or print */
 export default function Lent() {
   const { out, people, history, ready } = useLending();
   const [copied, setCopied] = useState(false);
+  const [asking, setAsking] = useState<Book | null>(null);
   if (!ready) return null;
 
   const shareList = async () => {
@@ -74,7 +77,7 @@ export default function Lent() {
                           </span>
                         </span>
                       </Link>
-                      <Button variant="soft" className="shrink-0 px-3 py-2 text-xs" onClick={() => void returnBook(b)}>
+                      <Button variant="soft" className="shrink-0 px-3 py-2 text-xs" onClick={() => setAsking(b)}>
                         Back ✓
                       </Button>
                     </div>
@@ -91,17 +94,44 @@ export default function Lent() {
             <Card className="divide-y divide-linen py-1">
               {history.slice(0, 30).map((h, i) => (
                 <div key={`${h.book.id}-${i}`} className="py-2.5 text-sm">
-                  <span className="font-medium">{h.book.title}</span>
-                  <span className="text-cocoa"> · {h.to}</span>
-                  <span className="block text-xs text-mocha">
-                    {dateLabel(h.since)} → {dateLabel(h.returnedAt)}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-medium">{h.book.title}</span>
+                      <span className="text-cocoa"> · {h.to}</span>
+                      <span className="block text-xs text-mocha">
+                        {dateLabel(h.since)} → {dateLabel(h.returnedAt)}
+                      </span>
+                    </div>
+                    {/* marked as back by mistake? put it back on loan (only while the book isn't lent to someone else) */}
+                    {!h.book.lent && (
+                      <button
+                        className="shrink-0 rounded-full bg-linen px-3 py-1.5 text-xs text-cocoa"
+                        onClick={() => void restoreLoan(h.book, h.index)}
+                      >
+                        Put back on loan
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </Card>
           </section>
         )}
       </div>
+      {asking && (
+        <ConfirmSheet
+          title={`Is ${asking.title} back?`}
+          confirmLabel="Yes, it's back"
+          cancelLabel="Not yet"
+          onCancel={() => setAsking(null)}
+          onConfirm={async () => {
+            await returnBook(asking);
+            setAsking(null);
+          }}
+        >
+          It was lent to {asking.lent?.to}. You can put it back on loan afterwards under “Earlier loans”.
+        </ConfirmSheet>
+      )}
     </div>
   );
 }

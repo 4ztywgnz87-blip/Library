@@ -10,12 +10,15 @@ export function ConfirmSheet({
   title,
   children,
   confirmLabel,
+  cancelLabel = 'Keep it',
   onConfirm,
   onCancel,
 }: {
   title: string;
   children?: ReactNode;
   confirmLabel: string;
+  /** the label of the button that closes without doing anything */
+  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -45,7 +48,7 @@ export function ConfirmSheet({
         {children && <div className="mt-2 text-sm text-cocoa">{children}</div>}
         <div className="mt-6 flex gap-3">
           <Button variant="soft" className="flex-1" onClick={onCancel}>
-            Keep it
+            {cancelLabel}
           </Button>
           <Button className="flex-1" onClick={onConfirm}>
             {confirmLabel}

@@ -17,6 +17,14 @@ export function returnBook(book: Book) {
   });
 }
 
+/** An earlier loan goes back to "lent out" (e.g. it was marked as returned by mistake) */
+export function restoreLoan(book: Book, index: number) {
+  const loan = book.loans?.[index];
+  if (!loan || book.lent) return;
+  const loans = (book.loans ?? []).filter((_, i) => i !== index);
+  return updateBook(book.id, { lent: { to: loan.to, since: loan.since }, loans: loans.length ? loans : undefined });
+}
+
 /** "today", "yesterday", "3 days ago", "2 weeks ago", "4 months ago" */
 export function ago(ts: number, now = Date.now()) {
   const days = Math.floor((now - ts) / 86_400_000);
@@ -38,7 +46,7 @@ export function useLending() {
     const people = new Map<string, Book[]>();
     for (const b of out) people.set(b.lent!.to, [...(people.get(b.lent!.to) ?? []), b]);
     const history = (books ?? [])
-      .flatMap((b) => (b.loans ?? []).map((l) => ({ book: b, ...l })))
+      .flatMap((b) => (b.loans ?? []).map((l, index) => ({ book: b, index, ...l })))
       .sort((a, b) => b.returnedAt - a.returnedAt);
     const names = [...new Set([...out.map((b) => b.lent!.to), ...history.map((h) => h.to)])];
     return { out, people, history, names, ready: !!books };

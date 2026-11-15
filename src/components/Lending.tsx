@@ -3,12 +3,14 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Book } from '../types';
 import { Button, Card } from './ui';
+import { ConfirmSheet } from './ConfirmSheet';
 import { useKeyboardLift } from '../lib/keyboard';
 import { ago, dateLabel, lendBook, returnBook, useLending } from '../lib/lending';
 
 /** On the book page: lend it to someone, or see who has it and mark it as back */
 export function LendCard({ book }: { book: Book }) {
   const [sheet, setSheet] = useState(false);
+  const [back, setBack] = useState(false);
   const lent = book.lent;
   return (
     <Card className="space-y-3">
@@ -20,7 +22,7 @@ export function LendCard({ book }: { book: Book }) {
             <span className="text-cocoa">· {ago(lent.since)}</span>
           </p>
           <div className="flex gap-2">
-            <Button className="flex-1 py-2.5" onClick={() => void returnBook(book)}>
+            <Button className="flex-1 py-2.5" onClick={() => setBack(true)}>
               Got it back ✓
             </Button>
             <Button variant="soft" className="py-2.5" onClick={() => setSheet(true)}>
@@ -39,6 +41,20 @@ export function LendCard({ book }: { book: Book }) {
         </p>
       )}
       <AnimatePresence>{sheet && <LendSheet book={book} onClose={() => setSheet(false)} />}</AnimatePresence>
+      {back && (
+        <ConfirmSheet
+          title={`Is ${book.title} back?`}
+          confirmLabel="Yes, it's back"
+          cancelLabel="Not yet"
+          onCancel={() => setBack(false)}
+          onConfirm={async () => {
+            await returnBook(book);
+            setBack(false);
+          }}
+        >
+          It was lent to {lent?.to}. You can put it back on loan afterwards under “Earlier loans” on the Lent out page.
+        </ConfirmSheet>
+      )}
     </Card>
   );
 }
