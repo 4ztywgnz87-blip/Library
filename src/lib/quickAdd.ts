@@ -1,4 +1,3 @@
-import { celebrateNewBook } from '../components/AddButton';
 import type { Book, Lang, Status } from '../types';
 import { searchBooks } from './bookSearch';
 import { bookKey, findExisting, newId, normalize, saveBook } from './library';
@@ -50,7 +49,6 @@ export async function quickAdd(
     updatedAt: now,
     series: extra.series ?? data.series,
   });
-  celebrateNewBook();
   if (!saved.series || !saved.genres.length) void lookupSeries(saved);
   return saved;
 }

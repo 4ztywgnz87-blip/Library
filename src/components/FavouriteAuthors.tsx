@@ -18,7 +18,9 @@ export function FavouriteAuthorsCard() {
   return (
     <Card className="space-y-3">
       <p className="text-xs tracking-wide text-mocha uppercase">Favourite authors</p>
-      <p className="text-sm text-cocoa">Snug keeps an eye out for their new books. Authors you love are added automatically too.</p>
+      <p className="text-sm text-cocoa">
+        Snug keeps an eye out for their new books. Authors you love are added automatically too.
+      </p>
       <div className="flex flex-wrap gap-2">
         {authors.map((a) => (
           <span key={a} className="inline-flex items-center gap-1 rounded-full bg-linen py-1.5 pr-1.5 pl-3 text-sm">
@@ -46,7 +48,11 @@ export function FavouriteAuthorsCard() {
           placeholder="Add an author"
           className="min-w-0 flex-1 rounded-xl border border-sand bg-white px-3 py-2.5 text-[16px] outline-none focus:border-oat"
         />
-        <button type="submit" className="rounded-xl bg-linen px-4 text-sm font-medium hover:bg-sand" disabled={!name.trim()}>
+        <button
+          type="submit"
+          className="rounded-xl bg-linen px-4 text-sm font-medium hover:bg-sand"
+          disabled={!name.trim()}
+        >
           Add
         </button>
       </form>

@@ -118,9 +118,9 @@ export default function StreakPage() {
                   <span
                     className={`relative grid h-8 w-8 place-items-center rounded-full text-sm ${
                       inRun
-                        ? `font-semibold text-ink ${isToday ? 'bg-wine text-cream' : ''}`
+                        ? `font-semibold ${isToday ? 'bg-[#e08a3f] text-white shadow-sm' : 'text-ink'}`
                         : isToday
-                          ? 'border-2 border-dashed border-wine/40 text-wine'
+                          ? 'border-2 border-dashed border-[#e08a3f]/70 font-semibold text-[#c2702c]'
                           : 'text-cocoa'
                     }`}
                   >

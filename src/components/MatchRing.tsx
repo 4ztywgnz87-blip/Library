@@ -23,7 +23,10 @@ export function MatchRing({ score, size = 44 }: { score: number; size?: number }
           transition={{ duration: 0.9, ease: 'easeOut' }}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center font-soft text-[0.72rem] font-semibold" style={{ color }}>
+      <span
+        className="absolute inset-0 flex items-center justify-center font-soft text-[0.72rem] font-semibold"
+        style={{ color }}
+      >
         {score}%
       </span>
     </div>

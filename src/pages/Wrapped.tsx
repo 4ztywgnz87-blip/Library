@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
@@ -7,6 +7,7 @@ import { dayKey, streakOf, useDays } from '../lib/streak';
 import { Cover } from '../components/Cover';
 import { CloseIcon } from '../components/Icons';
 import { formatRating } from '../components/Stars';
+import { Flame } from '../components/Streak';
 import type { Book } from '../types';
 import { shareWrapCard, type WrapSummary } from '../lib/wrapCard';
 
@@ -53,16 +54,53 @@ function personality(read: Book[], topGenre?: string) {
   const inSeries = read.filter((b) => b.series).length / Math.max(1, read.length);
   const spicy = read.filter((b) => b.genres.includes('Spicy') || b.tags.some((t) => t.startsWith('spicy'))).length;
   if (topGenre === 'Romantasy')
-    return { name: 'The Faerie Court Regular', line: 'Dragons, fae and a slow burn: your natural habitat.' };
+    return {
+      name: 'The Faerie Court Regular',
+      emoji: '🧚',
+      line: 'Dragons, fae and a slow burn: your natural habitat.',
+      tint: ['#f6c27a', '#e05a73', '#b07bd6'],
+    };
   if (spicy >= read.length / 3)
-    return { name: 'The Chilli Connoisseur', line: 'You like your books with a little 🌶️.' };
+    return {
+      name: 'The Chilli Connoisseur',
+      emoji: '🌶️',
+      line: 'You like your books with a little heat.',
+      tint: ['#ff9f43', '#e05a73', '#f6d27a'],
+    };
   if (inSeries > 0.6)
-    return { name: 'The Series Devourer', line: 'One book is never enough. You need to know what happens next.' };
+    return {
+      name: 'The Series Devourer',
+      emoji: '📚',
+      line: 'One book is never enough. You need to know what happens next.',
+      tint: ['#8fc1a9', '#f6d27a', '#e08a3f'],
+    };
   if (topGenre === 'Thriller' || topGenre === 'Mystery')
-    return { name: 'The Midnight Sleuth', line: 'Just one more chapter… until the twist.' };
-  if (topGenre === 'Fantasy') return { name: 'The World Wanderer', line: 'Maps at the front of the book? Yes please.' };
-  if (topGenre === 'Romance') return { name: 'The Hopeless Romantic', line: 'Happily ever after, every single time.' };
-  return { name: 'The Cosy Collector', line: 'A blanket, a cup of tea and a good book: that’s your year.' };
+    return {
+      name: 'The Midnight Sleuth',
+      emoji: '🔍',
+      line: 'Just one more chapter… until the twist.',
+      tint: ['#7fa7d9', '#b07bd6', '#f6d27a'],
+    };
+  if (topGenre === 'Fantasy')
+    return {
+      name: 'The World Wanderer',
+      emoji: '🗺️',
+      line: 'Maps at the front of the book? Yes please.',
+      tint: ['#8fc1a9', '#7fa7d9', '#f6d27a'],
+    };
+  if (topGenre === 'Romance')
+    return {
+      name: 'The Hopeless Romantic',
+      emoji: '💌',
+      line: 'Happily ever after, every single time.',
+      tint: ['#f2a7b8', '#e05a73', '#f6d27a'],
+    };
+  return {
+    name: 'The Cosy Collector',
+    emoji: '☕',
+    line: 'A blanket, a cup of tea and a good book: that’s your year.',
+    tint: ['#f6c27a', '#d9a27a', '#f2a7b8'],
+  };
 }
 
 interface Slide {
@@ -356,21 +394,29 @@ export default function Wrapped() {
     const inYear = days.filter((d) => d.date.startsWith(`${year}-`));
     const imp = profile.streakImport?.until.startsWith(`${year}-`) ? profile.streakImport : undefined;
     const st = streakOf(inYear, imp, `${year}-12-31` < dayKey() ? `${year}-12-31` : dayKey());
-    if (inYear.length >= 3 || imp)
+    // unbroken all year: the streak simply kept growing
+    const unbroken = st.current > 0 && st.current === st.longest;
+    if (inYear.length >= 1 || imp)
       out.push({
         key: 'streak',
         bg: 'from-[#A0644B] to-[#9C7A4C]',
         body: (
           <Center>
-            <motion.div animate={{ scale: [1, 1.08, 1] }} transition={{ duration: 1.6, repeat: Infinity }}>
-              <p className="text-7xl">🔥</p>
+            <motion.div
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 140, damping: 11 }}
+            >
+              <Flame flicker className="h-28 w-24" />
             </motion.div>
             <Pop delay={0.3}>
-              <p className="mt-4 text-cream/80">Your longest streak</p>
+              <p className="mt-4 text-cream/85">
+                {unbroken ? 'This year your streak grew to' : 'Your longest streak this year was'}
+              </p>
             </Pop>
             <Count to={st.longest} className="font-soft my-1 text-8xl leading-none font-semibold" />
             <Pop delay={0.6}>
-              <p className="text-xl">days in a row</p>
+              <p className="text-xl">days in a row{unbroken ? ', and counting' : ''}</p>
             </Pop>
             <Pop delay={1.2}>
               <p className="mt-6 text-cream/85">You picked up a book on {st.totalDays} days this year.</p>
@@ -380,26 +426,21 @@ export default function Wrapped() {
       });
 
     const p = personality(read, genres[0]?.key);
+    // three little facts that back up the personality
+    const traits: string[] = [];
+    const seriesShare = Math.round((read.filter((b) => b.series).length / read.length) * 100);
+    if (seriesShare >= 30) traits.push(`${seriesShare}% in a series`);
+    const ratedYear = read.filter((b) => b.rating);
+    if (ratedYear.length)
+      traits.push(
+        `${formatRating(Math.round((ratedYear.reduce((t, b) => t + b.rating!, 0) / ratedYear.length) * 4) / 4)}★ on average`,
+      );
+    if (tags[0]) traits.push(`mostly ${tags[0].key}`);
+    else if (genres[1]) traits.push(`a soft spot for ${genres[1].key.toLowerCase()}`);
     out.push({
       key: 'persona',
-      bg: 'from-[#4E3B47] to-[#3F4E5A]',
-      body: (
-        <Center>
-          <Pop>
-            <p className="text-cream/80">Your reader personality</p>
-          </Pop>
-          <motion.div
-            initial={{ scale: 0.3, rotate: -20, opacity: 0 }}
-            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-            transition={{ delay: 0.6, type: 'spring', stiffness: 120, damping: 10 }}
-            className="mt-6 rounded-[2rem] bg-cream px-6 py-8 text-ink shadow-2xl"
-          >
-            <p className="text-5xl">📚</p>
-            <p className="font-soft mt-3 text-3xl leading-tight font-semibold">{p.name}</p>
-            <p className="mt-2 text-sm text-cocoa">{p.line}</p>
-          </motion.div>
-        </Center>
-      ),
+      bg: 'from-[#2e2238] to-[#4E3B47]',
+      body: <Persona p={p} traits={traits.slice(0, 3)} />,
     });
 
     out.push({
@@ -433,7 +474,6 @@ export default function Wrapped() {
         topGenre: genres[0]?.key,
         topAuthor: authors[0] && authors[0].n >= 2 ? authors[0].key : undefined,
         favourite: rated[0],
-        persona: p.name,
         longestStreak: inYear.length >= 3 || imp ? st.longest : undefined,
         // her favourites first on the picture
         covers: [...rated, ...read.filter((b) => !b.rating)],
@@ -441,19 +481,85 @@ export default function Wrapped() {
     };
   }, [books, days, profile, year]);
 
-  // stories move on by themselves; holding a finger down pauses
+  // stories move on by themselves; holding a finger down pauses (the bar stops too)
+  const DURATION = 6500;
+  const elapsed = useRef(0);
+  const bar = useRef<HTMLDivElement>(null);
+  const pausedRef = useRef(false);
+  pausedRef.current = paused;
   useEffect(() => {
-    if (paused || !slides.length || i >= slides.length - 1) return;
-    const t = setTimeout(() => setI((n) => n + 1), 6500);
-    return () => clearTimeout(t);
-  }, [i, paused, slides.length]);
+    elapsed.current = 0;
+    if (!slides.length) return;
+    const last = i >= slides.length - 1;
+    let prev = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      if (!pausedRef.current) elapsed.current += now - prev;
+      prev = now;
+      const p = last ? 1 : Math.min(1, elapsed.current / DURATION);
+      if (bar.current) bar.current.style.width = `${p * 100}%`;
+      if (!last && elapsed.current >= DURATION) setI((n) => Math.min(slides.length - 1, n + 1));
+      else raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [i, slides.length]);
+
+  // swipe down to close, like a story
+  const [dragY, setDragY] = useState(0);
+  const press = useRef<{ x: number; y: number; dragging: boolean; held: boolean; timer?: number } | null>(null);
+  const close = () => (history.length > 1 ? navigate(-1) : navigate('/stats'));
 
   if (!slides.length) return null;
   const slide = slides[Math.min(i, slides.length - 1)];
   const go = (d: number) => setI((n) => Math.max(0, Math.min(slides.length - 1, n + d)));
 
+  const onDown = (e: React.PointerEvent) => {
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    const p = { x: e.clientX, y: e.clientY, dragging: false, held: false, timer: 0 };
+    p.timer = window.setTimeout(() => {
+      p.held = true;
+      setPaused(true);
+    }, 220);
+    press.current = p;
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const p = press.current;
+    if (!p) return;
+    const dx = e.clientX - p.x;
+    const dy = e.clientY - p.y;
+    if (!p.dragging && dy > 10 && Math.abs(dy) > Math.abs(dx)) {
+      p.dragging = true;
+      clearTimeout(p.timer);
+      setPaused(true);
+    }
+    if (p.dragging) setDragY(Math.max(0, dy));
+  };
+  const onUp = (e: React.PointerEvent) => {
+    const p = press.current;
+    press.current = null;
+    if (!p) return;
+    clearTimeout(p.timer);
+    if (p.dragging) {
+      if (e.clientY - p.y > 110) {
+        setDragY(window.innerHeight);
+        setTimeout(close, 180);
+      } else {
+        setDragY(0);
+        setPaused(false);
+      }
+      return;
+    }
+    if (p.held) return setPaused(false);
+    go(e.clientX < window.innerWidth / 3 ? -1 : 1);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-ink text-cream">
+    <motion.div
+      className="fixed inset-0 z-50 overflow-hidden bg-ink text-cream"
+      animate={{ y: dragY, scale: 1 - Math.min(dragY, 400) / 2000, borderRadius: dragY ? 28 : 0 }}
+      transition={press.current?.dragging ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 36 }}
+    >
       <AnimatePresence mode="popLayout">
         <motion.div
           key={slide.key}
@@ -468,43 +574,140 @@ export default function Wrapped() {
         </motion.div>
       </AnimatePresence>
 
-      {/* tap left to go back, right to go on; hold to pause */}
+      {/* tap left to go back, right to go on; hold to pause; swipe down to close */}
       <div
-        className="absolute inset-0 z-10 flex"
-        onPointerDown={() => setPaused(true)}
-        onPointerUp={() => setPaused(false)}
-        onPointerLeave={() => setPaused(false)}
-      >
-        <button className="h-full w-1/3" aria-label="Previous" onClick={() => go(-1)} />
-        <button className="h-full flex-1" aria-label="Next" onClick={() => go(1)} />
-      </div>
+        className="absolute inset-0 z-10 touch-none select-none"
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onContextMenu={(e) => e.preventDefault()}
+        role="button"
+        aria-label="Next"
+      />
 
       {summary && i === slides.length - 1 && <ShareButton summary={summary} />}
 
-      <div className="pt-safe absolute inset-x-0 top-0 z-20 px-3">
+      <motion.div
+        className="pt-safe absolute inset-x-0 top-0 z-20 px-3"
+        animate={{ opacity: paused && !dragY ? 0 : 1 }}
+        transition={{ duration: 0.2 }}
+      >
         <div className="mt-3 flex gap-1">
           {slides.map((s, n) => (
             <div key={s.key} className="h-1 flex-1 overflow-hidden rounded-full bg-cream/25">
-              <motion.div
-                key={n === i ? `on-${i}` : `off-${n}`}
+              <div
+                ref={n === i ? bar : undefined}
                 className="h-full bg-cream"
-                initial={{ width: n < i ? '100%' : '0%' }}
-                animate={{ width: n <= i ? '100%' : '0%' }}
-                transition={
-                  n === i ? { duration: n === slides.length - 1 ? 0.3 : 6.5, ease: 'linear' } : { duration: 0 }
-                }
+                style={{ width: n < i ? '100%' : n === i ? undefined : '0%' }}
               />
             </div>
           ))}
         </div>
         <div className="mt-2 flex items-center justify-between">
           <span className="text-xs text-cream/70">Snug · {year}</span>
-          <button onClick={() => navigate(-1)} className="rounded-full p-2 text-cream/90" aria-label="Close">
+          <button onClick={close} className="rounded-full p-2 text-cream/90" aria-label="Close">
             <CloseIcon width={22} height={22} />
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/** The reader-personality reveal: a shiny card that flips over, with her emblem orbited by sparkles */
+function Persona({ p, traits }: { p: ReturnType<typeof personality>; traits: string[] }) {
+  const [a, b, c] = p.tint;
+  return (
+    <Center>
+      {/* soft coloured glows drifting behind */}
+      {[a, b, c].map((col, i) => (
+        <motion.span
+          key={i}
+          className="pointer-events-none absolute h-64 w-64 rounded-full opacity-40 blur-3xl"
+          style={{ background: col, left: `${[5, 45, 20][i]}%`, top: `${[12, 40, 62][i]}%` }}
+          animate={{ x: [0, 30, -20, 0], y: [0, -25, 15, 0] }}
+          transition={{ duration: 9 + i * 2, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      ))}
+      <Pop>
+        <p className="text-sm tracking-[0.25em] text-cream/70 uppercase">Your reader personality</p>
+      </Pop>
+      <motion.div
+        className="relative mt-6 w-full max-w-[19rem] rounded-[2rem] p-[3px] shadow-2xl"
+        style={{ perspective: 800 }}
+        initial={{ rotateY: 180, scale: 0.6, opacity: 0 }}
+        animate={{ rotateY: 0, scale: 1, opacity: 1 }}
+        transition={{ delay: 0.5, duration: 1.1, type: 'spring', stiffness: 70, damping: 12 }}
+      >
+        {/* a shimmering rainbow edge */}
+        <motion.div
+          className="absolute inset-0 rounded-[2rem]"
+          style={{ background: `conic-gradient(from 0deg, ${a}, ${b}, ${c}, #fff, ${a})` }}
+          animate={{ filter: ['hue-rotate(0deg)', 'hue-rotate(40deg)', 'hue-rotate(0deg)'] }}
+          transition={{ duration: 4, repeat: Infinity }}
+        />
+        <div className="relative overflow-hidden rounded-[calc(2rem-3px)] bg-gradient-to-b from-[#3a2c45] to-[#2a1f33] px-6 pt-8 pb-7">
+          {/* a glint sweeping across the card */}
+          <motion.span
+            className="pointer-events-none absolute inset-y-0 w-16 -skew-x-12 bg-white/15 blur-md"
+            initial={{ left: '-30%' }}
+            animate={{ left: '130%' }}
+            transition={{ delay: 1.6, duration: 1.4, repeat: Infinity, repeatDelay: 2.5 }}
+          />
+          <div className="relative mx-auto grid h-32 w-32 place-items-center">
+            <span
+              className="absolute inset-0 rounded-full blur-xl"
+              style={{ background: `radial-gradient(${a}, transparent 70%)` }}
+            />
+            <motion.div
+              className="absolute inset-0"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+            >
+              {Array.from({ length: 6 }, (_, i) => (
+                <span
+                  key={i}
+                  className="absolute top-1/2 left-1/2 h-2 w-2 rounded-full"
+                  style={{
+                    background: [a, b, c][i % 3],
+                    transform: `rotate(${i * 60}deg) translateX(62px)`,
+                    boxShadow: `0 0 10px ${[a, b, c][i % 3]}`,
+                  }}
+                />
+              ))}
+            </motion.div>
+            <motion.span
+              className="relative text-7xl"
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              {p.emoji}
+            </motion.span>
+          </div>
+          <p
+            className="font-soft mt-5 bg-clip-text text-[2rem] leading-tight font-semibold text-transparent"
+            style={{ backgroundImage: `linear-gradient(90deg, ${a}, #fff, ${c})` }}
+          >
+            {p.name}
+          </p>
+          <p className="mt-2 text-sm text-cream/80">{p.line}</p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            {traits.map((t, i) => (
+              <motion.span
+                key={t}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.6 + i * 0.2 }}
+                className="rounded-full border border-cream/20 bg-cream/10 px-3 py-1 text-xs text-cream"
+              >
+                {t}
+              </motion.span>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+    </Center>
   );
 }
 

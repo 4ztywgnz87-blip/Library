@@ -1,3 +1,4 @@
+import { useKeyboardLift } from '../lib/keyboard';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
@@ -38,6 +39,7 @@ function when(d?: string, upcoming?: boolean) {
 
 /** Details of a book she doesn't have yet, with "+ Wishlist" */
 export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () => void }) {
+  const lift = useKeyboardLift();
   const [details, setDetails] = useState(book);
   const [owned, setOwned] = useState<Book | undefined>();
   const [added, setAdded] = useState(false);
@@ -81,6 +83,7 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
         onClick={onClose}
       />
       <motion.div
+        style={lift}
         className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88dvh] max-w-lg flex-col rounded-t-[1.75rem] bg-cream shadow-2xl md:bottom-8 md:rounded-[1.75rem]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}

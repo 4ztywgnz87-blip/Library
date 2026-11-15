@@ -1,3 +1,4 @@
+import { useKeyboardLift } from '../lib/keyboard';
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,7 +8,17 @@ import type { DayLog } from '../db';
 import { Cover } from './Cover';
 import { Button } from './ui';
 import { ChevronIcon } from './Icons';
-import { addDays, dayKey, logReading, pageBounds, parseDay, streakOf, unlogReading, useDays } from '../lib/streak';
+import {
+  addDays,
+  dayKey,
+  logReading,
+  pageBounds,
+  pagesPerDay,
+  parseDay,
+  streakOf,
+  unlogReading,
+  useDays,
+} from '../lib/streak';
 import { useProfile } from '../lib/profile';
 
 /** A little flame. With `flicker` it breathes gently from its base (centred, no swaying) */
@@ -107,7 +118,7 @@ export function StreakCard({ books }: { books: Book[] }) {
               </span>
               <span
                 className={`grid h-8 w-8 place-items-center rounded-full text-sm transition-colors ${
-                  done ? 'bg-[#f6d27a]/80' : d === today ? 'border-2 border-dashed border-wine/40' : 'bg-linen'
+                  done ? 'bg-[#f6d27a]/80' : d === today ? 'border-2 border-dashed border-[#e08a3f]/70' : 'bg-linen'
                 }`}
               >
                 {done ? <Flame className="h-5 w-4" lit /> : ''}
@@ -124,6 +135,9 @@ export function StreakCard({ books }: { books: Book[] }) {
             className="w-full rounded-full bg-linen px-4 py-2.5 text-sm text-cocoa transition-transform active:scale-[0.98]"
           >
             ✓ Read today: {todayLog.entries.map((e) => (e.page ? `${e.title}, p. ${e.page}` : e.title)).join(' · ')}
+            {(pagesPerDay(days).get(today) ?? 0) > 0 && (
+              <span className="font-medium text-wine"> · that's {pagesPerDay(days).get(today)} pages ✨</span>
+            )}
           </button>
         ) : (
           <Button className="w-full" onClick={() => setSheet(today)}>
@@ -165,6 +179,7 @@ export function LogSheet({
   log?: DayLog;
   onClose: () => void;
 }) {
+  const lift = useKeyboardLift();
   const navigate = useNavigate();
   const days = useDays();
   // the books she's reading first, then the ones waiting on her shelf, then the ones she read
@@ -230,6 +245,7 @@ export function LogSheet({
       <motion.div
         role="dialog"
         aria-modal="true"
+        style={lift}
         className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88dvh] max-w-md overflow-y-auto rounded-t-[1.75rem] bg-cream px-5 pt-5 pb-6 shadow-2xl md:top-[10%] md:bottom-auto md:rounded-[1.75rem]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}

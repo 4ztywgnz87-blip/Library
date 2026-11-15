@@ -72,7 +72,11 @@ export default function Profile() {
             className="rounded-full bg-linen px-4 py-2.5 text-sm font-medium hover:bg-sand"
             onClick={async () => {
               const books = await db.books.filter((b) => !b.deleted).toArray();
-              const data = { exportedAt: new Date().toISOString(), profile: profileForName, books: books.map(({ dirty: _d, ...b }) => b) };
+              const data = {
+                exportedAt: new Date().toISOString(),
+                profile: profileForName,
+                books: books.map(({ dirty: _d, ...b }) => b),
+              };
               const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
               const a = document.createElement('a');
               a.href = url;

@@ -1,3 +1,4 @@
+import { useKeyboardLift } from '../lib/keyboard';
 import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Cover } from '../components/Cover';
@@ -237,6 +238,7 @@ function ClaimSheet({
   onCancel: () => void;
   onClaim: (name: string) => Promise<void>;
 }) {
+  const lift = useKeyboardLift();
   const [who, setWho] = useState(initial);
   const [busy, setBusy] = useState(false);
   return (
@@ -249,6 +251,7 @@ function ClaimSheet({
         onClick={onCancel}
       />
       <motion.div
+        style={lift}
         className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-[1.75rem] bg-cream px-6 pt-6 pb-6 text-center shadow-2xl md:top-1/3 md:bottom-auto md:rounded-[1.75rem]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}

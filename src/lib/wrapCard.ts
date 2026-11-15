@@ -9,7 +9,6 @@ export interface WrapSummary {
   topGenre?: string;
   topAuthor?: string;
   favourite?: Book;
-  persona: string;
   longestStreak?: number;
   covers: Book[];
 }
@@ -106,60 +105,53 @@ export async function wrapCard(s: WrapSummary): Promise<Blob> {
   }
 
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(246,239,230,0.7)';
-  ctx.font = '500 34px "Inter Variable", sans-serif';
-  ctx.fillText('S N U G   P R E S E N T S', W / 2, 150);
   ctx.fillStyle = '#f6efe6';
-  ctx.font = '600 92px "Fraunces Variable", serif';
-  ctx.fillText(s.name ? `${s.name}’s` : 'My', W / 2, 270);
-  ctx.fillText(`${s.year} in books`, W / 2, 375);
+  ctx.font = '600 96px "Fraunces Variable", serif';
+  ctx.fillText(s.name ? `${s.name}’s` : 'My', W / 2, 200);
+  ctx.fillText(`${s.year} in books`, W / 2, 310);
 
   // the covers of the year, fanned out
   const fan = s.covers.slice(0, 5);
   const cw = 230;
   const mid = (fan.length - 1) / 2;
   for (let i = 0; i < fan.length; i++)
-    await drawCover(ctx, fan[i], W / 2 - cw / 2 + (i - mid) * 150, 470 + Math.abs(i - mid) * 22, cw, (i - mid) * 7);
+    await drawCover(ctx, fan[i], W / 2 - cw / 2 + (i - mid) * 150, 420 + Math.abs(i - mid) * 22, cw, (i - mid) * 7);
 
   // the numbers
-  const stat = (value: string, label: string, x: number, y: number) => {
+  const stat = (value: string, label: string, x: number, y: number, size: number) => {
     ctx.fillStyle = '#f6efe6';
-    ctx.font = '600 120px "Fraunces Variable", serif';
+    ctx.font = `600 ${size}px "Fraunces Variable", serif`;
     ctx.fillText(value, x, y);
     ctx.fillStyle = 'rgba(246,239,230,0.75)';
     ctx.font = '400 38px "Inter Variable", sans-serif';
     ctx.fillText(label, x, y + 58);
   };
-  stat(String(s.books), s.books === 1 ? 'book' : 'books', W / 4, 1020);
-  stat(s.pages ? s.pages.toLocaleString('en-GB') : '–', 'pages', (W * 3) / 4, 1020);
+  const stats: [string, string][] = [
+    [String(s.books), s.books === 1 ? 'book' : 'books'],
+    [s.pages ? s.pages.toLocaleString('en-GB') : '–', 'pages'],
+  ];
+  if (s.longestStreak) stats.push([String(s.longestStreak), 'day streak']);
+  stats.forEach(([v, l], i) => stat(v, l, (W / (stats.length * 2)) * (i * 2 + 1), 1000, stats.length > 2 ? 104 : 120));
 
   const rows: [string, string][] = [];
   if (s.topGenre) rows.push(['Genre of the year', s.topGenre]);
   if (s.topAuthor) rows.push(['Favourite author', s.topAuthor]);
   if (s.favourite) rows.push(['Book of the year', s.favourite.title]);
-  if (s.longestStreak) rows.push(['Longest streak', `${s.longestStreak} days 🔥`]);
-  let y = 1180;
+  let y = 1190;
   ctx.textAlign = 'left';
   for (const [k, v] of rows) {
     ctx.fillStyle = 'rgba(246,239,230,0.65)';
-    ctx.font = '400 34px "Inter Variable", sans-serif';
+    ctx.font = '400 36px "Inter Variable", sans-serif';
     ctx.fillText(k, 140, y);
     ctx.fillStyle = '#f6efe6';
-    ctx.font = '600 50px "Fraunces Variable", serif';
-    y += wrap(ctx, v, 140, y + 56, W - 280, 56, 2) * 56 + 54;
+    ctx.font = '600 56px "Fraunces Variable", serif';
+    y += wrap(ctx, v, 140, y + 62, W - 280, 62, 2) * 62 + 70;
   }
 
-  // her reader personality, as a little badge
   ctx.textAlign = 'center';
-  roundRect(ctx, 140, 1690, W - 280, 140, 70);
-  ctx.fillStyle = '#f6efe6';
-  ctx.fill();
-  ctx.fillStyle = '#7A2E3A';
-  ctx.font = '600 52px "Fraunces Variable", serif';
-  ctx.fillText(`📚 ${s.persona}`, W / 2, 1778);
-  ctx.fillStyle = 'rgba(246,239,230,0.6)';
-  ctx.font = '400 30px "Inter Variable", sans-serif';
-  ctx.fillText('made with Snug', W / 2, 1885);
+  ctx.fillStyle = 'rgba(246,239,230,0.75)';
+  ctx.font = '600 44px "Fraunces Variable", serif';
+  ctx.fillText('Snug', W / 2, 1850);
 
   return new Promise((resolve, reject) =>
     c.toBlob((b) => (b ? resolve(b) : reject(new Error('no image'))), 'image/png'),

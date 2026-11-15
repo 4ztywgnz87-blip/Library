@@ -1,4 +1,4 @@
-import { celebrateNewBook } from '../components/AddButton';
+import { useKeyboardLift } from '../lib/keyboard';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -346,6 +346,7 @@ function LoadingTea({ text = 'Looking through the shelves…' }: { text?: string
 }
 
 function AddSheet({ result, existingId, onClose }: { result: SearchResult; existingId?: string; onClose: () => void }) {
+  const lift = useKeyboardLift();
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('owned');
   const [language, setLanguage] = useState<Lang>(result.language ?? 'en');
@@ -375,7 +376,6 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
       finishedAt: status === 'read' && finished === 'this' ? now : undefined,
     });
     if (!book.series || !book.genres.length) void lookupSeries(book); // fills in series/genres in the background
-    celebrateNewBook();
     navigate(status === 'read' ? `/book/${book.id}?rate=1` : `/book/${book.id}`, { replace: true });
   };
 
@@ -389,6 +389,7 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
         onClick={onClose}
       />
       <motion.div
+        style={lift}
         className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto max-w-lg rounded-t-[1.75rem] bg-cream shadow-2xl md:bottom-8 md:rounded-[1.75rem]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}

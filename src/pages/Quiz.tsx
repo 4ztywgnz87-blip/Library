@@ -45,7 +45,17 @@ type Draft = Pick<
   'lovedTropes' | 'hatedTropes' | 'spice' | 'endings' | 'seriesOrStandalone' | 'length' | 'moods'
 >;
 
-function Option({ active, onClick, title, sub }: { active: boolean; onClick: () => void; title: string; sub?: string }) {
+function Option({
+  active,
+  onClick,
+  title,
+  sub,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  sub?: string;
+}) {
   return (
     <button
       onClick={onClick}
@@ -141,9 +151,24 @@ function QuizSteps({ profile }: { profile: ReaderProfile }) {
       title: 'Endings',
       body: (
         <div className="space-y-2">
-          <Option active={draft.endings === 'happy'} onClick={() => set({ endings: 'happy' })} title="Happy ever after, please" sub="I need my HEA" />
-          <Option active={draft.endings === 'bittersweet'} onClick={() => set({ endings: 'bittersweet' })} title="Bittersweet is fine" sub="A little heartbreak makes it real" />
-          <Option active={draft.endings === 'any'} onClick={() => set({ endings: 'any' })} title="Surprise me" sub="Any ending, as long as it's good" />
+          <Option
+            active={draft.endings === 'happy'}
+            onClick={() => set({ endings: 'happy' })}
+            title="Happy ever after, please"
+            sub="I need my HEA"
+          />
+          <Option
+            active={draft.endings === 'bittersweet'}
+            onClick={() => set({ endings: 'bittersweet' })}
+            title="Bittersweet is fine"
+            sub="A little heartbreak makes it real"
+          />
+          <Option
+            active={draft.endings === 'any'}
+            onClick={() => set({ endings: 'any' })}
+            title="Surprise me"
+            sub="Any ending, as long as it's good"
+          />
         </div>
       ),
     },
@@ -151,9 +176,23 @@ function QuizSteps({ profile }: { profile: ReaderProfile }) {
       title: 'Series or standalone?',
       body: (
         <div className="space-y-2">
-          <Option active={draft.seriesOrStandalone === 'series'} onClick={() => set({ seriesOrStandalone: 'series' })} title="Give me a series" sub="I love getting lost in a world" />
-          <Option active={draft.seriesOrStandalone === 'standalone'} onClick={() => set({ seriesOrStandalone: 'standalone' })} title="Standalones" sub="One book, one story" />
-          <Option active={draft.seriesOrStandalone === 'both'} onClick={() => set({ seriesOrStandalone: 'both' })} title="Both are great" />
+          <Option
+            active={draft.seriesOrStandalone === 'series'}
+            onClick={() => set({ seriesOrStandalone: 'series' })}
+            title="Give me a series"
+            sub="I love getting lost in a world"
+          />
+          <Option
+            active={draft.seriesOrStandalone === 'standalone'}
+            onClick={() => set({ seriesOrStandalone: 'standalone' })}
+            title="Standalones"
+            sub="One book, one story"
+          />
+          <Option
+            active={draft.seriesOrStandalone === 'both'}
+            onClick={() => set({ seriesOrStandalone: 'both' })}
+            title="Both are great"
+          />
         </div>
       ),
     },
@@ -161,9 +200,24 @@ function QuizSteps({ profile }: { profile: ReaderProfile }) {
       title: 'Book length',
       body: (
         <div className="space-y-2">
-          <Option active={draft.length === 'short'} onClick={() => set({ length: 'short' })} title="Short & sweet" sub="Under 300 pages" />
-          <Option active={draft.length === 'medium'} onClick={() => set({ length: 'medium' })} title="Just right" sub="300–450 pages" />
-          <Option active={draft.length === 'long'} onClick={() => set({ length: 'long' })} title="Big chunky books" sub="The thicker the better" />
+          <Option
+            active={draft.length === 'short'}
+            onClick={() => set({ length: 'short' })}
+            title="Short & sweet"
+            sub="Under 300 pages"
+          />
+          <Option
+            active={draft.length === 'medium'}
+            onClick={() => set({ length: 'medium' })}
+            title="Just right"
+            sub="300–450 pages"
+          />
+          <Option
+            active={draft.length === 'long'}
+            onClick={() => set({ length: 'long' })}
+            title="Big chunky books"
+            sub="The thicker the better"
+          />
           <Option active={draft.length === 'any'} onClick={() => set({ length: 'any' })} title="Doesn't matter" />
         </div>
       ),
@@ -198,7 +252,11 @@ function QuizSteps({ profile }: { profile: ReaderProfile }) {
             animate={{ width: `${(Math.min(step, steps.length) / steps.length) * 100}%` }}
           />
         </div>
-        <button onClick={() => navigate(-1)} className="rounded-full p-1.5 text-cocoa hover:bg-linen" aria-label="Close quiz">
+        <button
+          onClick={() => navigate(-1)}
+          className="rounded-full p-1.5 text-cocoa hover:bg-linen"
+          aria-label="Close quiz"
+        >
           <CloseIcon />
         </button>
       </div>

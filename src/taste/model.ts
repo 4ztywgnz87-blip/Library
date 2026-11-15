@@ -453,6 +453,12 @@ export interface Reason {
   quiz?: string;
   text: string;
   kind: 'closest' | 'feature' | 'scale' | 'author' | 'series' | 'mood';
+  /** "It has X / It is Y, which you loved in <book> (“quote”)": told together when they share a book */
+  loved?: { pred: string; book: string; quote: string };
+  /** the books a reason names (so a book already mentioned isn't named twice) */
+  books?: LibraryBook[];
+  /** "has slow burn": the reason without the book, for when the book was already named */
+  pred?: string;
 }
 
 export interface Prediction {
@@ -522,6 +528,7 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
     reasons.push({
       value: P.knnWeight * knnDev,
       kind: 'closest',
+      books: closest.map((x) => x.book),
       text:
         knnDev > 0
           ? `It's most like ${listBooks(closest.map((x) => x.book))}`
@@ -544,11 +551,14 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
   const tagTotal = soft(pos, P.tagPosMax) + soft(neg, P.tagNegMax);
   featureHits.sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
   for (const h of featureHits.slice(0, 6)) {
-    const text = featureText(h.f, h.v, h.ev, t, simTo);
+    const { text, loved, books, pred } = featureText(h.f, h.v, h.ev, t, simTo);
     reasons.push({
       value: P.tagWeight * h.v,
       kind: 'feature',
       text,
+      loved,
+      books,
+      pred,
       quiz: h.v > 0 && text.endsWith('a favourite of yours from your quiz') ? quizSay(t.fromQuiz.get(h.f)!) : undefined,
     });
   }
@@ -594,7 +604,8 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
     const v = miss + trend + said;
     scaleSum += v;
     const reason = scaleReason(k, x, miss, said, s, saidBy, simTo);
-    if (reason) reasons.push({ value: P.scaleWeight * reason.value, kind: 'scale', text: reason.text });
+    if (reason)
+      reasons.push({ value: P.scaleWeight * reason.value, kind: 'scale', text: reason.text, loved: reason.loved });
   }
   const scaleTotal = soft(scaleSum, P.scaleMax);
 
@@ -610,6 +621,7 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
         value: authorDev,
         kind: 'author',
         text: `You gave ${a.best.title} by ${c.author} ${fmt(a.best.rating!)}★`,
+        books: [a.best],
       });
     else if (a.worst && authorDev < -0.1)
       reasons.push({
@@ -746,7 +758,7 @@ function scaleReason(
   s: ScaleTaste,
   e: Evidence | undefined,
   simTo: (b: LibraryBook) => number,
-): { value: number; text: string } | undefined {
+): { value: number; text: string; loved?: Reason['loved'] } | undefined {
   const [hi, lo, noun] = SCALE_SAY[k];
   const phrase = x >= 3 ? hi : lo;
   if (Math.abs(said) >= 0.08 && e?.quote) {
@@ -755,7 +767,11 @@ function scaleReason(
       return e.sign > 0
         ? e.wantedMore
           ? { value: said, text: `It ${phrase}: just what you missed in ${e.book.title} (“${e.quote}”)` }
-          : { value: said, text: `It ${phrase}, which you loved in ${e.book.title} (“${e.quote}”)` }
+          : {
+              value: said,
+              text: `It ${phrase}, which you loved in ${e.book.title} (“${e.quote}”)`,
+              loved: { pred: phrase, book: e.book.title, quote: e.quote },
+            }
         : // "none of what bothered you" only matters for books in the same corner
           { value: related ? said : said * 0.4, text: `It ${phrase}, unlike ${e.book.title} (“${e.quote}”)` };
     return e.sign > 0
@@ -856,30 +872,45 @@ function featureName(f: FeatureId) {
   }
 }
 
-function featureText(f: FeatureId, v: number, evidence: Evidence[], t: Taste, simTo: (b: LibraryBook) => number) {
+function featureText(
+  f: FeatureId,
+  v: number,
+  evidence: Evidence[],
+  t: Taste,
+  simTo: (b: LibraryBook) => number,
+): { text: string; loved?: Reason['loved']; books?: LibraryBook[]; pred?: string } {
+  const say = (text: string) => ({ text });
   const name = featureName(f);
   // her own words first, from the book most like this one
   const quoted = evidence
     .filter((e) => e.quote && e.sign > 0 === v > 0)
     .sort((a, b) => b.strength * (0.5 + simTo(b.book)) - a.strength * (0.5 + simTo(a.book)))[0];
   if (quoted)
-    return v > 0
-      ? `It has ${name}, and you wrote “${quoted.quote}” about ${quoted.book.title}`
-      : `It has ${name}, and you wrote “${quoted.quote}” about ${quoted.book.title}`;
+    return {
+      text: `It has ${name}, and you wrote “${quoted.quote}” about ${quoted.book.title}`,
+      loved: v > 0 ? { pred: `has ${name}`, book: quoted.book.title, quote: quoted.quote! } : undefined,
+    };
   const books = evidence
     .filter((e) => e.rating !== undefined && (v > 0 ? e.rating >= t.mean + 0.25 : e.rating <= t.mean - 0.25))
     .sort((a, b) => (v > 0 ? b.rating! - a.rating! : a.rating! - b.rating!) || simTo(b.book) - simTo(a.book))
     .slice(0, 2)
     .map((e) => e.book);
   if (books.length)
-    return v > 0
-      ? `It has ${name}, like ${listBooks(books)}`
-      : `It has ${name}, like ${listBooks(books)}, which you rated lower`;
+    return {
+      text:
+        v > 0
+          ? `It has ${name}, like ${listBooks(books)}`
+          : `It has ${name}, like ${listBooks(books)}, which you rated lower`,
+      books: v > 0 ? books : undefined,
+      pred: `has ${name}`,
+    };
   if (t.fromQuiz.has(f))
-    return v > 0
-      ? `It has ${name}, a favourite of yours from your quiz`
-      : `It has ${name}, which you said in your quiz isn't for you`;
-  return v > 0 ? `It has ${name}, which you love` : `It has ${name}, which isn't really your thing`;
+    return say(
+      v > 0
+        ? `It has ${name}, a favourite of yours from your quiz`
+        : `It has ${name}, which you said in your quiz isn't for you`,
+    );
+  return say(v > 0 ? `It has ${name}, which you love` : `It has ${name}, which isn't really your thing`);
 }
 
 function explain(reasons: Reason[], t: Taste, c: Candidate, stars: number) {
@@ -895,7 +926,13 @@ function explain(reasons: Reason[], t: Taste, c: Candidate, stars: number) {
       .map((r) => `${r.text}.`)
       .join(' ');
     const bright = plus.find((r) => r.kind !== 'closest');
-    return { why, headsUp: undefined, plus: bright ? `On the plus side: ${lower(bright.text)}.` : undefined };
+    // the book was already named above ("it's closest to …"): call it "that one"
+    const named = minus.slice(0, 2).flatMap((r) => r.books?.map((b) => b.title) ?? []);
+    const brightText =
+      bright?.loved && named.length === 1 && named[0] === bright.loved.book
+        ? `it ${bright.loved.pred}, which you did love in that one (“${bright.loved.quote}”)`
+        : bright && lower(bright.text);
+    return { why, headsUp: undefined, plus: bright ? `On the plus side: ${brightText}.` : undefined };
   }
   const sentences: string[] = [];
   const closest = plus.find((r) => r.kind === 'closest');
@@ -910,9 +947,52 @@ function explain(reasons: Reason[], t: Taste, c: Candidate, stars: number) {
     if (!quizNames.includes(r.quiz!)) quizNames.push(r.quiz!);
   }
   let quizSaid = false;
+  // several things she loved in the same book: one sentence, the book named once
+  const lovedIn = new Map<string, Reason[]>();
+  for (const r of plus) if (r.loved) lovedIn.set(r.loved.book, [...(lovedIn.get(r.loved.book) ?? []), r]);
+  const cited = new Set<string>();
+  // "It's most like <book>" opens the explanation: that book is then not named again
+  const opener = sentences.length && closest && sentences[0] === closest.text ? closest.books : undefined;
+  const openerBook = opener?.length === 1 ? opener[0].title : undefined;
+  if (opener) opener.forEach((b) => cited.add(b.title));
   for (const r of plus) {
     if (sentences.length >= 3) break;
     if (used.has(r.text) || r.kind === 'closest' || r.kind === 'series') continue;
+    if (r.kind === 'feature' && r.pred && r.books?.every((b) => cited.has(b.title))) {
+      sentences.push(`It ${r.pred} too`);
+      used.add(r.text);
+      continue;
+    }
+    if (r.kind === 'author' && r.books?.length === 1 && cited.has(r.books[0].title)) {
+      sentences.push(`It's by ${c.author}, just like that one`);
+      used.add(r.text);
+      continue;
+    }
+    if (r.loved) {
+      const group = (lovedIn.get(r.loved.book) ?? []).slice(0, 3);
+      const sameAsOpener = r.loved.book === openerBook;
+      if (cited.has(r.loved.book) && !sameAsOpener) continue;
+      if (sameAsOpener && used.has(`opener:${openerBook}`)) continue;
+      cited.add(r.loved.book);
+      const preds = group.map((g) => g.loved!.pred);
+      const quotes = group.map((g) => `“${g.loved!.quote}”`).join(', ');
+      const what =
+        group.length > 1
+          ? `${preds.slice(0, -1).join(', ')} and ${preds[preds.length - 1]}, ${group.length === 2 ? 'both' : 'all'} things you loved`
+          : `${preds[0]}, which you loved`;
+      if (sameAsOpener) {
+        // fold it into the opening sentence: "It's most like X (4.5★): it has …, things you loved there (…)"
+        sentences[0] = `${closest!.text}, and it ${what} there (${quotes})`;
+        used.add(`opener:${openerBook}`);
+        group.forEach((g) => used.add(g.text));
+        continue;
+      }
+      if (group.length > 1) {
+        sentences.push(`It ${what} in ${r.loved.book} (${quotes})`);
+        group.forEach((g) => used.add(g.text));
+        continue;
+      }
+    }
     if (r.quiz) {
       if (quizSaid) continue;
       quizSaid = true;
@@ -935,6 +1015,12 @@ function explain(reasons: Reason[], t: Taste, c: Candidate, stars: number) {
     else if (minus.length) sentences.push(`Not much here matches what you love`);
     else sentences.push(`Not much is known about ${c.title} yet, so this is a careful guess`);
   }
-  const headsUp = minus[0] && (minus[0].value <= -0.15 || plus.length === 0) ? `${minus[0].text}.` : undefined;
+  const worry = minus[0] && (minus[0].value <= -0.15 || plus.length === 0) ? minus[0] : undefined;
+  let headsUp = worry && `${worry.text}.`;
+  // the book it's most like was already named above: don't name it again
+  if (worry?.kind === 'closest' && worry.books?.length === 1 && cited.has(worry.books[0].title)) {
+    const b = worry.books[0];
+    headsUp = `Overall it's most like that book, and you only gave it ${fmt(b.rating!)}★.`;
+  }
   return { why: sentences.map((s) => `${s}.`).join(' '), headsUp, plus: undefined as string | undefined };
 }

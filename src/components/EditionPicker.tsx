@@ -1,3 +1,4 @@
+import { useKeyboardLift } from '../lib/keyboard';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
@@ -87,6 +88,7 @@ export function EditionPicker({
   onPick: (cover: string) => void;
   onClose: () => void;
 }) {
+  const lift = useKeyboardLift();
   const [options, setOptions] = useState<Option[] | null>(null);
   const [broken, setBroken] = useState<Set<string>>(new Set());
   const [photo, setPhoto] = useState<File | null>(null);
@@ -113,6 +115,7 @@ export function EditionPicker({
         onClick={onClose}
       />
       <motion.div
+        style={lift}
         className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[85dvh] max-w-2xl flex-col rounded-t-[1.75rem] bg-cream shadow-2xl"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
