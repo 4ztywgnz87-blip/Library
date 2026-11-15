@@ -4,8 +4,7 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { searchBooks, fetchOpenLibraryDescription, findDescription, type SearchResult } from '../lib/bookSearch';
-import { useMatches } from '../lib/taste';
-import { profileKey } from '../taste/vocab';
+import { matchFor, useTaste, type Match } from '../lib/taste';
 import { MatchRing, matchLabel } from '../components/MatchRing';
 import { bookKey, newId, normalize, saveBook } from '../lib/library';
 import { useBooks } from '../lib/hooks';
@@ -434,20 +433,21 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
       alive = false;
     };
   }, [result]);
-  // and how well it fits her (this one book is analysed now, once, if Snug hasn't seen it yet)
-  const fitList = useMemo(
-    () => [
-      {
-        title: result.title,
-        author: result.authors[0] ?? '',
-        description: blurb,
-        genres: result.genres,
-        series: result.series,
-      },
-    ],
-    [result, blurb],
-  );
-  const fit = useMatches(fitList).get(profileKey(result.title, result.authors[0] ?? ''));
+  // how well it fits her: only when she taps for it, so she reads the blurb first and a mistap
+  // never makes Snug analyse a book
+  const taste = useTaste();
+  const [fit, setFit] = useState<Match | 'checking' | 'failed' | undefined>();
+  const askFit = async () => {
+    setFit('checking');
+    const m = await matchFor(taste, {
+      title: result.title,
+      author: result.authors[0] ?? '',
+      description: blurb,
+      genres: result.genres,
+      series: result.series,
+    }).catch(() => undefined);
+    setFit(m ?? 'failed');
+  };
 
   const add = async () => {
     setSaving(true);
@@ -512,23 +512,6 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
             </div>
           </div>
 
-          {fit && (
-            <div className="flex gap-3 rounded-2xl bg-white/70 p-3">
-              <div className="flex flex-col items-center">
-                <MatchRing score={fit.score} />
-                <span className="mt-0.5 text-[0.6rem] whitespace-nowrap text-mocha">{matchLabel(fit.score)}</span>
-              </div>
-              <div className="min-w-0 text-sm">
-                <p className="leading-relaxed text-ink/90 select-text">{fit.why}</p>
-                {fit.headsUp && (
-                  <p className="mt-1.5 text-xs leading-relaxed text-cocoa">
-                    <span className="font-medium">Heads up:</span> {fit.headsUp}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
           {blurb ? (
             <div>
               <p className={`text-sm leading-relaxed text-ink/90 select-text ${openBlurb ? '' : 'line-clamp-5'}`}>
@@ -547,6 +530,37 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
               ))}
             </div>
           ) : null}
+
+          {fit && typeof fit === 'object' && (
+            <div className="flex gap-3 rounded-2xl bg-white/70 p-3">
+              <div className="flex flex-col items-center">
+                <MatchRing score={fit.score} />
+                <span className="mt-0.5 text-[0.6rem] whitespace-nowrap text-mocha">{matchLabel(fit.score)}</span>
+              </div>
+              <div className="min-w-0 text-sm">
+                <p className="leading-relaxed text-ink/90 select-text">{fit.why}</p>
+                {fit.headsUp && (
+                  <p className="mt-1.5 text-xs leading-relaxed text-cocoa">
+                    <span className="font-medium">Heads up:</span> {fit.headsUp}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          {!fit && !existingId && (
+            <Button variant="soft" className="w-full" onClick={() => void askFit()}>
+              ✨ Is it my kind of book?
+            </Button>
+          )}
+          {fit === 'checking' && <p className="text-center text-sm text-mocha">Snug is checking…</p>}
+          {fit === 'failed' && (
+            <p className="text-center text-sm text-mocha">
+              Snug couldn't look into this book right now.{' '}
+              <button className="text-wine underline" onClick={() => void askFit()}>
+                Try again
+              </button>
+            </p>
+          )}
 
           {existingId && (
             <div className="rounded-2xl bg-blush px-4 py-3 text-sm text-wine">

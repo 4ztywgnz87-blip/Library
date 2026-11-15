@@ -5,7 +5,7 @@ import { useBooks } from '../lib/hooks';
 import { identifyCover } from '../lib/ai';
 import { matchFor, useTaste } from '../lib/taste';
 import { shrinkPhoto } from '../lib/photo';
-import { sameBook, searchBooks, type SearchResult } from '../lib/bookSearch';
+import { findDescription, sameBook, searchBooks, type SearchResult } from '../lib/bookSearch';
 import { bookKey, normalize } from '../lib/library';
 import { WantButtons } from '../components/WantButtons';
 import type { FitResponse } from '../shared';
@@ -27,7 +27,8 @@ type State =
   | { kind: 'idle' }
   | { kind: 'working'; text: string }
   | { kind: 'owned'; book: Book }
-  | { kind: 'fit'; book: SearchResult; fit: FitResponse }
+  /** the book she looked up: the blurb first, the match score only when she asks for it */
+  | { kind: 'book'; book: SearchResult; fit?: FitResponse; scoring?: boolean }
   | { kind: 'error'; text: string };
 
 export default function Shop() {
@@ -117,18 +118,10 @@ export default function Shop() {
   const check = async (title: string, author: string, picked?: SearchResult, setState = begin()) => {
     const own = books?.find((b) => bookKey(b) === bookKey({ title, authors: [author] }));
     if (own) return setState({ kind: 'owned', book: own });
-    setState({ kind: 'working', text: 'Checking if it fits you…' });
+    // no score yet: she reads what it's about first, and a mistap costs nothing
+    if (picked) return setState({ kind: 'book', book: picked });
+    setState({ kind: 'working', text: 'Looking it up…' });
     try {
-      if (picked) {
-        const fit = await fitCheck({
-          title: picked.title,
-          author: picked.authors[0] ?? author,
-          description: picked.description,
-          genres: picked.genres,
-          series: picked.series,
-        });
-        return setState({ kind: 'fit', book: picked, fit });
-      }
       const results = await searchBooks(`${title} ${author}`);
       const matches = author ? sameBook(results, title, author) : results;
       const found = matches.find((r) => r.coverUrl) ??
@@ -138,17 +131,24 @@ export default function Shop() {
           authors: [author],
           genres: [],
         };
-      const fit = await fitCheck({
-        title: found.title,
-        author: found.authors[0] ?? author,
-        description: found.description,
-        genres: found.genres,
-        series: found.series,
-      });
-      setState({ kind: 'fit', book: found, fit });
+      setState({ kind: 'book', book: found });
     } catch (e) {
       setState({ kind: 'error', text: (e as Error).message });
     }
+  };
+
+  // the match score, only when she taps for it (this is when Snug may analyse the book)
+  const score = async (book: SearchResult, description?: string) => {
+    const setState = begin();
+    setState({ kind: 'book', book, scoring: true });
+    const fit = await fitCheck({
+      title: book.title,
+      author: book.authors[0] ?? '',
+      description: description ?? book.description,
+      genres: book.genres,
+      series: book.series,
+    });
+    setState({ kind: 'book', book, fit });
   };
 
   const fromPhoto = async (file: File) => {
@@ -249,7 +249,15 @@ export default function Shop() {
               <OwnedRow book={state.book} />
             </motion.div>
           )}
-          {state.kind === 'fit' && <FitCard book={state.book} fit={state.fit} />}
+          {state.kind === 'book' && (
+            <ShopBook
+              key={state.book.title + state.book.authors[0]}
+              book={state.book}
+              fit={state.fit}
+              scoring={!!state.scoring}
+              onScore={(description) => void score(state.book, description)}
+            />
+          )}
           {state.kind !== 'idle' && state.kind !== 'working' && (
             <div className="mt-4 text-center">
               <button
@@ -287,60 +295,121 @@ function OwnedRow({ book }: { book: Book }) {
   );
 }
 
-function FitCard({ book, fit }: { book: SearchResult; fit: FitResponse }) {
-  const v = VERDICT[fit.verdict];
-  const r = 34;
-  const circ = 2 * Math.PI * r;
+/** The book she looked up in the shop: what it's about, and her match score once she asks for it */
+function ShopBook({
+  book,
+  fit,
+  scoring,
+  onScore,
+}: {
+  book: SearchResult;
+  fit?: FitResponse;
+  scoring: boolean;
+  onScore: (description?: string) => void;
+}) {
+  const [blurb, setBlurb] = useState(book.description);
+  const [looking, setLooking] = useState(!book.description);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (book.description) return;
+    let alive = true;
+    void findDescription(book)
+      .then((d) => alive && setBlurb(d))
+      .catch(() => {})
+      .finally(() => alive && setLooking(false));
+    return () => {
+      alive = false;
+    };
+  }, [book]);
   return (
     <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
       <Card className="space-y-4">
         <div className="flex gap-4">
           <Cover book={book} className="w-24 shrink-0" />
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg leading-snug font-semibold">{book.title}</h3>
+            <h3 className="text-lg leading-snug font-semibold select-text">{book.title}</h3>
             <p className="text-sm text-cocoa">{book.authors.join(', ')}</p>
-            <div className="mt-3 flex items-center gap-3">
-              <svg width="80" height="80" viewBox="0 0 80 80" className="-rotate-90">
-                <circle cx="40" cy="40" r={r} fill="none" stroke="var(--color-sand)" strokeWidth="7" />
-                <motion.circle
-                  cx="40"
-                  cy="40"
-                  r={r}
-                  fill="none"
-                  stroke={v.color}
-                  strokeWidth="7"
-                  strokeLinecap="round"
-                  strokeDasharray={circ}
-                  initial={{ strokeDashoffset: circ }}
-                  animate={{ strokeDashoffset: circ * (1 - fit.score / 100) }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                />
-              </svg>
-              <div>
-                <p className="font-soft text-3xl font-semibold" style={{ color: v.color }}>
-                  {fit.score}%
-                </p>
-                <p className="text-sm font-medium">{v.label}</p>
-              </div>
-            </div>
+            {book.series && (
+              <p className="mt-1 text-xs text-mocha">
+                {book.series.name}
+                {book.series.number ? ` #${book.series.number}` : ''}
+              </p>
+            )}
           </div>
         </div>
-        <p className="text-sm leading-relaxed select-text">{fit.why}</p>
-        {fit.headsUp && (
-          <p className="rounded-xl bg-linen px-3 py-2 text-sm text-cocoa">
-            <span className="font-medium">Heads up:</span> {fit.headsUp}
-          </p>
+        {blurb ? (
+          <div>
+            <p className={`text-sm leading-relaxed text-ink/90 select-text ${open ? '' : 'line-clamp-6'}`}>{blurb}</p>
+            {blurb.length > 320 && (
+              <button className="mt-1 text-sm text-wine" onClick={() => setOpen(!open)}>
+                {open ? 'Show less' : 'Read more'}
+              </button>
+            )}
+          </div>
+        ) : looking ? (
+          <div className="space-y-2" aria-label="Loading description">
+            {[100, 95, 98, 70].map((w, i) => (
+              <div key={i} className="h-3 animate-pulse rounded-full bg-sand/70" style={{ width: `${w}%` }} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-mocha">No description found.</p>
         )}
-        {fit.seriesNote && <p className="rounded-xl bg-linen px-3 py-2 text-sm text-cocoa">📚 {fit.seriesNote}</p>}
-        {fit.earlyGuess && (
-          <p className="text-xs text-mocha">
-            An early guess: the more books you rate, the better Snug knows your taste.
-          </p>
+        {fit ? (
+          <FitScore fit={fit} />
+        ) : (
+          <Button variant="soft" className="w-full" disabled={scoring} onClick={() => onScore(blurb)}>
+            {scoring ? 'Snug is checking…' : '✨ Is it my kind of book?'}
+          </Button>
         )}
         <div className="flex gap-2">
           <WantButtons size="large" title={book.title} author={book.authors[0] ?? ''} extra={{ coverUrl: book.coverUrl }} />
         </div>
       </Card>
+    </motion.div>
+  );
+}
+
+function FitScore({ fit }: { fit: FitResponse }) {
+  const v = VERDICT[fit.verdict];
+  const r = 34;
+  const circ = 2 * Math.PI * r;
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 border-t border-sand/70 pt-4">
+      <div className="flex items-center gap-3">
+        <svg width="80" height="80" viewBox="0 0 80 80" className="-rotate-90">
+          <circle cx="40" cy="40" r={r} fill="none" stroke="var(--color-sand)" strokeWidth="7" />
+          <motion.circle
+            cx="40"
+            cy="40"
+            r={r}
+            fill="none"
+            stroke={v.color}
+            strokeWidth="7"
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            initial={{ strokeDashoffset: circ }}
+            animate={{ strokeDashoffset: circ * (1 - fit.score / 100) }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+          />
+        </svg>
+        <div>
+          <p className="font-soft text-3xl font-semibold" style={{ color: v.color }}>
+            {fit.score}%
+          </p>
+          <p className="text-sm font-medium">{v.label}</p>
+        </div>
+      </div>
+      <p className="text-sm leading-relaxed select-text">{fit.why}</p>
+      {fit.headsUp && (
+        <p className="rounded-xl bg-linen px-3 py-2 text-sm text-cocoa">
+          <span className="font-medium">Heads up:</span> {fit.headsUp}
+        </p>
+      )}
+      {fit.seriesNote && <p className="rounded-xl bg-linen px-3 py-2 text-sm text-cocoa">📚 {fit.seriesNote}</p>}
+      {fit.earlyGuess && (
+        <p className="text-xs text-mocha">An early guess: the more books you rate, the better Snug knows your taste.</p>
+      )}
     </motion.div>
   );
 }
