@@ -7,7 +7,7 @@ import { isLight, updateSpineColors } from '../lib/coverColor';
 import { hashColor } from '../components/Cover';
 import type { Book, Status } from '../types';
 import { dayKey, useDays } from '../lib/streak';
-import { useFirstVisit } from '../lib/visited';
+import { useFirstVisit, useSeenIds } from '../lib/visited';
 import { Bookend, Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
 import {
   ChristmasTree,
@@ -201,6 +201,7 @@ function ShelfSection({
   decor,
   startDelay,
   entrance,
+  seen,
 }: {
   status: Status;
   label: string;
@@ -208,6 +209,8 @@ function ShelfSection({
   decor?: { el: ReactNode; width: number };
   startDelay: number;
   entrance: boolean;
+  /** books she has already seen here: they don't animate in again */
+  seen: Set<string>;
 }) {
   const navigate = useNavigate();
 
@@ -385,7 +388,7 @@ function ShelfSection({
                     book={it.b}
                     scale={scale}
                     widthFactor={it.factor}
-                    entrance={entrance}
+                    entrance={entrance || !seen.has(it.b.id)}
                     delay={startDelay + Math.min(it.i * 0.025, 0.6)}
                     lean={it.lean}
                     // it rests on the top corner of the book to its left: pivot exactly there
@@ -419,6 +422,10 @@ export default function Shelf() {
           : undefined;
   // the books slide onto the shelf once per visit; coming back, nothing moves
   const firstVisit = useFirstVisit('shelf');
+  const seenBefore = useSeenIds(
+    'shelf',
+    (books ?? []).map((b) => b.id),
+  );
   const byStatus = useMemo(() => {
     const m: Record<Status, Book[]> = { reading: [], owned: [], read: [], wishlist: [] };
     for (const b of books ?? []) m[b.status].push(b);
@@ -555,6 +562,7 @@ export default function Shelf() {
                 decor={decor[shelf.status]}
                 startDelay={i * 0.15}
                 entrance={firstVisit}
+                seen={seenBefore}
               />
             ))}
           </div>

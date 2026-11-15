@@ -78,8 +78,8 @@ export function followedAuthors(books: Book[], favourites: string[], muted: stri
 function recent(date: string | undefined) {
   if (!date) return false;
   const t = Date.parse(date.length === 4 ? `${date}-07-01` : date);
-  // not older than ~6 months, and not an impossible date (a stray "3430" in a listing)
-  return !Number.isNaN(t) && t > Date.now() - 180 * DAY && t < Date.now() + 3 * 365 * DAY;
+  // not older than ~6 months; anything announced counts, except impossible dates (a stray "3430")
+  return !Number.isNaN(t) && t > Date.now() - 180 * DAY && t < Date.now() + 5 * 365 * DAY;
 }
 
 const noArticle = (t: string) => t.replace(/^(the|a|an|de|het|een)\s+/i, '');
@@ -90,6 +90,9 @@ const newsKey = (i: { title: string; author: string }) => bookKey({ title: noArt
 
 const FOREIGN =
   /\b(el|la|los|las|del|un|una|uno|um|uma|nunca|talvez|jamais|día|dia|edición|edicion|especial|alas|de la|le|les|des|une|et|du|der|die|das|und|ein|eine|il|lo|gli|och|og|ja)\b|[áéíóúñãõçâêôàèìòùäöüß¿¡]/i;
+/** A special/deluxe/anniversary… edition is a new printing of an existing book, not a new book */
+const AN_EDITION =
+  /\b(deluxe|special|collector'?s?|anniversary|limited|exclusive|illustrated|signed|reissue|re-?release|new edition|(?:\w+ )?edition)\b/i;
 const NOT_A_NEW_BOOK =
   /\b(box ?set|collection|bind-?up|omnibus|books? \d+\s*[-–&]\s*\d+|\d books|summary|study guide|workbook|journal|colou?ring|calendar|language edition|untitled|tbc|tba)\b|\s\/\s/i;
 
@@ -110,6 +113,7 @@ function isRealNewBook(title: string, authors: string[] | undefined, author: str
   if (!authors?.length || !same(authors[0])) return false;
   if (authors.length > 1) return false; // translations list the translator as second author
   if (NOT_A_NEW_BOOK.test(title)) return false;
+  if (AN_EDITION.test(title)) return false;
   if (FOREIGN.test(title)) return false;
   if (/^[\w\s]+ \d+$/.test(title) && title.split(' ').length <= 3) return false; // "The Empyrean 5"
   return true;
@@ -206,13 +210,9 @@ async function fromOpenLibrary(author: string): Promise<{ items: AuthorNews[]; o
       (d) =>
         d.first_publish_year &&
         d.first_publish_year >= year &&
-        d.first_publish_year <= year + 3 &&
-        // English or Dutch. No language listed is only believable for a book that isn't out yet: the
-        // entries without a language that are already "out" are foreign editions (Portuguese, Polish…)
-        (d.language?.some((l) => l === 'eng' || l === 'dut') ||
-          (!d.language?.length &&
-            (d.first_publish_year > year ||
-              Date.parse(exactDate(d.publish_date, d.first_publish_year)) > Date.now()))) &&
+        d.first_publish_year <= year + 5 &&
+        // English or Dutch, and known to be: an entry without a language is left out
+        d.language?.some((l) => l === 'eng' || l === 'dut') &&
         isRealNewBook(d.title, d.author_name, author),
     )
     .map((d) => {
@@ -231,9 +231,46 @@ async function fromOpenLibrary(author: string): Promise<{ items: AuthorNews[]; o
   return { items, older };
 }
 
+/**
+ * When this book first came out: the earliest date among its English/Dutch editions on Google Books.
+ * A new printing of an old book carries a new date, but the earliest edition tells the truth.
+ * Kept for good (a first publication never changes).
+ */
+async function firstPublished(title: string, author: string): Promise<number | null> {
+  const key = `firstPub:${newsKey({ title, author })}`;
+  const saved = await getMeta<{ t: number | null } | null>(key, null);
+  if (saved) return saved.t;
+  try {
+    const res = await googleBooks(
+      new URLSearchParams({ q: `intitle:"${title}" inauthor:"${author}"`, maxResults: '20', printType: 'books' }),
+    );
+    const json = (await res.json()) as {
+      items?: { volumeInfo: { title?: string; language?: string; publishedDate?: string } }[];
+    };
+    const want = newsKey({ title, author });
+    const dates = (json.items ?? [])
+      .map((x) => x.volumeInfo)
+      .filter(
+        (v) =>
+          v.title &&
+          v.publishedDate &&
+          (!v.language || v.language === 'en' || v.language === 'nl') &&
+          !NOT_A_NEW_BOOK.test(v.title) &&
+          newsKey({ title: baseTitle(v.title), author }) === want,
+      )
+      .map((v) => Date.parse(v.publishedDate!.length === 4 ? `${v.publishedDate}-07-01` : v.publishedDate!))
+      .filter((t) => !Number.isNaN(t) && t > Date.parse('1900-01-01'));
+    const t = dates.length ? Math.min(...dates) : null;
+    await setMeta(key, { t });
+    return t;
+  } catch {
+    return null; // can't tell right now: leave the book in
+  }
+}
+
 /** New and upcoming books by an author, from both sources combined (cached for a day) */
 export async function authorNews(author: string): Promise<AuthorNews[]> {
-  const cacheKey = `authorNews9:${author.toLowerCase()}`; // v8: no foreign editions, no re-issues, no duplicates
+  const cacheKey = `authorNews10:${author.toLowerCase()}`; // v8: no foreign editions, no re-issues, no duplicates
   const cached = await getMeta<{ at: number; items: AuthorNews[] } | null>(cacheKey, null);
   if (cached && Date.now() - cached.at < DAY) return cached.items;
 
@@ -264,7 +301,19 @@ export async function authorNews(author: string): Promise<AuthorNews[]> {
     if (!prev.genres.length) prev.genres = i.genres;
     if (prev.publishedDate.length < i.publishedDate.length) prev.publishedDate = i.publishedDate;
   }
-  const items = [...byBook.values()];
+  const merged = [...byBook.values()];
+
+  // A new printing of an old book isn't a new book: when the earliest edition is older than the
+  // "new" window, it's the same old book (only books that are still to come are always kept)
+  const items: AuthorNews[] = [];
+  for (const item of merged) {
+    if (item.upcoming) {
+      items.push(item);
+      continue;
+    }
+    const first = await firstPublished(item.title, item.author);
+    if (first === null || first > Date.now() - 180 * DAY) items.push(item);
+  }
 
   // Still no cover: borrow one, but only from an English/Dutch edition with exactly this title
   for (const item of items.filter((i) => !i.coverUrl)) {

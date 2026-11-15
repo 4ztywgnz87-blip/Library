@@ -21,6 +21,12 @@ export function bookKey(b: Pick<Book, 'title' | 'authors'>) {
   return `${title}|${normalize(b.authors[0] ?? '')}`;
 }
 
+/** Like bookKey, but "The Ex" and "Ex" (or a new printing under another article) are the same book */
+export function looseKey(b: Pick<Book, 'title' | 'authors'>) {
+  const title = normalize(b.title.split(/[:(]/)[0]).replace(/^(the|a|an|de|het|een)\s+/, '');
+  return `${title}|${normalize(b.authors[0] ?? '')}`;
+}
+
 export async function findExisting(b: Pick<Book, 'title' | 'authors' | 'isbn13'>) {
   const all = await db.books.filter((x) => !x.deleted).toArray();
   const key = bookKey(b);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Book } from '../types';
 import { authorNews, followedAuthors, type AuthorNews } from './authors';
-import { bookKey } from './library';
+import { looseKey } from './library';
 import { useProfile } from './profile';
 
 /** New and upcoming books by the authors she follows, newest first (undefined while loading) */
@@ -29,9 +29,9 @@ export function useAuthorNews(books: Book[] | undefined, favourites: string[]) {
 export function useHave(books: Book[] | undefined) {
   return useMemo(() => {
     const m = new Map<string, Book>();
-    for (const b of books ?? []) if (b.status !== 'wishlist') m.set(bookKey(b), b);
+    for (const b of books ?? []) if (b.status !== 'wishlist') m.set(looseKey(b), b);
     return m;
   }, [books]);
 }
 
-export const keyOf = (b: { title: string; author: string }) => bookKey({ title: b.title, authors: [b.author] });
+export const keyOf = (b: { title: string; author: string }) => looseKey({ title: b.title, authors: [b.author] });

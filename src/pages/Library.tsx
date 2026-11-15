@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db';
 import { useFirstVisit } from '../lib/visited';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { useBooks, useMeta } from '../lib/hooks';
+import { useBooks } from '../lib/hooks';
 import { setMeta } from '../db';
 import { STATUSES, type Book, type Status } from '../types';
 import { Cover } from '../components/Cover';
@@ -38,6 +40,9 @@ function sortBooks(list: Book[], sort: Sort) {
   }
 }
 
+/** the last saved sort, so coming back to the Library needs no waiting at all */
+let lastSort: { v: Sort | null } | undefined;
+
 export default function Library() {
   const books = useBooks();
   const [params, setParams] = useSearchParams();
@@ -49,7 +54,18 @@ export default function Library() {
   const [genre, setGenre] = useState<string | null>(null);
   const [lang, setLang] = useState<'all' | 'en' | 'nl'>('all');
   // The chosen sort order is remembered on this device
-  const savedSort = useMeta<Sort | null>('librarySort', null);
+  // (the list waits for it: showing it in the default order first made every book jump to its place)
+  const sortRow = useLiveQuery(
+    async () => {
+      const v = ((await db.meta.get('librarySort'))?.value as Sort | undefined) ?? null;
+      lastSort = { v };
+      return { v };
+    },
+    [],
+    lastSort,
+  );
+  const sortReady = sortRow !== undefined;
+  const savedSort = sortRow?.v ?? null;
   const sort: Sort = savedSort ?? (tab === 'read' ? 'rating' : 'added');
   const setSort = (s: Sort) => void setMeta('librarySort', s);
   const [showFilters, setShowFilters] = useState(false);
@@ -67,7 +83,7 @@ export default function Library() {
   }, [books]);
 
   const visible = useMemo(() => {
-    if (!books) return [];
+    if (!books || !sortReady) return [];
     const q = normalize(query);
     const filtered = books.filter(
       (b) =>
@@ -78,7 +94,7 @@ export default function Library() {
         (!q || normalize([b.title, ...b.authors, b.series?.name ?? ''].join(' ')).includes(q)),
     );
     return sortBooks(filtered, sort);
-  }, [books, tab, year, query, genre, lang, sort]);
+  }, [books, sortReady, tab, year, query, genre, lang, sort]);
 
   const filtersActive = !!genre || lang !== 'all';
 

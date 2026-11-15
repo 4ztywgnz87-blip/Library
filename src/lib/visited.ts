@@ -14,3 +14,15 @@ export function useFirstVisit(page: string) {
   }, [page]);
   return first;
 }
+
+const seenIds = new Map<string, Set<string>>();
+
+/** The ids shown on this page the last time she was here (so only a newly added book animates in) */
+export function useSeenIds(page: string, ids: string[]) {
+  const [before] = useState(() => new Set(seenIds.get(page)));
+  const key = ids.join();
+  useEffect(() => {
+    seenIds.set(page, new Set(ids));
+  }, [page, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  return before;
+}

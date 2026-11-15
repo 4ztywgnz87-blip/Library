@@ -10,7 +10,7 @@ import { Cover } from '../components/Cover';
 import { StarsDisplay, StarsInput, formatRating } from '../components/Stars';
 import { Button, Card, Chip, PageHeader, Segmented } from '../components/ui';
 import { CoverChoice } from '../components/CoverChoice';
-import { ChevronIcon, TrashIcon } from '../components/Icons';
+import { ChevronIcon, CloseIcon, TrashIcon } from '../components/Icons';
 import { EditionPicker } from '../components/EditionPicker';
 import { ConfirmSheet } from '../components/ConfirmSheet';
 import { lookupSeries, setGenreForSeries } from '../lib/seriesLookup';
@@ -587,16 +587,33 @@ function BuyLink({ book }: { book: Book }) {
   return (
     <label className="block text-xs text-cocoa">
       Link to the right edition <span className="text-mocha">(for your shared wishlist)</span>
-      <input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        type="url"
-        inputMode="url"
-        placeholder="Paste a shop link, e.g. from bol.com"
-        className={`mt-1 w-full rounded-2xl border bg-white/80 px-3 py-2.5 text-base text-ink ${valid ? 'border-sand' : 'border-wine'}`}
-      />
+      <div className="relative mt-1">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+          type="url"
+          inputMode="url"
+          placeholder="Paste a shop link, e.g. from bol.com"
+          className={`w-full rounded-2xl border bg-white/80 py-2.5 pr-10 pl-3 text-ink ${valid ? 'border-sand' : 'border-wine'}`}
+        />
+        {value && (
+          <button
+            type="button"
+            aria-label="Clear the link"
+            // pointerdown so the field's own blur doesn't save the old link first
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setValue('');
+              if (book.buyUrl) void updateBook(book.id, { buyUrl: undefined });
+            }}
+            className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1.5 text-mocha hover:bg-sand"
+          >
+            <CloseIcon width={16} height={16} />
+          </button>
+        )}
+      </div>
       {!valid && <span className="mt-1 block text-wine">That doesn't look like a link</span>}
     </label>
   );
