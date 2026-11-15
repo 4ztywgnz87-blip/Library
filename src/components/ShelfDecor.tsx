@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { AnimatePresence, animate, motion, useMotionValue } from 'motion/react';
+import { AnimatePresence, animate, motion, useMotionValue, useTransform } from 'motion/react';
 import { CatHat, SEASON_LIGHTS, type Season } from './Seasonal';
 
 /** A terracotta pot with a leafy plant that sways gently */
@@ -816,13 +816,13 @@ export function HangingPlant({ className = '' }: { className?: string }) {
 export function Globe({ className = '' }: { className?: string }) {
   const id = useId();
   // The land's position: it drifts slowly all the time; a tap sends it round quickly, then it settles
-  // back into the slow drift from wherever it stopped (the pattern repeats every 40, so there's no jump)
+  // back into the slow drift from wherever it stopped
   const x = useMotionValue(0);
   const drift = useRef<{ stop: () => void } | null>(null);
+  // what is drawn is the position folded into one pattern width, so the land never runs out behind the sphere
+  const shown = useTransform(x, (v) => (((v % 40) + 40) % 40) - 40);
   const startDrift = () => {
-    const from = x.get() % 40;
-    x.set(from);
-    drift.current = animate(x, from - 40, { duration: 30, ease: 'linear', onComplete: startDrift });
+    drift.current = animate(x, x.get() - 40, { duration: 30, ease: 'linear', onComplete: startDrift });
   };
   useEffect(() => {
     startDrift();
@@ -873,7 +873,7 @@ export function Globe({ className = '' }: { className?: string }) {
       {/* the sphere with its turning land */}
       <circle cx="25" cy="30" r="17.5" fill={`url(#${id}sea)`} />
       <g clipPath={`url(#${id}clip)`}>
-        <motion.g style={{ x }}>
+        <motion.g style={{ x: shown }}>
           <g transform="translate(-5 0)">{land}</g>
           <g transform="translate(35 0)">{land}</g>
           <g transform="translate(75 0)">{land}</g>
