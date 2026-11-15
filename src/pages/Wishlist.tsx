@@ -21,9 +21,14 @@ export default function Wishlist() {
     <div>
       <PageHeader back title="Wishlist" />
       <div className="mx-auto max-w-4xl px-4 pb-10">
-        <p className="-mt-1 mb-5 text-sm text-cocoa">Books you're dreaming of. Got one? Tap “Got it!” and it moves onto your shelf.</p>
+        <p className="-mt-1 mb-4 text-sm text-cocoa">
+          Books you're dreaming of. Got one? Tap “Got it!” and it moves onto your shelf.
+        </p>
+        {wishes.length > 0 && <ShareWishlist />}
         {wishes.length === 0 ? (
-          <EmptyState title="Nothing on your wishlist">Add books you want with “+ Wishlist” anywhere in Snug.</EmptyState>
+          <EmptyState title="Nothing on your wishlist">
+            Add books you want with “+ Wishlist” anywhere in Snug.
+          </EmptyState>
         ) : (
           <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5">
             <AnimatePresence>
@@ -62,6 +67,69 @@ export default function Wishlist() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Send her wishlist to family and friends: a cute page with the language of each book, and gift reservations */
+function ShareWishlist() {
+  const [state, setState] = useState<'idle' | 'busy' | 'copied' | 'error'>('idle');
+  const [more, setMore] = useState(false);
+  const share = async (renew = false) => {
+    setState('busy');
+    try {
+      const res = await fetch('/api/share/wishlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ renew }),
+      });
+      const { token } = (await res.json()) as { token: string };
+      const url = `${location.origin}/w/${token}`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'My book wishlist 📚', text: 'The books I’m dreaming of 💛', url });
+          setState('idle');
+          return;
+        } catch (e) {
+          if ((e as Error).name === 'AbortError') return setState('idle');
+        }
+      }
+      await navigator.clipboard.writeText(url);
+      setState('copied');
+    } catch {
+      setState('error');
+    }
+  };
+  return (
+    <div className="mb-6 rounded-[var(--radius-card)] bg-blush/50 p-4">
+      <div className="flex items-center gap-3">
+        <span className="text-3xl">🎁</span>
+        <div className="min-w-0 flex-1">
+          <p className="font-soft text-lg leading-tight font-semibold">Share your wishlist</p>
+          <p className="text-xs text-cocoa">
+            A cute page for family and friends, with the language of each book. They can reserve a gift, and you won’t
+            see which.
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <Button className="px-4 py-2 text-sm" disabled={state === 'busy'} onClick={() => void share()}>
+          {state === 'copied' ? 'Link copied ✓' : 'Share link'}
+        </Button>
+        <button className="text-xs text-mocha underline" onClick={() => setMore(!more)}>
+          {more ? 'close' : 'more'}
+        </button>
+      </div>
+      {state === 'error' && <p className="mt-2 text-xs text-wine">That didn’t work. Are you online?</p>}
+      {more && (
+        <p className="mt-3 text-xs text-cocoa">
+          Sent it to the wrong person?{' '}
+          <button className="text-wine underline" onClick={() => void share(true)}>
+            Make a new link
+          </button>{' '}
+          and the old one stops working.
+        </p>
+      )}
     </div>
   );
 }

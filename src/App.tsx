@@ -15,10 +15,18 @@ import Stats from './pages/Stats';
 import Wishlist from './pages/Wishlist';
 import NewBooksPage from './pages/NewBooksPage';
 import StreakPage from './pages/StreakPage';
+import SharedWishlist from './pages/SharedWishlist';
 import { startBackgroundSync } from './lib/sync';
 import { backfillSeries, harmonizeSeriesGenres } from './lib/seriesLookup';
 
 export default function App() {
+  // a shared wishlist link: show only that, without syncing her library into a guest's browser
+  const shared = location.pathname.match(/^\/w\/([\w-]+)/);
+  if (shared) return <SharedWishlist token={shared[1]} />;
+  return <MainApp />;
+}
+
+function MainApp() {
   useEffect(() => {
     const stop = startBackgroundSync();
     // fill in series for older books in the background, once the app has settled

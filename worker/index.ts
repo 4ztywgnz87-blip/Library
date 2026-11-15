@@ -299,6 +299,92 @@ app.post('/ai/series', async (c) => {
   return aiRoute(c, () => seriesInfo(c.env, name, author ?? ''));
 });
 
+// ---------- her shareable wishlist ----------
+// A secret link she can send to family and friends. It shows only her wishlist (no reviews, nothing else),
+// and lets givers quietly reserve a gift so nobody buys the same book twice. Snug itself never asks who
+// reserved what, so the surprise stays a surprise.
+
+async function shareToken(env: Env) {
+  return (
+    await env.DB.prepare('SELECT token FROM wish_shares WHERE revoked = 0 ORDER BY created_at DESC LIMIT 1').first<{
+      token: string;
+    }>()
+  )?.token;
+}
+
+app.get('/share/wishlist', async (c) => c.json({ token: (await shareToken(c.env)) ?? null }));
+
+/** Make the link (or, with `renew`, a new one that replaces the old link) */
+app.post('/share/wishlist', async (c) => {
+  const { renew } = await c.req.json<{ renew?: boolean }>().catch(() => ({ renew: false }));
+  const existing = await shareToken(c.env);
+  if (existing && !renew) return c.json({ token: existing });
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  const token = btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE wish_shares SET revoked = 1'),
+    c.env.DB.prepare('INSERT INTO wish_shares (token, created_at) VALUES (?, ?)').bind(token, Date.now()),
+  ]);
+  return c.json({ token });
+});
+
+async function validShare(env: Env, token: string) {
+  return !!(await env.DB.prepare('SELECT 1 FROM wish_shares WHERE token = ? AND revoked = 0').bind(token).first());
+}
+
+app.get('/wish/:token', async (c) => {
+  const token = c.req.param('token');
+  if (!(await validShare(c.env, token))) return c.json({ error: 'This wishlist link is no longer active' }, 404);
+  const { books, profile } = await loadLibrary(c.env);
+  const { results: claims } = await c.env.DB.prepare('SELECT book_id, name FROM wish_claims WHERE token = ?')
+    .bind(token)
+    .all<{ book_id: string; name: string }>();
+  const claimed = new Map(claims.map((r) => [r.book_id, r.name]));
+  const wishes = books
+    .filter((b) => b.status === 'wishlist' && !b.deleted)
+    .sort((a, b) => b.addedAt - a.addedAt)
+    .map((b) => ({
+      id: b.id,
+      title: b.title,
+      author: b.authors[0] ?? '',
+      coverUrl: b.coverUrl,
+      // her own photo of a special edition, only when it's small enough to send along
+      customCover: b.customCover && b.customCover.length < 250_000 ? b.customCover : undefined,
+      language: b.language,
+      specialEdition: b.specialEdition,
+      series: b.series,
+      isbn13: b.isbn13,
+      pageCount: b.pageCount,
+      claimedBy: claimed.get(b.id) ?? null,
+    }));
+  return c.json({ name: profile?.name ?? '', books: wishes });
+});
+
+app.post('/wish/:token/claim', async (c) => {
+  const token = c.req.param('token');
+  if (!(await validShare(c.env, token))) return c.json({ error: 'This wishlist link is no longer active' }, 404);
+  const { bookId, name } = await c.req.json<{ bookId?: string; name?: string }>();
+  const who = (name ?? '').trim().slice(0, 40);
+  if (!bookId || !who) return c.json({ error: 'Name missing' }, 400);
+  const res = await c.env.DB.prepare(
+    'INSERT INTO wish_claims (token, book_id, name, claimed_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+  )
+    .bind(token, bookId, who, Date.now())
+    .run();
+  if (!res.meta.changes) return c.json({ error: 'Someone else has just reserved this one' }, 409);
+  return c.json({ ok: true });
+});
+
+app.delete('/wish/:token/claim/:bookId', async (c) => {
+  await c.env.DB.prepare('DELETE FROM wish_claims WHERE token = ? AND book_id = ?')
+    .bind(c.req.param('token'), c.req.param('bookId'))
+    .run();
+  return c.json({ ok: true });
+});
+
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
 
 // ---------- the app itself ----------
@@ -322,6 +408,17 @@ function serveStatic(req: Request): Response {
   const path = ASSETS[pathname] ? pathname : '/index.html';
   const a = asset(path)!;
   const immutable = path.startsWith('/assets/');
+  // a shared wishlist gets its own preview card in WhatsApp and Messages
+  if (pathname.startsWith('/w/')) {
+    const html = new TextDecoder()
+      .decode(a.bytes)
+      .replace(/<title>[^<]*<\/title>/, '<title>A little wishlist 📚</title>')
+      .replace(
+        '</head>',
+        '<meta property="og:title" content="A little wishlist 📚"><meta property="og:description" content="The books on her wishlist, and which language to get them in. Reserve one so nobody buys it twice."><meta name="robots" content="noindex"></head>',
+      );
+    return new Response(html, { headers: { 'Content-Type': a.type, 'Cache-Control': 'no-cache' } });
+  }
   return new Response(a.bytes, {
     headers: {
       'Content-Type': a.type,
