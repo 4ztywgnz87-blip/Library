@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Book } from '../types';
 import { authorNews, followedAuthors, type AuthorNews } from './authors';
 import { bookKey } from './library';
+import { useProfile } from './profile';
 
 /** New and upcoming books by the authors she follows, newest first (undefined while loading) */
 export function useAuthorNews(books: Book[] | undefined, favourites: string[]) {
-  const authors = books ? followedAuthors(books, favourites).slice(0, 10) : [];
+  const muted = useProfile().mutedAuthors ?? [];
+  const authors = books ? followedAuthors(books, favourites, muted).slice(0, 14) : [];
   const authorsKey = authors.join('|');
   const [items, setItems] = useState<AuthorNews[] | undefined>(undefined);
   useEffect(() => {

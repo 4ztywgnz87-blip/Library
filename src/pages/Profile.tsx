@@ -4,7 +4,6 @@ import { db } from '../db';
 import { useMeta } from '../lib/hooks';
 import { syncNow } from '../lib/sync';
 import { Card } from '../components/ui';
-import { FavouriteAuthorsCard } from '../components/FavouriteAuthors';
 import { useLending } from '../lib/lending';
 import { Link } from 'react-router-dom';
 import { aiStatus, setAiPause } from '../lib/ai';
@@ -50,7 +49,15 @@ export default function Profile() {
 
         <LentLink />
 
-        <FavouriteAuthorsCard />
+        <Link to="/authors" className="block">
+          <Card className="flex items-center gap-3">
+            <span className="text-2xl">✍️</span>
+            <div className="flex-1">
+              <p className="font-soft text-lg">Authors & genres</p>
+              <p className="text-sm text-cocoa">Who Snug keeps an eye out for, and your own genres.</p>
+            </div>
+          </Card>
+        </Link>
 
         <Link to="/quiz" className="block">
           <Card className="flex items-center gap-3">

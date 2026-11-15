@@ -11,7 +11,8 @@ import { sameBook, searchBooks } from '../lib/bookSearch';
 import { updateBook } from '../lib/library';
 import { quickAdd } from '../lib/quickAdd';
 import { MOODS, type Pick, type RecommendRequest } from '../shared';
-import { GENRES, type Book } from '../types';
+import type { Book } from '../types';
+import { useGenreList } from '../lib/profile';
 import { Cover } from '../components/Cover';
 import { Button, Card, Chip, PageHeader } from '../components/ui';
 import { SparkleIcon } from '../components/Icons';
@@ -34,12 +35,13 @@ export default function Next() {
   const [error, setError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  const genreList = useGenreList();
   // Genres she actually reads first, then the rest
   const genres = useMemo(() => {
     const count = new Map<string, number>();
     for (const b of books ?? []) for (const g of b.genres) count.set(g, (count.get(g) ?? 0) + 1);
-    return [...new Set([...[...count.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g), ...GENRES])];
-  }, [books]);
+    return [...new Set([...[...count.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g), ...genreList])];
+  }, [books, genreList]);
 
   const unread = (books ?? []).filter((b) => b.status === 'owned').length;
 

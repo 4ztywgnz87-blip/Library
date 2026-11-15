@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getMeta, setMeta } from '../db';
 import { DEFAULT_FAVOURITE_AUTHORS, type ReaderProfile } from '../shared';
 import { scheduleSync } from './sync';
+import { GENRES } from '../types';
 
 export const EMPTY_PROFILE: ReaderProfile = {
   lovedTropes: [],
@@ -33,4 +34,10 @@ export async function updateProfile(patch: Partial<ReaderProfile>) {
   await setMeta('profile', { ...current, ...patch, updatedAt: Date.now() });
   await setMeta('profileDirty', true);
   scheduleSync();
+}
+
+/** Snug's genres plus the ones she added herself */
+export function useGenreList(): string[] {
+  const custom = useProfile().customGenres ?? [];
+  return [...GENRES, ...custom.filter((g) => !(GENRES as readonly string[]).includes(g))];
 }

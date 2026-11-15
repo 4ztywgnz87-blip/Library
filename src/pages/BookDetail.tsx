@@ -4,7 +4,8 @@ import { seriesPath } from '../lib/series';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBook } from '../lib/hooks';
 import { deleteBook, updateBook } from '../lib/library';
-import { GENRES, STATUSES, type Book, type Status } from '../types';
+import { STATUSES, type Book, type Status } from '../types';
+import { useGenreList } from '../lib/profile';
 import { Cover } from '../components/Cover';
 import { StarsDisplay, StarsInput, formatRating } from '../components/Stars';
 import { Button, Card, Chip, PageHeader, Segmented } from '../components/ui';
@@ -43,6 +44,7 @@ export default function BookDetail() {
   const [pickingEdition, setPickingEdition] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [logging, setLogging] = useState(false);
+  const genreList = useGenreList();
   const days = useDays();
   const ratingRef = useRef<HTMLDivElement>(null);
 
@@ -224,7 +226,7 @@ export default function BookDetail() {
               Genres{book.series && <span className="normal-case tracking-normal"> · for the whole series</span>}
             </p>
             <div className="flex flex-wrap gap-2">
-              {[...new Set([...GENRES, ...book.genres])].map((g) => {
+              {[...new Set([...genreList, ...book.genres])].map((g) => {
                 const on = book.genres.includes(g);
                 return (
                   <Chip key={g} active={on} onClick={() => setGenreForSeries(book, g, !on)}>

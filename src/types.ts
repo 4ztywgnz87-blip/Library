@@ -17,6 +17,7 @@ export const GENRES = [
   'Thriller',
   'Mystery',
   'Fiction',
+  'Literature',
   'Historical',
   'Sci-fi',
   'Young adult',

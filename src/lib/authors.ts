@@ -25,23 +25,46 @@ export interface AuthorNews {
 
 const DAY = 86_400_000;
 
-/** Authors she follows: her chosen favourites plus authors she clearly loves */
-export function followedAuthors(books: Book[], favourites: string[]) {
-  const stats = new Map<string, { count: number; ratingSum: number; rated: number }>();
+export interface AutoAuthor {
+  name: string;
+  /** why Snug follows this author, in her words ("3 books in your library") */
+  reason: string;
+}
+
+/**
+ * Authors Snug follows by itself: those she has more than one book of, and those of whom a single
+ * book got an exceptional rating (4.5★ or more). Wishlist books don't count.
+ */
+export function autoAuthors(books: Book[]): AutoAuthor[] {
+  const stats = new Map<string, { count: number; best?: Book }>();
   for (const b of books) {
     const a = b.authors[0];
-    if (!a) continue;
-    const s = stats.get(a) ?? { count: 0, ratingSum: 0, rated: 0 };
+    if (!a || b.status === 'wishlist') continue;
+    const s = stats.get(a) ?? { count: 0 };
     s.count++;
-    if (b.rating !== undefined) {
-      s.ratingSum += b.rating;
-      s.rated++;
-    }
+    if (b.rating !== undefined && (!s.best || b.rating > s.best.rating!)) s.best = b;
     stats.set(a, s);
   }
-  const auto = [...stats.entries()]
-    .filter(([, s]) => s.count >= 3 || (s.rated >= 1 && s.ratingSum / s.rated >= 4.5))
-    .map(([a]) => a);
+  return [...stats.entries()]
+    .map(([name, s]) => ({ name, s, loved: s.best && s.best.rating! >= 4.5 }))
+    .filter((x) => x.s.count >= 2 || x.loved)
+    .sort((a, b) => Number(!!b.loved) - Number(!!a.loved) || b.s.count - a.s.count)
+    .map(({ name, s, loved }) => ({
+      name,
+      reason: loved
+        ? `you gave ${s.best!.title} ${s.best!.rating}★${s.count > 1 ? ` · ${s.count} books` : ''}`
+        : `${s.count} books in your library`,
+    }));
+}
+
+const sameAuthor = (a: string, b: string) =>
+  a.toLowerCase().replace(/[^a-z]/g, '') === b.toLowerCase().replace(/[^a-z]/g, '');
+
+/** Authors she follows: her chosen favourites plus the ones Snug follows by itself (minus the ones she muted) */
+export function followedAuthors(books: Book[], favourites: string[], muted: string[] = []) {
+  const auto = autoAuthors(books)
+    .map((a) => a.name)
+    .filter((a) => !muted.some((m) => sameAuthor(m, a)));
   const seen = new Set<string>();
   return [...favourites, ...auto].filter((a) => {
     const k = a.toLowerCase().replace(/[^a-z]/g, '');

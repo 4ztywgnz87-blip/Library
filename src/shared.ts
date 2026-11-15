@@ -12,6 +12,10 @@ export interface ReaderProfile {
   length: 'short' | 'medium' | 'long' | 'any';
   moods: string[];
   favouriteAuthors: string[];
+  /** Authors Snug follows by itself that she doesn't want to hear about */
+  mutedAuthors?: string[];
+  /** Genres she added herself, next to Snug's own list */
+  customGenres?: string[];
   /** Books she said "not for me" to */
   notForMe: string[];
   completedAt?: number;

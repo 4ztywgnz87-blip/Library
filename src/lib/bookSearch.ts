@@ -19,6 +19,7 @@ const GENRE_PATTERNS: [string, RegExp][] = [
   ['Mystery', /mystery|detective|crime|whodunit/],
   ['Historical', /histor/],
   ['Sci-fi', /science fiction|sci-fi|dystop/],
+  ['Literature', /literary fiction|literature|literatuur|\bclassics?\b|contemporary fiction/],
   ['Young adult', /young adult fiction|juvenile fiction|\bya\b|teen fiction/],
 ];
 
