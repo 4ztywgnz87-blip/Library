@@ -60,6 +60,10 @@ export type Mood = 'light' | 'swoony' | 'spicy' | 'cry' | 'tense' | 'epic' | 'qu
 
 // ---------- tuning (set by evaluation on test readers; see PLAN.md) ----------
 
+/**
+ * Tuned on her own 25 rated books (leave-one-out, checked with a nested test so the tuning itself
+ * was never shown the book it predicts): average error 0.47★ → 0.38★, right order 67% → 76%.
+ */
 export const PARAMS = {
   priorMean: 3.75,
   priorWeight: 2,
@@ -75,15 +79,15 @@ export const PARAMS = {
   scaleTolerance: 1.4,
   scalePenalty: 0.05,
   scaleSlope: 0.44,
-  scaleDirection: 0.2,
+  scaleDirection: 0.05,
   scaleMax: 1.3,
   knnK: 4,
   knnPower: 3.75,
-  knnWeight: 1.25,
-  tagWeight: 0.5,
-  scaleWeight: 0.95,
+  knnWeight: 0.6,
+  tagWeight: 0.15,
+  scaleWeight: 1.4,
   authorShrink: 1.5,
-  seriesWeight: 0.85,
+  seriesWeight: 0.3,
   gain: 0.5,
   /** > 0: learn all tag weights together (ridge regression) instead of one by one */
   ridge: 4,

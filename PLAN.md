@@ -270,3 +270,8 @@ Na elke fase krijgt ze een link om te testen, zodat ze kan meedenken.
 - Werkwijze: telkens één beoordeeld boek (en de review ervan) weglaten, laten voorspellen en vergelijken met haar eigen score.
 - Uitvoer: de gemiddelde fout, hoeveel boeken binnen een halve ster vallen, de juiste volgorde, en de grootste missers met uitleg.
 - Gebruikt geen AI en verandert niets.
+
+**Test op haar eigen smaak (november 2026):** 25 beoordeelde boeken, telkens één weggelaten (score én review) en voorspeld.
+Afgesteld met een geneste test (de afstelling zag het voorspelde boek nooit): gemiddelde fout 0,47★ → 0,38★,
+binnen een halve ster 56% → 64–68%, juiste volgorde 67% → 76%. Haar reviews en de lijst-eigenschappen
+(spanning, humor, donker…) wegen nu zwaarder dan tropen, reeksgemiddelde en "lijkt op".
