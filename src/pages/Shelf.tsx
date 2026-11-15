@@ -7,6 +7,7 @@ import { isLight, updateSpineColors } from '../lib/coverColor';
 import { hashColor } from '../components/Cover';
 import type { Book, Status } from '../types';
 import { dayKey, useDays } from '../lib/streak';
+import { euro, shelfValue } from '../lib/value';
 import { Bookend, Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
 import {
   ChristmasTree,
@@ -410,6 +411,7 @@ export default function Shelf() {
         : days && new Date().getHours() >= 17
           ? 'peek'
           : undefined;
+  const value = shelfValue(books ?? []);
   const byStatus = useMemo(() => {
     const m: Record<Status, Book[]> = { reading: [], owned: [], read: [], wishlist: [] };
     for (const b of books ?? []) m[b.status].push(b);
@@ -552,20 +554,31 @@ export default function Shelf() {
 
         {/* base: plinth, a curved apron and little bun feet */}
         <div className="-mx-2 h-3 bg-gradient-to-b from-[#a7754d] to-[#7d5236] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]" />
-        <svg
-          viewBox="0 0 400 24"
-          preserveAspectRatio="none"
-          className="-mx-1 block h-6 w-[calc(100%+0.5rem)]"
-          aria-hidden
-        >
-          <defs>
-            <linearGradient id="apron" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#7d5236" />
-              <stop offset="1" stopColor="#5f3d28" />
-            </linearGradient>
-          </defs>
-          <path d="M0 0h400v24h-34c-10 0-14-13-30-13H64c-16 0-20 13-30 13H0z" fill="url(#apron)" />
-        </svg>
+        <div className="relative">
+          <svg
+            viewBox="0 0 400 24"
+            preserveAspectRatio="none"
+            className="-mx-1 block h-6 w-[calc(100%+0.5rem)]"
+            aria-hidden
+          >
+            <defs>
+              <linearGradient id="apron" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#7d5236" />
+                <stop offset="1" stopColor="#5f3d28" />
+              </linearGradient>
+            </defs>
+            <path d="M0 0h400v24h-34c-10 0-14-13-30-13H64c-16 0-20 13-30 13H0z" fill="url(#apron)" />
+          </svg>
+          {/* a little brass plate: what the bookcase is worth (tap for the details) */}
+          {value.books > 0 && (
+            <Link
+              to="/stats"
+              className="absolute top-[3px] left-1/2 -translate-x-1/2 rounded-[3px] bg-gradient-to-b from-[#e2c48a] via-[#c9a465] to-[#a9824b] px-3 py-px font-soft text-[10px] font-semibold whitespace-nowrap text-[#3b2a22] shadow-[0_1px_2px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.45)]"
+            >
+              worth ≈ {euro(value.total)}
+            </Link>
+          )}
+        </div>
         <div className="-mt-1 flex justify-between px-1">
           <div className="h-3 w-9 rounded-b-full bg-gradient-to-b from-[#6b4630] to-[#4f3222]" />
           <div className="h-3 w-9 rounded-b-full bg-gradient-to-b from-[#6b4630] to-[#4f3222]" />

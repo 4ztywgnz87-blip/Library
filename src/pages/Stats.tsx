@@ -6,6 +6,7 @@ import type { Book } from '../types';
 import { Card, Chip, PageHeader } from '../components/ui';
 import { EmptyState } from '../components/SleepyCat';
 import { formatRating } from '../components/Stars';
+import { euro, shelfValue } from '../lib/value';
 
 const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const MONTH_NAMES = [
@@ -137,6 +138,8 @@ export default function Stats() {
     <div>
       <PageHeader back title="My reading" />
       <div className="mx-auto max-w-3xl space-y-5 px-4 pb-10">
+        <ShelfValue books={books} />
+
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
           {years.map((y) => (
             <Chip key={y} active={year === y} onClick={() => setYear(y)}>
@@ -222,5 +225,25 @@ export default function Stats() {
         )}
       </div>
     </div>
+  );
+}
+
+/** What the bookcase is worth: her own prices plus an estimate for the rest */
+function ShelfValue({ books }: { books: Book[] }) {
+  const v = shelfValue(books);
+  if (!v.books) return null;
+  return (
+    <Card className="flex items-center gap-3">
+      <span className="text-3xl">💰</span>
+      <div className="min-w-0">
+        <p className="text-xs tracking-wide text-mocha uppercase">Value of your bookcase</p>
+        <p className="font-soft text-2xl font-semibold">≈ {euro(v.total)}</p>
+        <p className="text-xs text-cocoa">
+          {v.books} books
+          {v.priced > 0 ? ` · ${v.priced} with a price you filled in` : ''}
+          {v.unpriced > 0 ? ` · the other ${v.unpriced} estimated at ${euro(v.estimate)} each` : ''}
+        </p>
+      </div>
+    </Card>
   );
 }

@@ -171,7 +171,7 @@ app.get('/series-books', async (c) => c.json({ books: await seriesParts(c.req.qu
 
 app.get('/gbooks', async (c) => {
   const params = new URLSearchParams();
-  for (const k of ['q', 'maxResults', 'printType', 'orderBy']) {
+  for (const k of ['q', 'maxResults', 'printType', 'orderBy', 'country']) {
     const v = c.req.query(k);
     if (v) params.set(k, v);
   }

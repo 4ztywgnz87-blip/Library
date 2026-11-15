@@ -66,6 +66,8 @@ export interface Book {
   review?: string;
   /** Marked as finished from her reading log (so taking that day off the log undoes it) */
   finishedVia?: 'log';
+  /** What she paid for it, in euro (for the value of her bookcase) */
+  price?: number;
   /** Lent out right now: to whom, and since when */
   lent?: { to: string; since: number };
   /** Earlier loans of this book (returned) */

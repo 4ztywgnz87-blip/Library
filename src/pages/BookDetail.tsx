@@ -215,6 +215,7 @@ export default function BookDetail() {
               onReset={() => set({ customCover: undefined, specialEdition: false })}
             />
             {book.status === 'wishlist' && <BuyLink book={book} />}
+            {book.status !== 'wishlist' && <PriceField book={book} />}
           </Card>
 
           {/* Lending (books she has, not the wishlist) */}
@@ -598,6 +599,33 @@ function BuyLink({ book }: { book: Book }) {
         className={`mt-1 w-full rounded-2xl border bg-white/80 px-3 py-2.5 text-base text-ink ${valid ? 'border-sand' : 'border-wine'}`}
       />
       {!valid && <span className="mt-1 block text-wine">That doesn't look like a link</span>}
+    </label>
+  );
+}
+
+/** What it cost, for the value of her bookcase (optional) */
+function PriceField({ book }: { book: Book }) {
+  const [value, setValue] = useState(book.price ? String(book.price).replace('.', ',') : '');
+  const save = () => {
+    const n = Number(value.replace(',', '.'));
+    const price = Number.isFinite(n) && n > 0 && n < 1000 ? Math.round(n * 100) / 100 : undefined;
+    if (price !== book.price) void updateBook(book.id, { price });
+  };
+  return (
+    <label className="block text-xs text-cocoa">
+      What did it cost? <span className="text-mocha">(optional, for the value of your bookcase)</span>
+      <div className="mt-1 flex items-center gap-2">
+        <span className="text-base text-cocoa">€</span>
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value.replace(/[^\d.,]/g, ''))}
+          onBlur={save}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+          inputMode="decimal"
+          placeholder="e.g. 14,99"
+          className="w-full rounded-2xl border border-sand bg-white/80 px-3 py-2.5 text-ink"
+        />
+      </div>
     </label>
   );
 }
