@@ -406,7 +406,7 @@ const SERIES_RULES =
 
 export async function seriesInfo(env: AiEnv, name: string, author: string): Promise<SeriesResponse> {
   if (!isLive(env)) return { books: [], mock: true };
-  const result = await cached(env, ['series2', name.toLowerCase(), author.toLowerCase()], 30, async () => {
+  const result = await cached(env, ['series2', name.toLowerCase(), author.toLowerCase()], 180, async () => {
     // first choice: look it up on the web (accurate titles, and the newest releases)
     const text = await askWithSearch(
       env,

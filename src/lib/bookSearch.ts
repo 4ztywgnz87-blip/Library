@@ -58,13 +58,17 @@ export function parseSeries(rawTitle: string, subtitle?: string): { title: strin
         '',
       )
       .trim() || rawTitle;
-  const paren = title.match(/^(.*?)\s*\(([^()#]+?),?\s*#\s*(\d+(?:\.\d+)?)\)\s*$/);
+  // "(Crescent City, #2)" and "(Dream Harbor, Book 3)"
+  const paren = title.match(/^(.*?)\s*\(([^()#]+?),?\s*(?:#|book\s+|boek\s+|deel\s+)\s*(\d+(?:\.\d+)?)\)\s*$/i);
   if (paren)
     return {
       title: paren[1],
       series: { name: paren[2].trim(), number: Number(paren[3]) },
     };
   // "A Court of Thorns and Roses, 6"
+  // "Boys of Tommen #1"
+  const hash = subtitle?.match(/^(.+?)\s*#\s*(\d+(?:\.\d+)?)$/);
+  if (hash) return { title, series: { name: hash[1].trim(), number: Number(hash[2]) } };
   const named = subtitle?.match(/^(.+?),\s*(?:book\s*|#\s*)?(\d+(?:\.\d+)?)$/i);
   if (named) return { title, series: { name: named[1].trim(), number: Number(named[2]) } };
   const sub = subtitle?.match(

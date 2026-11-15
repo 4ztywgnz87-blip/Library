@@ -7,6 +7,8 @@ import { useSeriesParts } from '../lib/seriesTotals';
 import { authorNews, type AuthorNews } from '../lib/authors';
 import { normalize } from '../lib/library';
 import { seriesInfo } from '../lib/ai';
+import { seriesFromGoogle } from '../lib/seriesGoogle';
+import { getMeta, setMeta } from '../db';
 import { quickAdd } from '../lib/quickAdd';
 import { sameBook, searchBooks } from '../lib/bookSearch';
 import type { SeriesBook } from '../shared';
@@ -153,7 +155,28 @@ export function SeriesDetail() {
           return;
         }
       }
+      // free first: what Google Books lists for this series (titles with a number, box sets in order)
+      const free = await seriesFromGoogle(group.name, group.author).catch(() => []);
+      if (free.length >= 3) {
+        if (!cancelled) {
+          setKnown(free);
+          setMock(false);
+        }
+        return;
+      }
+      // then what the AI found earlier (kept on the device for good: new parts come from the author news)
+      const aiKey = `seriesAi:${normalize(group.name)}|${normalize(group.author)}`;
+      const saved = await getMeta<SeriesBook[] | null>(aiKey, null);
+      if (saved?.length) {
+        if (!cancelled) {
+          setKnown(saved);
+          setMock(false);
+        }
+        return;
+      }
+      // last resort, once per series: ask the AI
       const r = await seriesInfo(group.name, group.author).catch(() => undefined);
+      if (r && !r.mock && r.books.length) await setMeta(aiKey, r.books);
       if (r && !cancelled) {
         setKnown(r.books);
         setMock(r.mock);
