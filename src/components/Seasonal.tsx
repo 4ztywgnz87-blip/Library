@@ -223,10 +223,12 @@ export function CatHat({ season }: { season: Season }) {
     );
   if (season === 'halloween')
     return (
-      <g>
-        <path d="M34 26c4-14 8-30 22-38-4 10-2 22 4 34z" fill="#3b2a4f" />
-        <path d="M37 22c8 1 16 1 22-1" stroke="#ff9f43" strokeWidth="3" fill="none" />
-        <ellipse cx="46" cy="27" rx="28" ry="4.5" fill="#2d1f3d" />
+      // sits snugly on the head (the ears go under the hat), tilted a little, the tip flopping over
+      <g transform="rotate(-6 45 31)">
+        <path d="M31 31c3-13 7-26 17-34 6-5 13-5 16 0-6-1-10 2-11 8-1 8 2 17 6 26z" fill="#3b2a4f" />
+        <path d="M34.5 25.5c7 1.6 15 1.6 22-.6" stroke="#ff9f43" strokeWidth="3.4" fill="none" strokeLinecap="round" />
+        <ellipse cx="45" cy="31.5" rx="25" ry="4.6" fill="#2d1f3d" />
+        <circle cx="64.5" cy="-2" r="2" fill="#ffcf6b" />
       </g>
     );
   if (season === 'valentine')

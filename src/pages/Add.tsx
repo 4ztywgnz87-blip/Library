@@ -1,3 +1,4 @@
+import { celebrateNewBook } from '../components/AddButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -374,6 +375,7 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
       finishedAt: status === 'read' && finished === 'this' ? now : undefined,
     });
     if (!book.series || !book.genres.length) void lookupSeries(book); // fills in series/genres in the background
+    celebrateNewBook();
     navigate(status === 'read' ? `/book/${book.id}?rate=1` : `/book/${book.id}`, { replace: true });
   };
 

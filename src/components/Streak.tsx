@@ -1,35 +1,43 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Book } from '../types';
 import type { DayLog } from '../db';
 import { Cover } from './Cover';
 import { Button } from './ui';
 import { ChevronIcon } from './Icons';
-import { addDays, dayKey, logReading, parseDay, streakOf, unlogReading, useDays } from '../lib/streak';
+import { addDays, dayKey, logReading, pageBounds, parseDay, streakOf, unlogReading, useDays } from '../lib/streak';
 import { useProfile } from '../lib/profile';
 
-/** A little flame; it dances while the streak is alive and sleeps when it isn't */
-export function Flame({ lit = true, className = 'h-10 w-10' }: { lit?: boolean; className?: string }) {
+/** A little flame. With `flicker` it breathes gently from its base (centred, no swaying) */
+export function Flame({
+  lit = true,
+  flicker = false,
+  className = 'h-10 w-10',
+}: {
+  lit?: boolean;
+  flicker?: boolean;
+  className?: string;
+}) {
+  const move = flicker && lit;
   return (
-    <motion.svg
-      viewBox="0 0 40 48"
-      className={className}
-      aria-hidden
-      style={{ transformBox: 'view-box', transformOrigin: '20px 46px' }}
-      animate={lit ? { scaleY: [1, 1.06, 0.97, 1], rotate: [0, -2, 2, 0] } : undefined}
-      transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-    >
-      <path
+    <svg viewBox="0 0 40 48" className={className} aria-hidden>
+      <motion.path
         d="M20 2c3 8 14 13 14 27a14 14 0 0 1-28 0c0-7 4-11 6-14 1 4 3 6 5 6-1-7 0-13 3-19z"
         fill={lit ? '#f0a64b' : '#e3d6c4'}
+        style={{ transformBox: 'view-box', transformOrigin: '20px 43px' }}
+        animate={move ? { scaleY: [1, 1.05, 0.98, 1], scaleX: [1, 0.97, 1.01, 1] } : undefined}
+        transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
       />
-      <path
+      <motion.path
         d="M20 22c2 5 7 7 7 14a7 7 0 0 1-14 0c0-4 2-6 3-7 .5 2 2 3 3 3-.5-4 0-7 1-10z"
         fill={lit ? '#f6d27a' : '#f1e8da'}
+        style={{ transformBox: 'view-box', transformOrigin: '20px 43px' }}
+        animate={move ? { scaleY: [1, 1.1, 0.95, 1] } : undefined}
+        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
       />
-    </motion.svg>
+    </svg>
   );
 }
 
@@ -66,7 +74,7 @@ export function StreakCard({ books }: { books: Book[] }) {
       <div className="flex items-center gap-3">
         <Link to="/streak" className="flex min-w-0 flex-1 items-center gap-3">
           <div className="relative shrink-0">
-            <Flame lit={s.current > 0} className="h-12 w-10" />
+            <Flame lit={s.current > 0} flicker className="h-12 w-10" />
           </div>
           <div className="min-w-0">
             <p className="font-soft text-2xl leading-none font-semibold text-ink">
@@ -145,7 +153,7 @@ export function dayLabel(date: string) {
   return parseDay(date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-/** "I read today": which book, and up to which page */
+/** "I read today": which book, up to which page, finished?, and a little note */
 export function LogSheet({
   date,
   books,
@@ -157,36 +165,57 @@ export function LogSheet({
   log?: DayLog;
   onClose: () => void;
 }) {
-  // the books she's reading first, then the ones waiting on her shelf
+  const navigate = useNavigate();
+  const days = useDays();
+  // the books she's reading first, then the ones waiting on her shelf, then the ones she read
   const options = useMemo(() => {
     const rank = (b: Book) => (b.status === 'reading' ? 0 : b.status === 'owned' ? 1 : b.status === 'read' ? 2 : 3);
     return books
       .filter((b) => b.status !== 'wishlist')
       .sort((a, b) => rank(a) - rank(b) || (b.startedAt ?? 0) - (a.startedAt ?? 0) || a.title.localeCompare(b.title));
   }, [books]);
-  const quick = options.filter((b) => b.status === 'reading');
   const logged = new Map((log?.entries ?? []).map((e) => [e.bookId, e]));
-  const [bookId, setBookId] = useState<string | undefined>(log?.entries[0]?.bookId ?? quick[0]?.id ?? options[0]?.id);
+  const [bookId, setBookId] = useState<string | undefined>(log?.entries[0]?.bookId ?? options[0]?.id);
   const book = options.find((b) => b.id === bookId);
-  const [page, setPage] = useState<string>(() => {
+  const [picking, setPicking] = useState(!book);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(() => {
     const e = bookId ? logged.get(bookId) : undefined;
-    return e?.page ? String(e.page) : '';
+    return e?.page && !e.finished ? String(e.page) : '';
   });
+  const [finished, setFinished] = useState(() => !!(bookId && logged.get(bookId)?.finished));
+  const [note, setNote] = useState(log?.note ?? '');
   const [saving, setSaving] = useState(false);
 
   const pick = (id: string) => {
     setBookId(id);
-    setPage(logged.get(id)?.page ? String(logged.get(id)!.page) : '');
+    const e = logged.get(id);
+    setPage(e?.page && !e.finished ? String(e.page) : '');
+    setFinished(!!e?.finished);
+    setPicking(false);
+    setQuery('');
   };
+
+  const bounds = book && days ? pageBounds(days, book.id, date, book.pageCount) : undefined;
   const n = Number(page);
-  const valid = !page || (Number.isFinite(n) && n > 0 && n < 5000);
-  const finishing = !!(book?.pageCount && n >= book.pageCount);
+  const tooLow = !!(page && bounds && n < bounds.min);
+  const tooHigh = !!(page && bounds && n > bounds.max);
+  const valid = !page || (n > 0 && !tooLow && !tooHigh);
+  const since = page && bounds && bounds.min && n > bounds.min ? n - bounds.min : 0;
+
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((b) => `${b.title} ${b.authors.join(' ')}`.toLowerCase().includes(q));
+  }, [options, query]);
 
   const save = async () => {
     if (!book || !valid) return;
     setSaving(true);
-    await logReading(date, book, page ? Math.round(n) : undefined);
+    await logReading(date, book, { page: page ? Math.round(n) : undefined, finished, note });
     onClose();
+    // finished it: straight to her stars and review
+    if (finished && !logged.get(book.id)?.finished) setTimeout(() => navigate(`/book/${book.id}?rate=1`), 250);
   };
 
   return createPortal(
@@ -201,7 +230,7 @@ export function LogSheet({
       <motion.div
         role="dialog"
         aria-modal="true"
-        className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] max-w-md overflow-y-auto rounded-t-[1.75rem] bg-cream px-5 pt-5 pb-6 shadow-2xl md:top-1/4 md:bottom-auto md:rounded-[1.75rem]"
+        className="pb-safe fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88dvh] max-w-md overflow-y-auto rounded-t-[1.75rem] bg-cream px-5 pt-5 pb-6 shadow-2xl md:top-[10%] md:bottom-auto md:rounded-[1.75rem]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -217,62 +246,120 @@ export function LogSheet({
 
         {options.length === 0 ? (
           <p className="mt-5 text-sm text-cocoa">Add a book to your library first.</p>
+        ) : picking ? (
+          <div className="mt-4">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search your books"
+              className="w-full rounded-2xl border border-sand bg-white/80 px-4 py-2.5 text-base"
+            />
+            <div className="mt-3 grid max-h-[46dvh] grid-cols-4 gap-2.5 overflow-y-auto p-1.5">
+              {shown.map((b) => (
+                <button
+                  key={b.id}
+                  onClick={() => pick(b.id)}
+                  aria-label={b.title}
+                  className={`relative rounded-md transition-transform active:scale-95 ${
+                    b.id === bookId ? 'ring-2 ring-wine ring-offset-2 ring-offset-cream' : ''
+                  }`}
+                >
+                  <Cover book={b} />
+                  {b.status === 'reading' && (
+                    <span className="absolute -top-1.5 -right-1.5 grid h-5 w-5 place-items-center rounded-full bg-wine text-[10px] text-cream">
+                      📖
+                    </span>
+                  )}
+                </button>
+              ))}
+              {shown.length === 0 && <p className="col-span-4 py-4 text-center text-sm text-mocha">No book found</p>}
+            </div>
+          </div>
         ) : (
-          <>
-            {quick.length > 0 && (
-              <div className="mt-5 flex gap-3 overflow-x-auto pb-1">
-                {quick.map((b) => (
-                  <button
-                    key={b.id}
-                    onClick={() => pick(b.id)}
-                    className={`w-20 shrink-0 rounded-2xl p-1.5 text-left transition-all ${
-                      bookId === b.id ? 'bg-blush ring-2 ring-wine/50' : 'bg-white/60'
-                    }`}
-                  >
-                    <Cover book={b} className="w-full" />
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-tight text-ink">{b.title}</p>
-                  </button>
-                ))}
+          book && (
+            <>
+              {/* the book: cover with the title next to it */}
+              <div className="mt-4 flex items-center gap-3 rounded-2xl bg-white/70 p-2.5">
+                <Cover book={book} className="w-12 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 leading-snug font-semibold">{book.title}</p>
+                  <p className="truncate text-xs text-cocoa">{book.authors[0]}</p>
+                </div>
+                <button
+                  onClick={() => setPicking(true)}
+                  className="shrink-0 rounded-full bg-linen px-3 py-1.5 text-xs text-cocoa"
+                >
+                  Other book
+                </button>
               </div>
-            )}
-            <label className="mt-4 block text-xs text-cocoa">
-              {quick.length ? 'Or another book' : 'Book'}
-              <select
-                value={bookId}
-                onChange={(e) => pick(e.target.value)}
-                className="mt-1 w-full rounded-2xl border border-sand bg-white/80 px-3 py-2.5 text-sm text-ink"
-              >
-                {options.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.title}
-                    {b.status === 'read' ? ' (read)' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
 
-            <label className="mt-4 block text-xs text-cocoa">
-              Up to page <span className="text-mocha">(optional)</span>
-              <div className="mt-1 flex items-center gap-2">
-                <input
-                  inputMode="numeric"
-                  value={page}
-                  onChange={(e) => setPage(e.target.value.replace(/\D/g, ''))}
-                  placeholder={book?.currentPage ? `last time: ${book.currentPage}` : 'e.g. 120'}
-                  className="w-full rounded-2xl border border-sand bg-white/80 px-3 py-2.5 text-base text-ink"
+              {!finished && (
+                <label className="mt-4 block text-xs text-cocoa">
+                  Up to page <span className="text-mocha">(optional)</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      inputMode="numeric"
+                      value={page}
+                      onChange={(e) => setPage(e.target.value.replace(/\D/g, ''))}
+                      placeholder={bounds?.min ? `last time: ${bounds.min}` : 'e.g. 120'}
+                      className={`w-full rounded-2xl border bg-white/80 px-3 py-2.5 text-base text-ink ${
+                        valid ? 'border-sand' : 'border-wine'
+                      }`}
+                    />
+                    {book.pageCount && <span className="shrink-0 text-sm text-mocha">of {book.pageCount}</span>}
+                  </div>
+                </label>
+              )}
+              {!finished && tooLow && bounds?.minDate && (
+                <p className="mt-2 text-xs text-wine">
+                  You were already on page {bounds.min} {dayLabel(bounds.minDate).toLowerCase()}.
+                </p>
+              )}
+              {!finished && tooHigh && (
+                <p className="mt-2 text-xs text-wine">
+                  {bounds?.maxDate
+                    ? `On ${dayLabel(bounds.maxDate).toLowerCase()} you were only on page ${bounds.max}.`
+                    : `The book has ${bounds?.max} pages.`}
+                </p>
+              )}
+              {!finished && valid && since > 0 && (
+                <p className="mt-2 text-xs text-cocoa">That's {since} pages since last time ✨</p>
+              )}
+
+              <button
+                onClick={() => setFinished(!finished)}
+                className={`mt-4 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm transition-colors ${
+                  finished ? 'bg-blush text-wine' : 'bg-white/70 text-cocoa'
+                }`}
+              >
+                <span
+                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 text-xs ${
+                    finished ? 'border-wine bg-wine text-cream' : 'border-oat'
+                  }`}
+                >
+                  {finished ? '✓' : ''}
+                </span>
+                <span className="flex-1 font-medium">I finished it! 🎉</span>
+                {finished && <span className="text-xs">next: your stars</span>}
+              </button>
+
+              <label className="mt-4 block text-xs text-cocoa">
+                A little note <span className="text-mocha">(optional)</span>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={2}
+                  maxLength={280}
+                  placeholder="Chapter 30… I'm not okay 😭"
+                  className="mt-1 w-full resize-none rounded-2xl border border-sand bg-white/80 px-3 py-2.5 text-base text-ink"
                 />
-                {book?.pageCount && <span className="shrink-0 text-sm text-mocha">of {book.pageCount}</span>}
-              </div>
-            </label>
-            {book?.currentPage && n > book.currentPage && (
-              <p className="mt-2 text-xs text-cocoa">That's {n - book.currentPage} pages since last time ✨</p>
-            )}
-            {finishing && <p className="mt-2 text-xs text-wine">The last page! Don't forget to rate it afterwards.</p>}
-          </>
+              </label>
+            </>
+          )
         )}
 
-        <div className="mt-6 flex gap-3">
-          {log ? (
+        <div className="mt-5 flex gap-3">
+          {log && !picking ? (
             <Button
               variant="soft"
               className="flex-1"
@@ -284,23 +371,20 @@ export function LogSheet({
               {bookId && logged.has(bookId) && log.entries.length > 1 ? 'Remove this book' : 'I didn’t read'}
             </Button>
           ) : (
-            <Button variant="soft" className="flex-1" onClick={onClose}>
-              Cancel
+            <Button variant="soft" className="flex-1" onClick={() => (picking && book ? setPicking(false) : onClose())}>
+              {picking && book ? 'Back' : 'Cancel'}
             </Button>
           )}
-          <Button className="flex-1" disabled={!book || !valid || saving} onClick={save}>
-            {logged.has(bookId ?? '') ? 'Save' : 'Log it'}
-          </Button>
+          {!picking && (
+            <Button className="flex-1" disabled={!book || !valid || saving} onClick={save}>
+              {finished && !logged.get(bookId ?? '')?.finished
+                ? 'Log & rate it'
+                : logged.has(bookId ?? '')
+                  ? 'Save'
+                  : 'Log it'}
+            </Button>
+          )}
         </div>
-        {finishing && book && (
-          <Link
-            to={`/book/${book.id}`}
-            onClick={() => void save()}
-            className="mt-3 block text-center text-sm text-wine underline"
-          >
-            Log it and rate the book
-          </Link>
-        )}
       </motion.div>
     </>,
     document.body,

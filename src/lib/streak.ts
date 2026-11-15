@@ -71,31 +71,117 @@ export function streakOf(days: Pick<DayLog, 'date'>[], imported?: StreakImport, 
   return { current, longest, readToday, atRisk: !readToday && current > 0, totalDays: read.size + Math.max(0, extra) };
 }
 
-/** Log that she read `book` on `date`, up to `page` */
-export async function logReading(date: string, book: Book, page?: number) {
+/** Every logged page of one book, oldest day first */
+async function bookLog(bookId: string) {
+  const all = await db.days.toArray();
+  return all
+    .filter((d) => !d.deleted)
+    .flatMap((d) => d.entries.filter((e) => e.bookId === bookId).map((e) => ({ date: d.date, ...e })))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+/**
+ * The pages that make sense for this book on this day: at least where she was before,
+ * at most where she was after (and never past the end of the book)
+ */
+export function pageBounds(days: DayLog[], bookId: string, date: string, pageCount?: number) {
+  let min = 0;
+  let minDate: string | undefined;
+  let max = pageCount ?? Infinity;
+  let maxDate: string | undefined;
+  for (const d of days) {
+    if (d.deleted) continue;
+    const e = d.entries.find((x) => x.bookId === bookId);
+    if (!e?.page) continue;
+    if (d.date < date && e.page >= min) {
+      min = e.page;
+      minDate = d.date;
+    }
+    if (d.date > date && e.page <= max) {
+      max = e.page;
+      maxDate = d.date;
+    }
+  }
+  return { min, minDate, max, maxDate };
+}
+
+/** Her bookmark follows her log: the page of the latest day she logged this book */
+async function syncBookmark(book: Book) {
+  const log = (await bookLog(book.id)).filter((e) => e.page);
+  const last = log[log.length - 1];
+  const patch: Partial<Book> = { currentPage: last?.page };
+  // the day she finished it was taken off her log: the book is back to "reading"
+  const finishedOn = (await bookLog(book.id)).find((e) => e.finished);
+  if (book.status === 'read' && book.finishedAt && !finishedOn && book.finishedVia === 'log') {
+    patch.status = 'reading';
+    patch.finishedAt = undefined;
+    patch.finishedVia = undefined;
+  }
+  if (patch.currentPage !== book.currentPage || patch.status) await updateBook(book.id, patch);
+}
+
+/** Log that she read `book` on `date`, up to `page`; `finished` when she turned the last page */
+export async function logReading(
+  date: string,
+  book: Book,
+  { page, finished = false, note }: { page?: number; finished?: boolean; note?: string },
+) {
   const cur = await db.days.get(date);
   const entries = (cur && !cur.deleted ? cur.entries : []).filter((e) => e.bookId !== book.id);
-  const finished = !!(page && book.pageCount && page >= book.pageCount);
-  entries.push({ bookId: book.id, title: book.title, ...(page ? { page } : {}), ...(finished ? { finished } : {}) });
-  await db.days.put({ date, entries, updatedAt: Date.now(), dirty: 1 });
+  const last = finished && book.pageCount ? Math.max(page ?? 0, book.pageCount) : page;
+  entries.push({
+    bookId: book.id,
+    title: book.title,
+    ...(last ? { page: last } : {}),
+    ...(finished ? { finished } : {}),
+  });
+  await db.days.put({
+    date,
+    entries,
+    note: note?.trim() || undefined,
+    updatedAt: Date.now(),
+    dirty: 1,
+  });
 
   const patch: Partial<Book> = {};
-  // only move the bookmark forward when this is her latest log of the book
-  if (page && (date >= dayKey() || !book.currentPage || page > book.currentPage)) patch.currentPage = page;
-  if (book.status === 'owned' || book.status === 'wishlist') {
+  if (finished) {
+    patch.status = 'read';
+    patch.finishedAt = parseDay(date).getTime() + 12 * 3_600_000;
+    patch.finishedVia = 'log';
+    patch.startedAt = book.startedAt ?? parseDay(date).getTime();
+  } else if (book.status !== 'reading') {
     patch.status = 'reading';
     patch.startedAt = book.startedAt ?? parseDay(date).getTime();
+    if (book.finishedVia === 'log') {
+      patch.finishedAt = undefined;
+      patch.finishedVia = undefined;
+    }
   }
   if (Object.keys(patch).length) await updateBook(book.id, patch);
+  const fresh = await db.books.get(book.id);
+  if (fresh) await syncBookmark(fresh);
   scheduleSync();
 }
 
-/** Take one book (or the whole day) off her log */
+/** Take one book (or the whole day) off her log; the bookmark goes back to the last page she logged */
 export async function unlogReading(date: string, bookId?: string) {
   const cur = await db.days.get(date);
   if (!cur) return;
+  const removed = cur.entries.filter((e) => !bookId || e.bookId === bookId);
   const entries = bookId ? cur.entries.filter((e) => e.bookId !== bookId) : [];
   await db.days.put({ ...cur, entries, deleted: entries.length === 0, updatedAt: Date.now(), dirty: 1 });
+  for (const e of removed) {
+    const book = await db.books.get(e.bookId);
+    if (book) await syncBookmark(book);
+  }
+  scheduleSync();
+}
+
+/** Her note for a day, without changing what she read */
+export async function setDayNote(date: string, note: string) {
+  const cur = await db.days.get(date);
+  if (!cur) return;
+  await db.days.put({ ...cur, note: note.trim() || undefined, updatedAt: Date.now(), dirty: 1 });
   scheduleSync();
 }
 

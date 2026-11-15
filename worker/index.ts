@@ -327,6 +327,8 @@ app.post('/share/wishlist', async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare('UPDATE wish_shares SET revoked = 1'),
     c.env.DB.prepare('INSERT INTO wish_shares (token, created_at) VALUES (?, ?)').bind(token, Date.now()),
+    // gifts already reserved stay reserved under the new link
+    c.env.DB.prepare('UPDATE wish_claims SET token = ?').bind(token),
   ]);
   return c.json({ token });
 });

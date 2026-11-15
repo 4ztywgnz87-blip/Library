@@ -385,7 +385,7 @@ export function ShelfCat({ className = '', season }: { className?: string; seaso
       <ellipse cx="34" cy="74" rx="9" ry="4.5" fill="#f2e3cf" />
       <ellipse cx="52" cy="75" rx="9" ry="4.5" fill="#f2e3cf" />
       {/* head */}
-      {season !== 'christmas' && (
+      {season !== 'christmas' && season !== 'halloween' && (
         <>
           <path d="M22 34l2-17 12 10z" fill="#a87449" />
           <path d="M54 27l12-10 2 17z" fill="#a87449" />
@@ -531,6 +531,7 @@ export function DreamCloud({ count, className = '' }: { count: number; className
       viewBox="0 0 170 120"
       className={className}
       aria-hidden
+      style={{ overflow: 'visible' }}
       animate={{ y: [0, -4, 0] }}
       transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
     >
@@ -549,9 +550,9 @@ export function DreamCloud({ count, className = '' }: { count: number; className
           fill={`url(#${id}c)`}
         />
         {/* little bubbles leading down to the cat */}
-        <circle cx="128" cy="92" r="6" fill={`url(#${id}c)`} />
-        <circle cx="140" cy="106" r="4" fill={`url(#${id}c)`} />
-        <circle cx="149" cy="116" r="2.6" fill={`url(#${id}c)`} />
+        <circle cx="117" cy="95" r="6" fill={`url(#${id}c)`} />
+        <circle cx="123" cy="109" r="4" fill={`url(#${id}c)`} />
+        <circle cx="128" cy="121" r="2.6" fill={`url(#${id}c)`} />
       </g>
       <text
         x="80"

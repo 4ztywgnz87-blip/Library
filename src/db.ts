@@ -15,6 +15,8 @@ export interface DayLog {
   /** YYYY-MM-DD, her own time zone */
   date: string;
   entries: { bookId: string; title: string; page?: number; finished?: boolean }[];
+  /** A little line about the day ("chapter 30, I'm not okay") */
+  note?: string;
   updatedAt: number;
   deleted?: boolean;
   dirty: 0 | 1;

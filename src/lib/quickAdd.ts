@@ -1,3 +1,4 @@
+import { celebrateNewBook } from '../components/AddButton';
 import type { Book, Lang, Status } from '../types';
 import { searchBooks } from './bookSearch';
 import { bookKey, findExisting, newId, normalize, saveBook } from './library';
@@ -21,10 +22,16 @@ export async function quickAdd(
   const surname = normalize(author).split(' ').pop() ?? '';
   const match =
     results.find((r) => bookKey(r) === want) ??
-    results.find((r) => normalize(r.title).startsWith(normalize(title)) && normalize(r.authors.join(' ')).includes(surname));
+    results.find(
+      (r) => normalize(r.title).startsWith(normalize(title)) && normalize(r.authors.join(' ')).includes(surname),
+    );
 
   const now = Date.now();
-  const { source: _s, language, ...data } = match ?? {
+  const {
+    source: _s,
+    language,
+    ...data
+  } = match ?? {
     source: 'google' as const,
     language: undefined as Lang | undefined,
     title,
@@ -43,6 +50,7 @@ export async function quickAdd(
     updatedAt: now,
     series: extra.series ?? data.series,
   });
+  celebrateNewBook();
   if (!saved.series || !saved.genres.length) void lookupSeries(saved);
   return saved;
 }

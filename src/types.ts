@@ -63,6 +63,8 @@ export interface Book {
   /** The rating card was saved at least once (also without stars) */
   ratingSaved?: boolean;
   review?: string;
+  /** Marked as finished from her reading log (so taking that day off the log undoes it) */
+  finishedVia?: 'log';
   /** The page she has reached (from her reading log) */
   currentPage?: number;
   /** What Snug read from her review (once per review), for her match scores */

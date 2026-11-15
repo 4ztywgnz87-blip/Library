@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { AddButtonIcon } from './AddButton';
 import { motion } from 'motion/react';
 import { TABS, useTabSwipe } from '../lib/swipe';
 import { BooksIcon, HomeIcon, PlusIcon, ShelfIcon, UserIcon } from './Icons';
@@ -70,7 +71,7 @@ export function Layout() {
             >
               {({ isActive }) =>
                 primary ? (
-                  <Icon width={26} height={26} />
+                  <AddButtonIcon />
                 ) : (
                   <>
                     {/* the icon hops when its tab opens */}

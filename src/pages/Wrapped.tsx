@@ -8,6 +8,7 @@ import { Cover } from '../components/Cover';
 import { CloseIcon } from '../components/Icons';
 import { formatRating } from '../components/Stars';
 import type { Book } from '../types';
+import { shareWrapCard, type WrapSummary } from '../lib/wrapCard';
 
 const MONTH_NAMES = [
   'January',
@@ -80,8 +81,8 @@ export default function Wrapped() {
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  const slides = useMemo<Slide[]>(() => {
-    if (!books || !days) return [];
+  const { slides, summary } = useMemo<{ slides: Slide[]; summary?: WrapSummary }>(() => {
+    if (!books || !days) return { slides: [] };
     const name = profile.name;
     const read = books
       .filter((b) => b.status === 'read' && b.finishedAt && new Date(b.finishedAt).getFullYear() === year)
@@ -119,7 +120,7 @@ export default function Wrapped() {
           </Center>
         ),
       });
-      return out;
+      return { slides: out };
     }
 
     const pages = read.reduce((t, b) => t + (b.pageCount ?? 0), 0);
@@ -422,7 +423,22 @@ export default function Wrapped() {
         </Center>
       ),
     });
-    return out;
+    return {
+      slides: out,
+      summary: {
+        name,
+        year,
+        books: read.length,
+        pages,
+        topGenre: genres[0]?.key,
+        topAuthor: authors[0] && authors[0].n >= 2 ? authors[0].key : undefined,
+        favourite: rated[0],
+        persona: p.name,
+        longestStreak: inYear.length >= 3 || imp ? st.longest : undefined,
+        // her favourites first on the picture
+        covers: [...rated, ...read.filter((b) => !b.rating)],
+      },
+    };
   }, [books, days, profile, year]);
 
   // stories move on by themselves; holding a finger down pauses
@@ -463,6 +479,8 @@ export default function Wrapped() {
         <button className="h-full flex-1" aria-label="Next" onClick={() => go(1)} />
       </div>
 
+      {summary && i === slides.length - 1 && <ShareButton summary={summary} />}
+
       <div className="pt-safe absolute inset-x-0 top-0 z-20 px-3">
         <div className="mt-3 flex gap-1">
           {slides.map((s, n) => (
@@ -487,6 +505,30 @@ export default function Wrapped() {
         </div>
       </div>
     </div>
+  );
+}
+
+function ShareButton({ summary }: { summary: WrapSummary }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <motion.div
+      className="pb-safe absolute inset-x-0 bottom-0 z-20 flex justify-center px-8 pb-10"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 1.8 }}
+    >
+      <button
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          await shareWrapCard(summary).catch(() => undefined);
+          setBusy(false);
+        }}
+        className="rounded-full bg-cream px-6 py-3 text-sm font-semibold text-wine shadow-xl transition-transform active:scale-95 disabled:opacity-70"
+      >
+        {busy ? 'Making your picture…' : 'Share my year ✨'}
+      </button>
+    </motion.div>
   );
 }
 

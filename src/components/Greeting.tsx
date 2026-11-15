@@ -44,7 +44,7 @@ function subline(books: Book[], m: Moment) {
 function MomentIcon({ m }: { m: Moment }) {
   if (m === 'morning')
     return (
-      <svg viewBox="0 0 48 48" className="h-11 w-11" aria-hidden>
+      <svg viewBox="0 0 48 48" className="-my-2 h-12 w-12" aria-hidden>
         <motion.g
           style={{ transformBox: 'view-box', transformOrigin: '24px 26px' }}
           animate={{ rotate: 360 }}
@@ -78,7 +78,7 @@ function MomentIcon({ m }: { m: Moment }) {
     );
   if (m === 'afternoon')
     return (
-      <svg viewBox="0 0 48 48" className="h-11 w-11" aria-hidden>
+      <svg viewBox="0 0 48 48" className="-my-2 h-12 w-12" aria-hidden>
         {[18, 24, 30].map((x, i) => (
           <motion.path
             key={x}
@@ -98,7 +98,7 @@ function MomentIcon({ m }: { m: Moment }) {
     );
   if (m === 'evening')
     return (
-      <svg viewBox="0 0 48 48" className="h-11 w-11" aria-hidden>
+      <svg viewBox="0 0 48 48" className="-my-2 h-12 w-12" aria-hidden>
         <motion.ellipse
           cx="24"
           cy="13"
@@ -122,7 +122,7 @@ function MomentIcon({ m }: { m: Moment }) {
       </svg>
     );
   return (
-    <svg viewBox="0 0 48 48" className="h-11 w-11" aria-hidden>
+    <svg viewBox="0 0 48 48" className="-my-2 h-12 w-12" aria-hidden>
       <path d="M30 10a14 14 0 1 0 8 22 12 12 0 0 1-8-22z" fill="#e9d7a6" />
       {[
         [12, 12],
@@ -150,28 +150,37 @@ export function Greeting({ name, books }: { name?: string; books: Book[] }) {
   const m = forced && forced in WORDS ? forced : moment(new Date().getHours());
   const words = `${WORDS[m]}${name ? `, ${name}` : ''}`.split(' ');
   return (
-    <header className="flex items-center gap-3 pt-8 pb-6">
-      <motion.div
-        className="shrink-0 rounded-full bg-white/70 p-1.5 shadow-[var(--shadow-soft)]"
-        initial={{ opacity: 0, scale: 0.8, rotate: -8 }}
-        animate={{ opacity: 1, scale: 1, rotate: 0 }}
-        transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 14 }}
-      >
-        <MomentIcon m={m} />
-      </motion.div>
-      <div className="min-w-0">
+    <header className="pt-8 pb-6">
+      <div>
         <h1 className="text-[2rem] leading-tight font-semibold">
-          {words.map((w, i) => (
-            <motion.span
-              key={i}
-              className="mr-[0.25em] inline-block"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 * i, duration: 0.45, ease: 'easeOut' }}
-            >
-              {w}
-            </motion.span>
-          ))}
+          {words.map((w, i) => {
+            const word = (
+              <motion.span
+                key={i}
+                className="mr-[0.25em] inline-block"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.08 * i, duration: 0.45, ease: 'easeOut' }}
+              >
+                {w}
+              </motion.span>
+            );
+            if (i < words.length - 1) return word;
+            // the picture for the time of day sticks to the last word, like a little emoji
+            return (
+              <span key={i} className="whitespace-nowrap">
+                {word}
+                <motion.span
+                  className="inline-block align-middle"
+                  initial={{ opacity: 0, scale: 0.6, rotate: -10 }}
+                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.08 * words.length + 0.1, type: 'spring', stiffness: 200, damping: 14 }}
+                >
+                  <MomentIcon m={m} />
+                </motion.span>
+              </span>
+            );
+          })}
         </h1>
         {books.length > 0 && (
           <motion.p
