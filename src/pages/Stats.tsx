@@ -154,7 +154,8 @@ export default function Stats() {
           </EmptyState>
         ) : (
           <>
-            {year !== 'all' && (
+            {/* this year's story opens on 1 December; earlier years can always be watched again */}
+            {year !== 'all' && (year < new Date().getFullYear() || new Date().getMonth() === 11) && (
               <Link
                 to={`/wrapped?year=${year}`}
                 className="flex items-center gap-3 rounded-[var(--radius-card)] bg-gradient-to-br from-wine to-[#4E3B47] p-4 text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.99]"

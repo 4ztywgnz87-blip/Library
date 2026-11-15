@@ -10,6 +10,7 @@ import { formatRating } from '../components/Stars';
 import { Flame } from '../components/Streak';
 import type { Book } from '../types';
 import { shareWrapCard, type WrapSummary } from '../lib/wrapCard';
+import { preloadCovers } from '../lib/coverCache';
 
 const MONTH_NAMES = [
   'January',
@@ -117,6 +118,10 @@ export default function Wrapped() {
   const [params] = useSearchParams();
   const year = Number(params.get('year')) || wrappedYear();
   const [i, setI] = useState(0);
+  // the year's covers start loading right away, so no slide has to wait for one
+  useEffect(() => {
+    if (books) preloadCovers(books.filter((b) => b.status === 'read').map((b) => b.customCover || b.coverUrl));
+  }, [books]);
   const [paused, setPaused] = useState(false);
 
   const { slides, summary } = useMemo<{ slides: Slide[]; summary?: WrapSummary }>(() => {

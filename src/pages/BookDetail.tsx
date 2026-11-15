@@ -16,8 +16,9 @@ import { lookupSeries, setGenreForSeries } from '../lib/seriesLookup';
 import { useMatches } from '../lib/taste';
 import { profileKey } from '../taste/vocab';
 import { MatchRing, matchLabel } from '../components/MatchRing';
-import { BookmarkRibbon, LogSheet, PageProgress } from '../components/Streak';
+import { BookmarkRibbon, LogSheet, PageProgress, PagesEditor } from '../components/Streak';
 import { PageConfetti } from '../components/PageConfetti';
+import { coverSrc } from '../lib/coverCache';
 import { dayKey, useDays } from '../lib/streak';
 
 const TAG_SUGGESTIONS = [
@@ -89,7 +90,7 @@ export default function BookDetail() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-80 overflow-hidden">
         {(book.customCover || book.coverUrl) && (
           <img
-            src={book.customCover || book.coverUrl}
+            src={book.customCover || coverSrc(book.coverUrl)}
             alt=""
             className="h-full w-full scale-125 object-cover opacity-30 blur-2xl"
           />
@@ -144,14 +145,12 @@ export default function BookDetail() {
             {book.status === 'reading' && (
               <>
                 <PageProgress book={book} className="mt-4" />
-                <div className="mt-4 flex gap-3">
-                  <Button variant="soft" className="flex-1" onClick={() => setLogging(true)}>
-                    {book.currentPage ? 'Update page' : 'Log my page'}
-                  </Button>
-                  <Button className="flex-1" onClick={() => setStatus('read')}>
-                    I finished it! 🎉
-                  </Button>
-                </div>
+                <Button className="mt-4 w-full" onClick={() => setStatus('read')}>
+                  I finished it! 🎉
+                </Button>
+                <Button variant="soft" className="mt-2 w-full" onClick={() => setLogging(true)}>
+                  📖 Log today's reading
+                </Button>
               </>
             )}
             <AnimatePresence>
@@ -202,6 +201,7 @@ export default function BookDetail() {
               onChoose={() => setPickingEdition(true)}
               onReset={() => set({ customCover: undefined, specialEdition: false })}
             />
+            {book.status === 'wishlist' && <BuyLink book={book} />}
           </Card>
 
           {/* Genres */}
@@ -227,7 +227,7 @@ export default function BookDetail() {
           {book.description && <AboutCard text={book.description} />}
 
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2 text-xs text-mocha">
-            {book.pageCount && <span>{book.pageCount} pages</span>}
+            <PagesEditor book={book} />
             {book.publishedDate && <span>Published {book.publishedDate.slice(0, 4)}</span>}
             {book.isbn13 && <span>ISBN {book.isbn13}</span>}
           </div>
@@ -546,5 +546,31 @@ function FitForYou({ book }: { book: Book }) {
         </div>
       </div>
     </Card>
+  );
+}
+
+/** The exact edition to buy, for her shared wishlist (so people get the right one) */
+function BuyLink({ book }: { book: Book }) {
+  const [value, setValue] = useState(book.buyUrl ?? '');
+  const valid = !value.trim() || /^https?:\/\/\S+\.\S+/.test(value.trim());
+  const save = () => {
+    const url = value.trim();
+    if (valid && url !== (book.buyUrl ?? '')) void updateBook(book.id, { buyUrl: url || undefined });
+  };
+  return (
+    <label className="block text-xs text-cocoa">
+      Link to the right edition <span className="text-mocha">(for your shared wishlist)</span>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+        type="url"
+        inputMode="url"
+        placeholder="Paste a shop link, e.g. from bol.com"
+        className={`mt-1 w-full rounded-2xl border bg-white/80 px-3 py-2.5 text-base text-ink ${valid ? 'border-sand' : 'border-wine'}`}
+      />
+      {!valid && <span className="mt-1 block text-wine">That doesn't look like a link</span>}
+    </label>
   );
 }

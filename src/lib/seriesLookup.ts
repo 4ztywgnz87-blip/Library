@@ -62,7 +62,9 @@ export async function lookupSeries(
     const params = new URLSearchParams({ title: book.title, author: book.authors[0] ?? '' });
     const res = await fetch(`/api/book-series?${params}`);
     const found = res.ok ? ((await res.json()) as Partial<SeriesInfo> & { subjects?: string[] }) : {};
-    let series: SeriesInfo | undefined = found.name ? { name: found.name, number: found.number, key: found.key } : undefined;
+    let series: SeriesInfo | undefined = found.name
+      ? { name: found.name, number: found.number, key: found.key }
+      : undefined;
     if (!series) series = await guessSeriesFromLibrary(book);
 
     const current = await db.books.get(book.id);
@@ -99,7 +101,12 @@ export async function backfillSeries(max = 25) {
   try {
     const todo = (
       await db.books
-        .filter((b) => !b.deleted && (!b.series || b.genres.length === 0 || b.genres.join() === 'Fiction') && (b.lookupVersion ?? 0) < LOOKUP_VERSION)
+        .filter(
+          (b) =>
+            !b.deleted &&
+            (!b.series || b.genres.length === 0 || b.genres.join() === 'Fiction') &&
+            (b.lookupVersion ?? 0) < LOOKUP_VERSION,
+        )
         .toArray()
     ).slice(0, max);
     for (const b of todo) await lookupSeries(b);
@@ -129,7 +136,9 @@ export async function harmonizeSeriesGenres() {
 /** Turns a genre on or off for a book and, when it's part of a series, for the whole series */
 export async function setGenreForSeries(book: Book, genre: string, on: boolean) {
   const parts = book.series
-    ? await db.books.filter((b) => !b.deleted && !!b.series && normalize(b.series.name) === normalize(book.series!.name)).toArray()
+    ? await db.books
+        .filter((b) => !b.deleted && !!b.series && normalize(b.series.name) === normalize(book.series!.name))
+        .toArray()
     : [book];
   for (const b of parts) {
     const has = b.genres.includes(genre);

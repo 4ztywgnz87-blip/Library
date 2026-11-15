@@ -5,7 +5,7 @@ import { useProfile } from '../lib/profile';
 import { addDays, dayKey, pagesPerDay, parseDay, streakOf, useDays } from '../lib/streak';
 import { Flame, LogSheet, dayLabel } from '../components/Streak';
 import { Button, Card, PageHeader } from '../components/ui';
-import { BackIcon } from '../components/Icons';
+import { BackIcon, PageIcon } from '../components/Icons';
 
 const WEEKDAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -36,7 +36,7 @@ export default function StreakPage() {
     const d = new Date(first.getFullYear(), first.getMonth() + n, 1);
     setMonth(dayKey(d).slice(0, 7));
   };
-  const monthDays = cells.filter((c) => c && read.has(c)).length;
+  const monthDays = cells.filter((c) => c && (read.has(c) || imported(c))).length;
   const monthPages = cells.reduce((t, c) => t + (c ? (pages.get(c) ?? 0) : 0), 0);
   const weekPages = Array.from({ length: 7 }, (_, i) => pages.get(addDays(today, -i)) ?? 0).reduce((a, b) => a + b, 0);
 
@@ -49,11 +49,11 @@ export default function StreakPage() {
             <Flame lit={s.current > 0} flicker className="h-11 w-9 shrink-0" />
             <div>
               <p className="font-soft text-3xl leading-none font-semibold">{s.current}</p>
-              <p className="mt-1 text-xs text-cocoa">day{s.current === 1 ? '' : 's'} in a row</p>
+              <p className="mt-1 text-xs text-cocoa">day streak</p>
             </div>
           </Card>
           <Card className="flex items-center gap-3">
-            <span className="text-3xl">📖</span>
+            <PageIcon className="h-10 w-9 shrink-0 text-[#c98b5a]" strokeWidth={1.5} />
             <div>
               <p className="font-soft text-3xl leading-none font-semibold">{weekPages}</p>
               <p className="mt-1 text-xs text-cocoa">pages this week</p>
@@ -131,7 +131,6 @@ export default function StreakPage() {
               );
             })}
           </div>
-          <p className="mt-3 text-center text-xs text-mocha">Tap a day to fill it in or change it</p>
         </Card>
 
         <Button className="w-full" variant={s.readToday ? 'soft' : 'primary'} onClick={() => setSheet(today)}>

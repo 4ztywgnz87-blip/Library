@@ -1,5 +1,6 @@
 import { useKeyboardLift } from '../lib/keyboard';
 import { useMemo, useState } from 'react';
+import { updateBook } from '../lib/library';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
@@ -324,7 +325,9 @@ export function LogSheet({
                         valid ? 'border-sand' : 'border-wine'
                       }`}
                     />
-                    {book.pageCount && <span className="shrink-0 text-sm text-mocha">of {book.pageCount}</span>}
+                    <span className="shrink-0 text-sm text-mocha">
+                      of <PagesEditor book={book} />
+                    </span>
                   </div>
                 </label>
               )}
@@ -438,8 +441,8 @@ export function PageProgress({ book, className = '' }: { book: Book; className?:
  * the further it hangs down
  */
 export function BookmarkRibbon({ book }: { book: Book }) {
-  if (book.status !== 'reading' || !book.currentPage || !book.pageCount) return null;
-  const pct = Math.min(1, book.currentPage / book.pageCount);
+  if (book.status !== 'reading') return null;
+  const pct = book.currentPage && book.pageCount ? Math.min(1, book.currentPage / book.pageCount) : 0;
   return (
     <motion.div
       className="pointer-events-none absolute top-0 right-[14%] z-10 w-[13%] origin-top drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]"
@@ -459,5 +462,44 @@ export function BookmarkRibbon({ book }: { book: Book }) {
         <div className="mx-auto h-full w-[60%] border-x border-dashed border-white/25" />
       </div>
     </motion.div>
+  );
+}
+
+/** "352 pages ✎": the page count, which she can correct (editions differ; she knows her own copy) */
+export function PagesEditor({ book, className = '' }: { book: Book; className?: string }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(book.pageCount ?? ''));
+  const save = async () => {
+    const n = Math.round(Number(value));
+    if (n > 0 && n < 5000 && n !== book.pageCount) await updateBook(book.id, { pageCount: n });
+    setEditing(false);
+  };
+  if (editing)
+    return (
+      <span className={`inline-flex items-center gap-1.5 ${className}`}>
+        <input
+          autoFocus
+          inputMode="numeric"
+          value={value}
+          onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
+          onKeyDown={(e) => e.key === 'Enter' && void save()}
+          onBlur={() => void save()}
+          className="w-16 rounded-lg border border-sand bg-white px-2 py-0.5 text-center text-sm text-ink"
+        />
+        <span>pages</span>
+      </span>
+    );
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setValue(String(book.pageCount ?? ''));
+        setEditing(true);
+      }}
+      className={`inline-flex items-center gap-1 underline decoration-dotted underline-offset-2 ${className}`}
+      aria-label="Change the number of pages"
+    >
+      {book.pageCount ? `${book.pageCount} pages` : 'Add page count'} <span aria-hidden>✎</span>
+    </button>
   );
 }

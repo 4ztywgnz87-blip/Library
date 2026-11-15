@@ -12,7 +12,8 @@ function blockedTarget(el: EventTarget | null): boolean {
   while (node && node !== document.body) {
     if (node.matches('input, textarea, select, [role="slider"], [data-no-swipe]')) return true;
     const style = getComputedStyle(node);
-    if ((style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth + 2) return true;
+    if ((style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth + 2)
+      return true;
     node = node.parentElement;
   }
   return false;
@@ -30,7 +31,12 @@ export function useTabSwipe(pathname: string, onSwipe: (to: string, dir: 1 | -1)
 
     const onStart = (e: TouchEvent) => {
       const t = e.touches[0];
-      if (e.touches.length !== 1 || t.clientX < EDGE || t.clientX > window.innerWidth - EDGE || blockedTarget(e.target)) {
+      if (
+        e.touches.length !== 1 ||
+        t.clientX < EDGE ||
+        t.clientX > window.innerWidth - EDGE ||
+        blockedTarget(e.target)
+      ) {
         start = null;
         return;
       }

@@ -65,6 +65,8 @@ export interface Book {
   review?: string;
   /** Marked as finished from her reading log (so taking that day off the log undoes it) */
   finishedVia?: 'log';
+  /** Where to buy exactly this edition (shown on her shared wishlist) */
+  buyUrl?: string;
   /** The page she has reached (from her reading log) */
   currentPage?: number;
   /** What Snug read from her review (once per review), for her match scores */

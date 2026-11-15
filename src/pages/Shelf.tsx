@@ -20,7 +20,7 @@ import {
   useSeason,
 } from '../components/Seasonal';
 
-const ROW = 140; // px per shelf row (spines + board)
+const ROW = 146; // px per shelf row (spines + board): room above the tallest spines
 const BOARD = 12;
 const GROUP_GAP = 3; // px between two series/authors; books of one series touch
 const MIN_SCALE = 0.72; // books never get smaller than this before a new row is added
@@ -434,10 +434,10 @@ export default function Shelf() {
 
   return (
     <div>
-      <div className="pt-safe h-4" />
+      <div className="pt-safe" />
       <div className="mx-auto max-w-4xl px-5 pb-10">
         {/* things on top of the bookcase: a plant and the cat (its tail hangs over the edge) */}
-        <div className="relative h-44">
+        <div className="relative -mt-3 h-44">
           {/* pot stands on top, vines hang over the front edge of the cornice */}
           {season === 'christmas' ? (
             <ChristmasTree className="absolute bottom-0 left-3 z-20 h-[116px] w-[78px]" />
@@ -456,7 +456,7 @@ export default function Shelf() {
           >
             <DreamCloud count={wishCount} className="w-full" />
           </Link>
-          <ShelfCat className="absolute right-[6%] bottom-[-3px] z-20 h-[78px]" season={season} mood={catMood} />
+          <ShelfCat className="absolute right-[6%] bottom-[-7px] z-20 h-[78px]" season={season} mood={catMood} />
         </div>
 
         {/* crown: a little arched pediment on a layered cornice with dentils */}
@@ -525,7 +525,7 @@ export default function Shelf() {
               backgroundColor: '#4d3427',
             }}
           >
-            <FairyLights className="pointer-events-none mb-1 h-7 w-full" season={season} />
+            <FairyLights className="pointer-events-none -mb-2 h-7 w-full" season={season} />
             {season === 'halloween' && <Cobweb className="pointer-events-none absolute top-0 right-0 z-10 h-16 w-16" />}
             {season === 'valentine' && (
               <FloatingHearts className="pointer-events-none absolute inset-0 z-10 h-full w-full" />

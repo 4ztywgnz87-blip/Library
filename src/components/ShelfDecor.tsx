@@ -793,7 +793,13 @@ export function HangingPlant({ className = '' }: { className?: string }) {
           />
         ))}
       {/* watered today: little flowers on the vines */}
-      {/* leaves on top of the pot */}
+      {/* leaves on top of the pot: a low, full layer over the soil first, so the pot looks filled */}
+      <ellipse cx="45" cy="45.5" rx="24" ry="3" fill="#5a3d2b" />
+      {leaf(23, 49, -55, 0.85, 2)}
+      {leaf(67, 49, 55, 0.85, 0)}
+      {leaf(34, 48.5, -25, 0.95, 0)}
+      {leaf(56, 48.5, 22, 0.95, 2)}
+      {leaf(45, 48, 0, 0.9, 1)}
       {leaf(30, 44, -20, 1.1, 1)}
       {leaf(40, 42, 5, 1.2, 0)}
       {leaf(50, 43, 25, 1.1, 2)}

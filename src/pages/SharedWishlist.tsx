@@ -16,8 +16,9 @@ interface Wish {
   specialEdition: boolean;
   series?: SeriesInfo;
   isbn13?: string;
-  pageCount?: number;
+  buyUrl?: string;
   claimedBy: string | null;
+  mine: boolean;
 }
 
 const LANG: Record<Lang, { flag: string; label: string; hint: string }> = {
@@ -41,83 +42,96 @@ function writeLocal(key: string, value: unknown) {
   }
 }
 
-/** The wishlist as family and friends see it, through her secret link. Works without the rest of Snug. */
+interface Visitor {
+  name: string;
+  email: string;
+}
+
+/**
+ * The wishlist as family and friends see it, through her link. Givers sign in with their name and
+ * email first, so a reservation can be changed later from any device. She can look too, without
+ * spoilers: then nothing about reservations is even loaded.
+ */
 export default function SharedWishlist({ token }: { token: string }) {
   const [data, setData] = useState<{ name: string; books: Wish[] } | null>(null);
   const [error, setError] = useState('');
-  // gift mode shows what's already reserved; it stays off by default so she can peek without spoilers
-  const [giving, setGiving] = useState(() => readLocal('snug-gift-mode', false));
-  const [mine, setMine] = useState<string[]>(() => readLocal(`snug-gifts-${token}`, []));
-  const [giver, setGiver] = useState(() => readLocal('snug-giver', ''));
+  const [visitor, setVisitor] = useState<Visitor | null>(() => readLocal('snug-giver-v2', null));
+  const [peeking, setPeeking] = useState(() => readLocal('snug-owner-peek', false));
   const [asking, setAsking] = useState<Wish | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/wish/${encodeURIComponent(token)}`);
+    const q = visitor && !peeking ? `?email=${encodeURIComponent(visitor.email)}` : '';
+    const res = await fetch(`/api/wish/${encodeURIComponent(token)}${q}`);
     const body = await res.json();
     if (!res.ok) setError(body.error ?? 'This wishlist could not be opened');
     else setData(body);
-  }, [token]);
+  }, [token, visitor, peeking]);
   useEffect(() => {
     void load().catch(() => setError('No connection. Try again in a moment.'));
   }, [load]);
 
-  const name = data?.name || 'her';
+  const owner = data?.name?.trim();
+  const title = owner ? `${owner}'s little wishlist` : 'A little wishlist';
   useEffect(() => {
-    if (data) document.title = `${data.name ? `${data.name}'s` : 'A little'} wishlist 📚`;
-  }, [data]);
+    if (data) document.title = `${title} 📚`;
+  }, [data, title]);
 
-  const claim = async (w: Wish, who: string) => {
+  const claim = async (w: Wish) => {
+    if (!visitor) return;
     const res = await fetch(`/api/wish/${encodeURIComponent(token)}/claim`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookId: w.id, name: who }),
+      body: JSON.stringify({ bookId: w.id, name: visitor.name, email: visitor.email }),
     });
     if (!res.ok) alert((await res.json()).error ?? 'That did not work, sorry');
-    else {
-      const next = [...mine, w.id];
-      setMine(next);
-      writeLocal(`snug-gifts-${token}`, next);
-      setGiver(who);
-      writeLocal('snug-giver', who);
-    }
     setAsking(null);
     await load();
   };
   const unclaim = async (w: Wish) => {
-    await fetch(`/api/wish/${encodeURIComponent(token)}/claim/${encodeURIComponent(w.id)}`, { method: 'DELETE' });
-    const next = mine.filter((id) => id !== w.id);
-    setMine(next);
-    writeLocal(`snug-gifts-${token}`, next);
+    if (!visitor) return;
+    await fetch(
+      `/api/wish/${encodeURIComponent(token)}/claim/${encodeURIComponent(w.id)}?email=${encodeURIComponent(visitor.email)}`,
+      { method: 'DELETE' },
+    );
     await load();
   };
 
+  const signedIn = !!visitor || peeking;
   return (
     <div className="min-h-dvh bg-cream text-ink">
       <div className="pt-safe mx-auto max-w-3xl px-4 pb-16">
         <header className="relative pt-10 pb-6 text-center">
           <GiftDoodle />
-          <h1 className="mt-3 text-[2.1rem] leading-tight font-semibold">
-            {data?.name ? `${data.name}'s wishlist` : 'A little wishlist'}
-          </h1>
-          <p className="mx-auto mt-2 max-w-md text-sm text-cocoa">
-            The books {name} is dreaming of. Each one says which language to get, because that matters to a reader. 💛
-          </p>
-          {data && data.books.length > 0 && (
-            <button
-              onClick={() => {
-                setGiving(!giving);
-                writeLocal('snug-gift-mode', !giving);
-              }}
-              className={`mt-4 rounded-full px-4 py-2 text-sm transition-colors ${
-                giving ? 'bg-wine text-cream' : 'bg-white/80 text-wine shadow-[var(--shadow-soft)]'
-              }`}
-            >
-              {giving ? '🎁 Gift mode on · showing what’s taken' : '🎁 I’m choosing a gift'}
-            </button>
-          )}
-          {data && !giving && data.books.length > 0 && (
+          <h1 className="mt-3 text-[2.1rem] leading-tight font-semibold">{title}</h1>
+          {signedIn && (
             <p className="mt-2 text-xs text-mocha">
-              (Reserved gifts stay hidden until you tap that, so {name} can look without spoilers.)
+              {peeking ? (
+                <>
+                  Just looking, no spoilers ·{' '}
+                  <button
+                    className="underline"
+                    onClick={() => {
+                      setPeeking(false);
+                      writeLocal('snug-owner-peek', false);
+                    }}
+                  >
+                    I'm buying a gift
+                  </button>
+                </>
+              ) : (
+                <>
+                  Hi {visitor!.name} 👋 ·{' '}
+                  <button
+                    className="underline"
+                    onClick={() => {
+                      setVisitor(null);
+                      writeLocal('snug-giver-v2', null);
+                    }}
+                  >
+                    not you?
+                  </button>
+                </>
+              )}
             </p>
           )}
         </header>
@@ -127,6 +141,18 @@ export default function SharedWishlist({ token }: { token: string }) {
             <SleepyCat className="mx-auto w-32" />
             <p className="mt-3 text-cocoa">{error}</p>
           </div>
+        ) : !signedIn ? (
+          <SignIn
+            owner={owner}
+            onSignIn={(v) => {
+              setVisitor(v);
+              writeLocal('snug-giver-v2', v);
+            }}
+            onPeek={() => {
+              setPeeking(true);
+              writeLocal('snug-owner-peek', true);
+            }}
+          />
         ) : !data ? (
           <p className="pt-10 text-center text-sm text-mocha">Opening the wishlist…</p>
         ) : data.books.length === 0 ? (
@@ -137,10 +163,12 @@ export default function SharedWishlist({ token }: { token: string }) {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {data.books.map((w, i) => {
-              const taken = giving && w.claimedBy && !mine.includes(w.id);
-              const byMe = giving && mine.includes(w.id);
+              const taken = !peeking && w.claimedBy && !w.mine;
+              const byMe = !peeking && w.mine;
               const lang = LANG[w.language] ?? LANG.en;
-              const find = `https://www.bol.com/be/nl/s/?searchtext=${encodeURIComponent(w.isbn13 ?? `${w.title} ${w.author}`)}`;
+              const find =
+                w.buyUrl ||
+                `https://www.bol.com/be/nl/s/?searchtext=${encodeURIComponent(w.isbn13 ?? `${w.title} ${w.author}`)}`;
               return (
                 <motion.article
                   key={w.id}
@@ -183,10 +211,10 @@ export default function SharedWishlist({ token }: { token: string }) {
                     {w.isbn13 && <p className="mt-1 text-[11px] text-mocha select-text">ISBN {w.isbn13}</p>}
 
                     <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
-                      {giving &&
+                      {!peeking &&
                         (byMe ? (
                           <>
-                            <span className="text-xs font-medium text-wine">You’re getting this one 🎁</span>
+                            <span className="text-xs font-medium text-wine">You're getting this one 🎁</span>
                             <button className="text-xs text-mocha underline" onClick={() => void unclaim(w)}>
                               undo
                             </button>
@@ -195,12 +223,12 @@ export default function SharedWishlist({ token }: { token: string }) {
                           <span className="text-xs text-cocoa">Already taken by {w.claimedBy} 🎀</span>
                         ) : (
                           <Button className="px-4 py-2 text-xs" onClick={() => setAsking(w)}>
-                            I’ll get this
+                            I'll get this
                           </Button>
                         ))}
                       {!taken && (
                         <a href={find} target="_blank" rel="noreferrer" className="text-xs text-wine underline">
-                          Find it online
+                          {w.buyUrl ? 'Buy it here' : 'Find it online'}
                         </a>
                       )}
                     </div>
@@ -210,36 +238,60 @@ export default function SharedWishlist({ token }: { token: string }) {
             })}
           </div>
         )}
-        <p className="mt-10 text-center text-xs text-mocha">Made with love in Snug 📚</p>
+        <p className="mt-10 text-center text-xs text-mocha">Snug 📚</p>
       </div>
 
       <AnimatePresence>
-        {asking && (
-          <ClaimSheet
-            book={asking}
-            initial={giver}
-            onCancel={() => setAsking(null)}
-            onClaim={(who) => claim(asking, who)}
-          />
-        )}
+        {asking && <ClaimSheet book={asking} onCancel={() => setAsking(null)} onClaim={() => claim(asking)} />}
       </AnimatePresence>
     </div>
   );
 }
 
-function ClaimSheet({
-  book,
-  initial,
-  onCancel,
-  onClaim,
-}: {
-  book: Wish;
-  initial: string;
-  onCancel: () => void;
-  onClaim: (name: string) => Promise<void>;
-}) {
+/** Name and email first: then reservations follow them to any device */
+function SignIn({ owner, onSignIn, onPeek }: { owner?: string; onSignIn: (v: Visitor) => void; onPeek: () => void }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const ok = name.trim() && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+  return (
+    <form
+      className="mx-auto max-w-sm rounded-[var(--radius-card)] bg-white/75 p-5 shadow-[var(--shadow-soft)]"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ok) onSignIn({ name: name.trim(), email: email.trim().toLowerCase() });
+      }}
+    >
+      <p className="text-center text-sm text-cocoa">
+        Choosing a gift? Fill in your name and email. You can reserve a book, and change it later from any device.
+      </p>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Your name"
+        autoComplete="name"
+        maxLength={40}
+        className="mt-4 w-full rounded-2xl border border-sand bg-white/80 px-4 py-3 text-base"
+      />
+      <input
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Your email"
+        type="email"
+        autoComplete="email"
+        className="mt-2 w-full rounded-2xl border border-sand bg-white/80 px-4 py-3 text-base"
+      />
+      <Button type="submit" className="mt-4 w-full" disabled={!ok}>
+        Open the wishlist
+      </Button>
+      <button type="button" onClick={onPeek} className="mt-4 block w-full text-center text-xs text-mocha underline">
+        I'm {owner || 'the owner'}: show it without spoilers
+      </button>
+    </form>
+  );
+}
+
+function ClaimSheet({ book, onCancel, onClaim }: { book: Wish; onCancel: () => void; onClaim: () => Promise<void> }) {
   const lift = useKeyboardLift();
-  const [who, setWho] = useState(initial);
   const [busy, setBusy] = useState(false);
   return (
     <>
@@ -261,26 +313,18 @@ function ClaimSheet({
         <p className="text-3xl">🎁</p>
         <h2 className="mt-1 text-2xl font-semibold">Reserve {book.title}?</h2>
         <p className="mt-1 text-sm text-cocoa">
-          Other gift-givers will see it’s taken, so nobody buys it twice. She won’t see who.
+          Others choosing a gift will see it's taken, so nobody buys it twice. You can undo it any time.
         </p>
-        <input
-          value={who}
-          onChange={(e) => setWho(e.target.value)}
-          placeholder="Your name"
-          maxLength={40}
-          autoFocus
-          className="mt-4 w-full rounded-2xl border border-sand bg-white/80 px-4 py-3 text-base"
-        />
         <div className="mt-5 flex gap-3">
           <Button variant="soft" className="flex-1" onClick={onCancel}>
             Not yet
           </Button>
           <Button
             className="flex-1"
-            disabled={!who.trim() || busy}
+            disabled={busy}
             onClick={async () => {
               setBusy(true);
-              await onClaim(who.trim());
+              await onClaim();
             }}
           >
             Reserve it

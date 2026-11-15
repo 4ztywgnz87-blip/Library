@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Book } from '../types';
+import { coverSrc, isLoaded, keep } from '../lib/coverCache';
 
 const PALETTE = ['#7A2E3A', '#8B5E3C', '#5F6B52', '#A0644B', '#4E3B47', '#9C7A4C', '#6B4A3A', '#3F4E5A'];
 
@@ -22,7 +23,8 @@ export function Cover({
   rounded?: string;
 }) {
   const [failed, setFailed] = useState(false);
-  const src = book.customCover || book.coverUrl;
+  const src = book.customCover || coverSrc(book.coverUrl);
+  const known = !!src && isLoaded(src);
   return (
     <div
       className={`relative aspect-[2/3] overflow-hidden ${rounded} bg-sand shadow-[var(--shadow-book)] ${className}`}
@@ -31,7 +33,9 @@ export function Cover({
         <img
           src={src}
           alt={book.title}
-          loading="lazy"
+          loading={known ? 'eager' : 'lazy'}
+          decoding={known ? 'sync' : 'async'}
+          onLoad={() => src && keep(src)}
           onError={() => setFailed(true)}
           className="h-full w-full object-cover"
         />

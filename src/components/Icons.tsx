@@ -91,3 +91,15 @@ export const ChevronIcon = (p: P) => (
     <path d="m9 6 6 6-6 6" />
   </svg>
 );
+export const ShareIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 15V4M8 8l4-4 4 4M6 12v6.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V12" />
+  </svg>
+);
+/** A sheet of paper with lines, for page counts */
+export const PageIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M7 3.5h7l4 4v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z" />
+    <path d="M14 3.5v4h4M9 11.5h6M9 14.5h6M9 17.5h4" />
+  </svg>
+);

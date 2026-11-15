@@ -314,75 +314,111 @@ async function shareToken(env: Env) {
 
 app.get('/share/wishlist', async (c) => c.json({ token: (await shareToken(c.env)) ?? null }));
 
-/** Make the link (or, with `renew`, a new one that replaces the old link) */
+/** A friendly address from her name: /w/kels */
+function slugOf(name: string) {
+  return name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 24);
+}
+
+/**
+ * The link to share. With her name it becomes /w/<name>; reservations always carry over to the
+ * current link, so changing the address never loses them.
+ */
 app.post('/share/wishlist', async (c) => {
-  const { renew } = await c.req.json<{ renew?: boolean }>().catch(() => ({ renew: false }));
+  const { name = '' } = await c.req.json<{ name?: string }>().catch(() => ({ name: '' }));
   const existing = await shareToken(c.env);
-  if (existing && !renew) return c.json({ token: existing });
-  const bytes = crypto.getRandomValues(new Uint8Array(12));
-  const token = btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  const wanted = slugOf(name) || existing || crypto.randomUUID().slice(0, 8);
+  if (existing === wanted) {
+    await c.env.DB.prepare('UPDATE wish_shares SET name = ? WHERE token = ?').bind(name.trim(), wanted).run();
+    return c.json({ token: wanted });
+  }
   await c.env.DB.batch([
     c.env.DB.prepare('UPDATE wish_shares SET revoked = 1'),
-    c.env.DB.prepare('INSERT INTO wish_shares (token, created_at) VALUES (?, ?)').bind(token, Date.now()),
-    // gifts already reserved stay reserved under the new link
-    c.env.DB.prepare('UPDATE wish_claims SET token = ?').bind(token),
+    c.env.DB.prepare(
+      'INSERT INTO wish_shares (token, created_at, revoked, name) VALUES (?, ?, 0, ?) ON CONFLICT (token) DO UPDATE SET revoked = 0, name = excluded.name',
+    ).bind(wanted, Date.now(), name.trim()),
+    c.env.DB.prepare('UPDATE wish_claims SET token = ?').bind(wanted),
   ]);
-  return c.json({ token });
+  return c.json({ token: wanted });
 });
 
-async function validShare(env: Env, token: string) {
-  return !!(await env.DB.prepare('SELECT 1 FROM wish_shares WHERE token = ? AND revoked = 0').bind(token).first());
+/** Open every book up again (people reserved but never bought) */
+app.post('/share/wishlist/reset', async (c) => {
+  await c.env.DB.prepare('DELETE FROM wish_claims').run();
+  return c.json({ ok: true });
+});
+
+async function shareInfo(env: Env, token: string) {
+  return env.DB.prepare('SELECT name FROM wish_shares WHERE token = ? AND revoked = 0')
+    .bind(token)
+    .first<{ name: string | null }>();
 }
+
+const cleanEmail = (e?: string | null) => (e ?? '').trim().toLowerCase().slice(0, 120);
 
 app.get('/wish/:token', async (c) => {
   const token = c.req.param('token');
-  if (!(await validShare(c.env, token))) return c.json({ error: 'This wishlist link is no longer active' }, 404);
+  const share = await shareInfo(c.env, token);
+  if (!share) return c.json({ error: 'This wishlist link is no longer active' }, 404);
+  const email = cleanEmail(c.req.query('email'));
+  // her own peek (no email): nothing about reservations is sent at all
+  const showClaims = !!email;
   const { books, profile } = await loadLibrary(c.env);
-  const { results: claims } = await c.env.DB.prepare('SELECT book_id, name FROM wish_claims WHERE token = ?')
+  const { results: claims } = await c.env.DB.prepare('SELECT book_id, name, email FROM wish_claims WHERE token = ?')
     .bind(token)
-    .all<{ book_id: string; name: string }>();
-  const claimed = new Map(claims.map((r) => [r.book_id, r.name]));
+    .all<{ book_id: string; name: string; email: string | null }>();
+  const claimed = new Map(claims.map((r) => [r.book_id, r]));
   const wishes = books
     .filter((b) => b.status === 'wishlist' && !b.deleted)
     .sort((a, b) => b.addedAt - a.addedAt)
-    .map((b) => ({
-      id: b.id,
-      title: b.title,
-      author: b.authors[0] ?? '',
-      coverUrl: b.coverUrl,
-      // her own photo of a special edition, only when it's small enough to send along
-      customCover: b.customCover && b.customCover.length < 250_000 ? b.customCover : undefined,
-      language: b.language,
-      specialEdition: b.specialEdition,
-      series: b.series,
-      isbn13: b.isbn13,
-      pageCount: b.pageCount,
-      claimedBy: claimed.get(b.id) ?? null,
-    }));
-  return c.json({ name: profile?.name ?? '', books: wishes });
+    .map((b) => {
+      const cl = showClaims ? claimed.get(b.id) : undefined;
+      return {
+        id: b.id,
+        title: b.title,
+        author: b.authors[0] ?? '',
+        coverUrl: b.coverUrl,
+        // her own photo of a special edition, only when it's small enough to send along
+        customCover: b.customCover && b.customCover.length < 250_000 ? b.customCover : undefined,
+        language: b.language,
+        specialEdition: b.specialEdition,
+        series: b.series,
+        isbn13: b.isbn13,
+        buyUrl: b.buyUrl,
+        claimedBy: cl ? cl.name : null,
+        mine: !!cl && cl.email === email,
+      };
+    });
+  return c.json({ name: share.name || profile?.name || '', books: wishes });
 });
 
 app.post('/wish/:token/claim', async (c) => {
   const token = c.req.param('token');
-  if (!(await validShare(c.env, token))) return c.json({ error: 'This wishlist link is no longer active' }, 404);
-  const { bookId, name } = await c.req.json<{ bookId?: string; name?: string }>();
+  if (!(await shareInfo(c.env, token))) return c.json({ error: 'This wishlist link is no longer active' }, 404);
+  const { bookId, name, email } = await c.req.json<{ bookId?: string; name?: string; email?: string }>();
   const who = (name ?? '').trim().slice(0, 40);
-  if (!bookId || !who) return c.json({ error: 'Name missing' }, 400);
+  const mail = cleanEmail(email);
+  if (!bookId || !who || !mail.includes('@')) return c.json({ error: 'Name or email missing' }, 400);
   const res = await c.env.DB.prepare(
-    'INSERT INTO wish_claims (token, book_id, name, claimed_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+    'INSERT INTO wish_claims (token, book_id, name, claimed_at, email) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
   )
-    .bind(token, bookId, who, Date.now())
+    .bind(token, bookId, who, Date.now(), mail)
     .run();
   if (!res.meta.changes) return c.json({ error: 'Someone else has just reserved this one' }, 409);
   return c.json({ ok: true });
 });
 
+/** Undo a reservation: only the person who made it (same email), from any device */
 app.delete('/wish/:token/claim/:bookId', async (c) => {
-  await c.env.DB.prepare('DELETE FROM wish_claims WHERE token = ? AND book_id = ?')
-    .bind(c.req.param('token'), c.req.param('bookId'))
+  const mail = cleanEmail(c.req.query('email'));
+  if (!mail) return c.json({ error: 'Email missing' }, 400);
+  await c.env.DB.prepare('DELETE FROM wish_claims WHERE token = ? AND book_id = ? AND email = ?')
+    .bind(c.req.param('token'), c.req.param('bookId'), mail)
     .run();
   return c.json({ ok: true });
 });

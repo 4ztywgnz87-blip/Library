@@ -32,6 +32,7 @@ export default defineConfig({
           {
             // Book covers: keep them around so the library looks right offline
             urlPattern: ({ url }) =>
+              url.pathname === '/api/img' ||
               url.hostname.endsWith('books.google.com') ||
               url.hostname.endsWith('googleusercontent.com') ||
               url.hostname === 'covers.openlibrary.org',
