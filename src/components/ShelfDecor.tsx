@@ -1,5 +1,6 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
+import { CatHat, SEASON_LIGHTS, type Season } from './Seasonal';
 
 /** A terracotta pot with a leafy plant that sways gently */
 export function Plant({ className = '' }: { className?: string }) {
@@ -48,7 +49,16 @@ export function Plant({ className = '' }: { className?: string }) {
 /**
  * A candle in a glass jar. Tap to blow it out (a wisp of smoke curls up), tap again to light it.
  */
-export function Candle({ className = '' }: { className?: string }) {
+const WAX: Record<Season | 'default', [string, string, string, string]> = {
+  default: ['#efe1cc', '#fbf3e6', '#e2d1b8', '#f6e7cd'],
+  christmas: ['#b52a3c', '#d64a5a', '#9c2232', '#e06070'],
+  halloween: ['#d9772f', '#ef9a50', '#c0641f', '#f2ab6a'],
+  valentine: ['#f2a7b8', '#fbd0da', '#e58a9e', '#fbd6de'],
+  easter: ['#d7c8f4', '#ece4fb', '#c4b2ea', '#efe9fc'],
+};
+
+export function Candle({ className = '', season }: { className?: string; season?: Season }) {
+  const wax = WAX[season ?? 'default'];
   const id = useId();
   const [lit, setLit] = useState(true);
   const [puffs, setPuffs] = useState(0); // bumps each time it's blown out, to replay the smoke
@@ -76,9 +86,9 @@ export function Candle({ className = '' }: { className?: string }) {
           <stop offset="1" stopColor="#fff" stopOpacity="0.22" />
         </linearGradient>
         <linearGradient id={`${id}wax`} x1="0" x2="1">
-          <stop offset="0" stopColor="#efe1cc" />
-          <stop offset="0.5" stopColor="#fbf3e6" />
-          <stop offset="1" stopColor="#e2d1b8" />
+          <stop offset="0" stopColor={wax[0]} />
+          <stop offset="0.5" stopColor={wax[1]} />
+          <stop offset="1" stopColor={wax[2]} />
         </linearGradient>
       </defs>
       {/* warm glow (fades away when blown out) */}
@@ -94,7 +104,7 @@ export function Candle({ className = '' }: { className?: string }) {
       </motion.g>
       {/* wax inside the jar */}
       <rect x="14" y="56" width="32" height="38" rx="3" fill={`url(#${id}wax)`} />
-      <ellipse cx="30" cy="56" rx="16" ry="3" fill="#f6e7cd" />
+      <ellipse cx="30" cy="56" rx="16" ry="3" fill={wax[3]} />
       <ellipse cx="30" cy="56" rx="7" ry="1.4" fill={lit ? '#e9cf9f' : '#efe0c6'} />
       {/* wick, glowing at the tip for a moment after blowing out */}
       <rect x="29.3" y="47" width="1.4" height="9" rx="0.7" fill="#3b2a22" />
@@ -141,26 +151,81 @@ export function Candle({ className = '' }: { className?: string }) {
           />
         ))}
       {/* glass jar */}
-      <path d="M11 44h38v48a6 6 0 0 1-6 6H17a6 6 0 0 1-6-6z" fill={`url(#${id}glass)`} stroke="#fff" strokeOpacity="0.35" />
+      <path
+        d="M11 44h38v48a6 6 0 0 1-6 6H17a6 6 0 0 1-6-6z"
+        fill={`url(#${id}glass)`}
+        stroke="#fff"
+        strokeOpacity="0.35"
+      />
       <rect x="10" y="42" width="40" height="4" rx="2" fill="#fff" fillOpacity="0.3" />
-      <rect x="17" y="68" width="26" height="12" rx="2" fill="#c49a5a" fillOpacity="0.85" />
-      <text x="30" y="75.8" textAnchor="middle" fontSize="4.3" letterSpacing="0.1" fontFamily="Fraunces Variable, serif" fill="#3b2a22">
-        old books
-      </text>
+      {season === 'christmas' ? (
+        <g>
+          <path
+            d="M24 74c3-5 8-5 6 0 4-2 6 2 2 4-3 1-6 0-8-4zM36 74c-3-5-8-5-6 0-4-2-6 2-2 4 3 1 6 0 8-4z"
+            fill="#3f8a5a"
+          />
+          <circle cx="29" cy="76" r="2" fill="#d64545" />
+          <circle cx="32" cy="77.5" r="2" fill="#d64545" />
+        </g>
+      ) : season === 'halloween' ? (
+        <path d="M30 72c-2-3-5-3-7-1 2 0 3 2 2 4 2-1 3 0 5 2 2-2 3-3 5-2-1-2 0-4 2-4-2-2-5-2-7 1z" fill="#3b2a22" />
+      ) : season === 'valentine' ? (
+        <path d="M30 71c2-4 8-3 6 2-1.5 3-6 6-6 6s-4.5-3-6-6c-2-5 4-6 6-2z" fill="#e05a73" />
+      ) : season === 'easter' ? (
+        <g>
+          {[0, 72, 144, 216, 288].map((r) => (
+            <ellipse key={r} cx="30" cy="71" rx="2" ry="3" fill="#fbe39a" transform={`rotate(${r} 30 74)`} />
+          ))}
+          <circle cx="30" cy="74" r="1.6" fill="#f2a7b8" />
+        </g>
+      ) : (
+        <>
+          <rect x="17" y="68" width="26" height="12" rx="2" fill="#c49a5a" fillOpacity="0.85" />
+          <text
+            x="30"
+            y="75.8"
+            textAnchor="middle"
+            fontSize="4.3"
+            letterSpacing="0.1"
+            fontFamily="Fraunces Variable, serif"
+            fill="#3b2a22"
+          >
+            old books
+          </text>
+        </>
+      )}
     </svg>
   );
 }
 
 /** A ceramic mug with a heart, rising steam, on a little stack of books */
-export function Mug({ className = '' }: { className?: string }) {
+/** Tap the mug: it wobbles, a puff of steam rises and a little heart floats up */
+const MUG: Record<Season | 'default', { colors: [string, string, string]; rim: string; tea: string }> = {
+  default: { colors: ['#6a2632', '#8e3a47', '#5a1f29'], rim: '#4a1821', tea: '#7b4a30' },
+  christmas: { colors: ['#a3202b', '#d23a3a', '#8a1a24'], rim: '#6e131b', tea: '#f7efe6' },
+  halloween: { colors: ['#3b2a4f', '#5a3f73', '#2d1f3d'], rim: '#21162d', tea: '#6ab04c' },
+  valentine: { colors: ['#e58a9a', '#f2a7b8', '#d97085'], rim: '#c25d72', tea: '#8a5a44' },
+  easter: { colors: ['#f1d27a', '#f7e3a1', '#e2bf5f'], rim: '#c9a54a', tea: '#c98a5a' },
+};
+
+export function Mug({ className = '', season }: { className?: string; season?: Season }) {
   const id = useId();
+  const look = MUG[season ?? 'default'];
+  const [sips, setSips] = useState(0);
   return (
-    <svg viewBox="0 0 80 94" className={className} aria-hidden>
+    <motion.svg
+      viewBox="0 0 80 94"
+      className={className}
+      role="button"
+      aria-label="Mug of tea"
+      style={{ cursor: 'pointer', overflow: 'visible', WebkitTapHighlightColor: 'transparent' }}
+      onClick={() => setSips((n) => n + 1)}
+    >
       <defs>
         <linearGradient id={`${id}mug`} x1="0" x2="1">
-          <stop offset="0" stopColor="#6a2632" />
-          <stop offset="0.4" stopColor="#8e3a47" />
-          <stop offset="1" stopColor="#5a1f29" />
+          <stop offset="0" stopColor={look.colors[0]} />
+          <stop offset="0.4" stopColor={look.colors[1]} />
+          <stop offset="1" stopColor={look.colors[2]} />
         </linearGradient>
       </defs>
       {[28, 38, 48].map((x, i) => (
@@ -175,13 +240,101 @@ export function Mug({ className = '' }: { className?: string }) {
           transition={{ duration: 2.8, repeat: Infinity, delay: i * 0.8 }}
         />
       ))}
-      {/* mug */}
-      <path d="M18 36h40v24a12 12 0 0 1-12 12H30a12 12 0 0 1-12-12z" fill={`url(#${id}mug)`} />
-      <path d="M58 41h4a8 8 0 0 1 0 16h-5" stroke="#7a2e3a" strokeWidth="4.5" fill="none" strokeLinecap="round" />
-      <ellipse cx="38" cy="36" rx="20" ry="3.4" fill="#4a1821" />
-      <ellipse cx="38" cy="36.6" rx="17" ry="2.4" fill="#7b4a30" />
-      <path d="M33 47c2-4 7-3 5 1-1 3-5 5-5 5s-4-2-5-5c-2-4 3-5 5-1z" fill="#f1dcdc" opacity="0.9" />
-      <path d="M23 40v20" stroke="#fff" strokeOpacity="0.18" strokeWidth="3" strokeLinecap="round" />
+      {/* a heart floats up from the tea after a tap */}
+      {sips > 0 && (
+        <motion.path
+          key={`heart${sips}`}
+          d="M38 20c2-4 8-3 6 2-1.5 3-6 6-6 6s-4.5-3-6-6c-2-5 4-6 6-2z"
+          fill="#e58a9a"
+          initial={{ opacity: 0, y: 8, scale: 0.6 }}
+          animate={{ opacity: [0, 1, 1, 0], y: [8, -6, -20, -34], scale: [0.6, 1, 1.05, 1], x: [0, -3, 3, 0] }}
+          transition={{ duration: 2.2, ease: 'easeOut' }}
+          style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+        />
+      )}
+      {sips > 0 &&
+        [30, 46].map((x, i) => (
+          <motion.path
+            key={`puff${sips}-${i}`}
+            d={`M${x} 30c-4-5 4-8 0-13`}
+            stroke="#f3ebe1"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            fill="none"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: [0, 0.9, 0], y: [4, -10] }}
+            transition={{ duration: 1.4, delay: i * 0.15 }}
+          />
+        ))}
+      {/* mug (wobbles when tapped) */}
+      <motion.g
+        key={`mug${sips}`}
+        animate={sips ? { rotate: [0, -7, 5, -2, 0] } : undefined}
+        transition={{ duration: 0.6 }}
+        style={{ transformBox: 'view-box', transformOrigin: '38px 72px' }}
+      >
+        <path d="M18 36h40v24a12 12 0 0 1-12 12H30a12 12 0 0 1-12-12z" fill={`url(#${id}mug)`} />
+        <path
+          d="M58 41h4a8 8 0 0 1 0 16h-5"
+          stroke={look.colors[0]}
+          strokeWidth="4.5"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <ellipse cx="38" cy="36" rx="20" ry="3.4" fill={look.rim} />
+        <ellipse cx="38" cy="36.6" rx="17" ry="2.4" fill={look.tea} />
+        {season === 'christmas' ? (
+          <>
+            <rect x="30" y="33.5" width="4" height="3" rx="1" fill="#fff" />
+            <rect x="38" y="34" width="4" height="3" rx="1" fill="#fde2e6" />
+            <path
+              d="M33 44v12M27.8 47l10.4 6M27.8 53l10.4-6"
+              stroke="#fff"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              opacity="0.9"
+            />
+            <path d="M50 52V34c0-5 8-5 8 0" stroke="#fff" strokeWidth="3.2" fill="none" strokeLinecap="round" />
+            <path
+              d="M50 52V34c0-5 8-5 8 0"
+              stroke="#d64545"
+              strokeWidth="3.2"
+              fill="none"
+              strokeLinecap="round"
+              strokeDasharray="2.5 2.5"
+            />
+          </>
+        ) : season === 'halloween' ? (
+          <>
+            {[32, 42].map((x, i) => (
+              <motion.circle
+                key={x}
+                cx={x}
+                cy={35}
+                r={1.6}
+                fill="#9be07b"
+                animate={{ y: [0, -5], opacity: [1, 0] }}
+                transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.7 }}
+              />
+            ))}
+            <path d="M33 47c-2-3-5-3-7-1 2 0 3 2 2 4 2-1 3 0 5 2 2-2 3-3 5-2-1-2 0-4 2-4-2-2-5-2-7 1z" fill="#ff9f43" />
+          </>
+        ) : season === 'easter' ? (
+          <g>
+            {[0, 72, 144, 216, 288].map((r) => (
+              <ellipse key={r} cx="33" cy="46" rx="2.2" ry="3.4" fill="#fff" transform={`rotate(${r} 33 49)`} />
+            ))}
+            <circle cx="33" cy="49" r="1.8" fill="#f2a7b8" />
+          </g>
+        ) : (
+          <path
+            d="M33 47c2-4 7-3 5 1-1 3-5 5-5 5s-4-2-5-5c-2-4 3-5 5-1z"
+            fill={season === 'valentine' ? '#c8344d' : '#f1dcdc'}
+            opacity="0.9"
+          />
+        )}
+        <path d="M23 40v20" stroke="#fff" strokeOpacity="0.18" strokeWidth="3" strokeLinecap="round" />
+      </motion.g>
       {/* books underneath */}
       <rect x="6" y="72" width="66" height="10" rx="1.5" fill="#5f6b52" />
       <rect x="6" y="73" width="3" height="8" fill="#e9c98f" opacity="0.7" />
@@ -191,7 +344,7 @@ export function Mug({ className = '' }: { className?: string }) {
       <rect x="10" y="82" width="62" height="2" rx="1" fill="#fff" opacity="0.15" />
       <rect x="14" y="85" width="34" height="2" fill="#e9c98f" opacity="0.7" />
       <rect x="66" y="83.5" width="5" height="9" fill="#f3ead9" />
-    </svg>
+    </motion.svg>
   );
 }
 
@@ -200,7 +353,7 @@ export function Mug({ className = '' }: { className?: string }) {
  * "z"s drift up towards the dream cloud, and now and then the tail gives a lazy flick. The tail
  * keeps its shape and only rotates around where it joins the body, so nothing can flicker.
  */
-export function ShelfCat({ className = '' }: { className?: string }) {
+export function ShelfCat({ className = '', season }: { className?: string; season?: Season }) {
   const id = useId();
   return (
     <svg viewBox="0 0 150 80" className={className} aria-hidden style={{ overflow: 'visible' }}>
@@ -210,17 +363,33 @@ export function ShelfCat({ className = '' }: { className?: string }) {
           <stop offset="1" stopColor="#9a6a43" />
         </linearGradient>
       </defs>
-      {/* tail: a slow, lazy flick now and then */}
-      <motion.g
-        style={{ transformOrigin: '112px 66px', transformBox: 'view-box', willChange: 'transform' }}
-        animate={{ rotate: [0, 0, 12, 0, 0] }}
-        transition={{ duration: 7, repeat: Infinity, times: [0, 0.55, 0.68, 0.82, 1], ease: 'easeInOut' }}
-      >
-        <path d="M112 66c18 2 28-6 30-20" stroke="#a87449" strokeWidth="8" strokeLinecap="round" fill="none" />
-      </motion.g>
       {/* body */}
       <path d="M44 74c-4-20 14-34 40-34 24 0 36 12 34 34z" fill={`url(#${id}fur)`} />
-      <path d="M70 42c2 6 2 12 0 18M82 40c2 7 2 14 0 21M94 42c2 6 2 12 0 18M104 48c2 5 2 10 0 14" stroke="#8a5a36" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.6" />
+      <path
+        d="M70 42c2 6 2 12 0 18M82 40c2 7 2 14 0 21M94 42c2 6 2 12 0 18M104 48c2 5 2 10 0 14"
+        stroke="#8a5a36"
+        strokeWidth="3"
+        strokeLinecap="round"
+        fill="none"
+        opacity="0.6"
+      />
+      {/* tail: grows out of the back of the body (drawn in front, so it never disappears behind the
+          cat) and curls up; a slow, lazy flick of the tip now and then */}
+      <motion.g
+        style={{ transformOrigin: '112px 70px', transformBox: 'view-box', willChange: 'transform' }}
+        animate={{ rotate: [0, 0, -9, 0, 0] }}
+        transition={{ duration: 7, repeat: Infinity, times: [0, 0.55, 0.68, 0.82, 1], ease: 'easeInOut' }}
+      >
+        <path d="M108 71c16 3 31 0 34-15" stroke="#a87449" strokeWidth="8" strokeLinecap="round" fill="none" />
+        <path
+          d="M139.5 61c1.6-1.8 2.4-3.6 2.5-5"
+          stroke="#8a5a36"
+          strokeWidth="8"
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.55"
+        />
+      </motion.g>
       {/* front paws */}
       <ellipse cx="34" cy="74" rx="9" ry="4.5" fill="#f2e3cf" />
       <ellipse cx="52" cy="75" rx="9" ry="4.5" fill="#f2e3cf" />
@@ -230,15 +399,41 @@ export function ShelfCat({ className = '' }: { className?: string }) {
       <path d="M25.5 29l1.2-8 6 5z" fill="#e7b9a8" />
       <path d="M57 26l6-5 1.2 8z" fill="#e7b9a8" />
       <ellipse cx="45" cy="47" rx="25" ry="21" fill={`url(#${id}fur)`} />
-      <path d="M40 27c2 3 2 6 0 9M46 26c1 3 1 6 0 9M52 27c-1 3-1 6 0 9" stroke="#8a5a36" strokeWidth="2.2" strokeLinecap="round" fill="none" opacity="0.6" />
+      <path
+        d="M40 27c2 3 2 6 0 9M46 26c1 3 1 6 0 9M52 27c-1 3-1 6 0 9"
+        stroke="#8a5a36"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        fill="none"
+        opacity="0.6"
+      />
       {/* muzzle */}
       <ellipse cx="45" cy="57" rx="12" ry="9" fill="#f2e3cf" />
       <path d="M42 53.5h6l-3 3z" fill="#d98b84" />
-      <path d="M45 56.5v2.5M45 59c-2 2-4 2-5 0M45 59c2 2 4 2 5 0" stroke="#5c4033" strokeWidth="1" fill="none" strokeLinecap="round" />
+      <path
+        d="M45 56.5v2.5M45 59c-2 2-4 2-5 0M45 59c2 2 4 2 5 0"
+        stroke="#5c4033"
+        strokeWidth="1"
+        fill="none"
+        strokeLinecap="round"
+      />
       {/* closed, sleepy eyes */}
-      <path d="M30.5 45.5q4.5 3.2 9 0M50.5 45.5q4.5 3.2 9 0" stroke="#3b2a22" strokeWidth="1.6" strokeLinecap="round" fill="none" />
+      <path
+        d="M30.5 45.5q4.5 3.2 9 0M50.5 45.5q4.5 3.2 9 0"
+        stroke="#3b2a22"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        fill="none"
+      />
       {/* whiskers */}
-      <path d="M33 57l-14-2M33 60l-13 2M57 57l14-2M57 60l13 2" stroke="#fff" strokeOpacity="0.7" strokeWidth="0.8" strokeLinecap="round" />
+      <path
+        d="M33 57l-14-2M33 60l-13 2M57 57l14-2M57 60l13 2"
+        stroke="#fff"
+        strokeOpacity="0.7"
+        strokeWidth="0.8"
+        strokeLinecap="round"
+      />
+      {season && <CatHat season={season} />}
       {/* z z z, drifting up and away from the head (left of the ear) */}
       {[0, 1, 2].map((i) => (
         <motion.text
@@ -261,7 +456,8 @@ export function ShelfCat({ className = '' }: { className?: string }) {
 }
 
 /** String of fairy lights with soft glowing halos */
-export function FairyLights({ className = '' }: { className?: string }) {
+export function FairyLights({ className = '', season }: { className?: string; season?: Season }) {
+  const colors = SEASON_LIGHTS[season ?? 'default'];
   const id = useId();
   const bulbs = Array.from({ length: 13 }, (_, i) => i);
   const yAt = (x: number) => 6 + 9 * Math.sin((x / 300) * Math.PI) + 3 * Math.sin((x / 300) * Math.PI * 4);
@@ -281,7 +477,7 @@ export function FairyLights({ className = '' }: { className?: string }) {
       {bulbs.map((i) => {
         const x = 8 + i * 23.5;
         const y = yAt(x) + 5;
-        const color = ['#ffd27a', '#ffb89a', '#fff0b8'][i % 3];
+        const color = colors[i % 3];
         return (
           <g key={i}>
             <motion.circle
@@ -362,10 +558,26 @@ export function DreamCloud({ count, className = '' }: { count: number; className
         <circle cx="140" cy="106" r="4" fill={`url(#${id}c)`} />
         <circle cx="149" cy="116" r="2.6" fill={`url(#${id}c)`} />
       </g>
-      <text x="80" y="49" textAnchor="middle" fontFamily="Inter Variable, sans-serif" fontSize="7.5" letterSpacing="1.1" fill="#a08a78">
+      <text
+        x="80"
+        y="49"
+        textAnchor="middle"
+        fontFamily="Inter Variable, sans-serif"
+        fontSize="7.5"
+        letterSpacing="1.1"
+        fill="#a08a78"
+      >
         WISHLIST
       </text>
-      <text x="80" y="63" textAnchor="middle" fontFamily="Fraunces Variable, serif" fontSize="12" fontWeight="600" fill="#7a2e3a">
+      <text
+        x="80"
+        y="63"
+        textAnchor="middle"
+        fontFamily="Fraunces Variable, serif"
+        fontSize="12"
+        fontWeight="600"
+        fill="#7a2e3a"
+      >
         {count === 0 ? 'Dreaming of books' : `Dreaming of ${count} ${count === 1 ? 'book' : 'books'}`}
       </text>
       {[
@@ -393,29 +605,87 @@ export function DreamCloud({ count, className = '' }: { count: number; className
  * A trailing pothos in a pot on top of the bookcase; its vines hang down over the front
  * edge and sway gently. The top of the bookcase is at y = 80.
  */
+const today = () => new Date().toISOString().slice(0, 10);
+const wateredToday = () => {
+  try {
+    return localStorage.getItem('snug-plant-watered') === today();
+  } catch {
+    return false;
+  }
+};
+
+/** Tap the plant to water it: drops fall, the vines do a happy little dance and it flowers for the day */
 export function HangingPlant({ className = '' }: { className?: string }) {
   const id = useId();
+  const [waters, setWaters] = useState(0);
+  const [bloom, setBloom] = useState(wateredToday);
+  const water = () => {
+    setWaters((n) => n + 1);
+    setTimeout(() => setBloom(true), 900);
+    try {
+      localStorage.setItem('snug-plant-watered', today());
+    } catch {
+      /* no storage: it just flowers until the app closes */
+    }
+  };
+  // a five-petal flower that pops open
+  const flower = (x: number, y: number, delay: number, color: string) => (
+    <motion.g
+      key={`${x}-${y}`}
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ delay, type: 'spring', stiffness: 260, damping: 12 }}
+      style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+    >
+      {[0, 72, 144, 216, 288].map((r) => (
+        <ellipse key={r} cx={x} cy={y - 3} rx="2.2" ry="3.2" fill={color} transform={`rotate(${r} ${x} ${y})`} />
+      ))}
+      <circle cx={x} cy={y} r="1.6" fill="#f3d27a" />
+    </motion.g>
+  );
   // heart-shaped leaf at (x, y), turned by `r` degrees
   const leaf = (x: number, y: number, r: number, s = 1, shade = 0) => (
     <g transform={`translate(${x} ${y}) rotate(${r}) scale(${s})`}>
-      <path d="M0 0c-6-2-9-8-6-12 2-3 5-2 6 0 1-2 4-3 6 0 3 4 0 10-6 12z" fill={['#6f8f5c', '#85a56f', '#5f7d4f'][shade]} />
+      <path
+        d="M0 0c-6-2-9-8-6-12 2-3 5-2 6 0 1-2 4-3 6 0 3 4 0 10-6 12z"
+        fill={['#6f8f5c', '#85a56f', '#5f7d4f'][shade]}
+      />
       <path d="M0 0v-10" stroke="#4f6a42" strokeWidth="0.7" opacity="0.6" />
     </g>
   );
-  const vine = (d: string, leaves: [number, number, number, number?, number?][], delay: number, originX: number) => (
+  const vine = (
+    d: string,
+    leaves: [number, number, number, number?, number?][],
+    delay: number,
+    originX: number,
+    flowers?: ReactNode,
+  ) => (
     <motion.g
       style={{ transformOrigin: `${originX}px 46px`, transformBox: 'view-box', willChange: 'transform' }}
-      animate={{ rotate: [-2.5, 2.5, -2.5] }}
-      transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay }}
+      key={`v${waters}`}
+      animate={waters ? { rotate: [-2.5, 7, -6, 4, -2.5, 2.5, -2.5] } : { rotate: [-2.5, 2.5, -2.5] }}
+      transition={
+        waters
+          ? { duration: 6, times: [0, 0.06, 0.13, 0.2, 0.28, 0.64, 1], ease: 'easeInOut', delay: 0.6 }
+          : { duration: 6, repeat: Infinity, ease: 'easeInOut', delay }
+      }
     >
       <path d={d} stroke="#5f7d4f" strokeWidth="1.6" fill="none" strokeLinecap="round" />
       {leaves.map(([x, y, r, s, sh], i) => (
         <g key={i}>{leaf(x, y, r, s, sh)}</g>
       ))}
+      {flowers}
     </motion.g>
   );
   return (
-    <svg viewBox="0 0 90 160" className={className} aria-hidden style={{ overflow: 'visible' }}>
+    <svg
+      viewBox="0 0 90 160"
+      className={className}
+      role="button"
+      aria-label="Water the plant"
+      onClick={water}
+      style={{ overflow: 'visible', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+    >
       <defs>
         <linearGradient id={`${id}pot`} x1="0" x2="1">
           <stop offset="0" stopColor="#b8654a" />
@@ -428,9 +698,55 @@ export function HangingPlant({ className = '' }: { className?: string }) {
       <rect x="18" y="44" width="54" height="9" rx="2.5" fill="#d08a6c" />
       <path d="M28 56c1 7 2 14 3 21" stroke="#fff" strokeOpacity="0.18" strokeWidth="3" strokeLinecap="round" />
       {/* vines spilling over the rim, in front of the pot, and down over the cornice */}
-      {vine('M26 48c-6 16-6 38-10 62-2 14-1 28 3 40', [[22, 62, 160, 1, 0], [18, 82, 200, 1.1, 2], [16, 102, 150, 1, 1], [16, 122, 210, 0.9, 0], [19, 142, 170, 0.8, 2]], 0, 26)}
-      {vine('M42 49c3 18 2 36 5 56 2 12 1 22-1 30', [[44, 64, 200, 1, 1], [46, 84, 160, 1.1, 0], [47, 104, 210, 0.9, 2], [46, 124, 170, 0.8, 1]], 0.8, 42)}
-      {vine('M60 48c7 12 10 26 10 42', [[63, 60, 210, 1, 2], [68, 74, 160, 0.9, 0], [70, 88, 200, 0.8, 1]], 1.6, 60)}
+      {vine(
+        'M26 48c-6 16-6 38-10 62-2 14-1 28 3 40',
+        [
+          [22, 62, 160, 1, 0],
+          [18, 82, 200, 1.1, 2],
+          [16, 102, 150, 1, 1],
+          [16, 122, 210, 0.9, 0],
+          [19, 142, 170, 0.8, 2],
+        ],
+        0,
+        26,
+        bloom && [flower(23, 70, 0, '#f2a7b8'), flower(17, 112, 0.45, '#f7c6d0')],
+      )}
+      {vine(
+        'M42 49c3 18 2 36 5 56 2 12 1 22-1 30',
+        [
+          [44, 64, 200, 1, 1],
+          [46, 84, 160, 1.1, 0],
+          [47, 104, 210, 0.9, 2],
+          [46, 124, 170, 0.8, 1],
+        ],
+        0.8,
+        42,
+        bloom && flower(47, 92, 0.15, '#f7c6d0'),
+      )}
+      {vine(
+        'M60 48c7 12 10 26 10 42',
+        [
+          [63, 60, 210, 1, 2],
+          [68, 74, 160, 0.9, 0],
+          [70, 88, 200, 0.8, 1],
+        ],
+        1.6,
+        60,
+        bloom && flower(66, 68, 0.3, '#f2a7b8'),
+      )}
+      {/* water drops after a tap */}
+      {waters > 0 &&
+        [36, 46, 56].map((x, i) => (
+          <motion.path
+            key={`drop${waters}-${i}`}
+            d={`M${x} 0c2 3 3 5 3 6.5a3 3 0 0 1-6 0c0-1.5 1-3.5 3-6.5z`}
+            fill="#8cc2e0"
+            initial={{ opacity: 0, y: -14 }}
+            animate={{ opacity: [0, 1, 1, 0], y: [-14, 10, 30, 36] }}
+            transition={{ duration: 0.9, delay: i * 0.12, ease: 'easeIn' }}
+          />
+        ))}
+      {/* watered today: little flowers on the vines */}
       {/* leaves on top of the pot */}
       {leaf(30, 44, -20, 1.1, 1)}
       {leaf(40, 42, 5, 1.2, 0)}

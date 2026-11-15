@@ -326,7 +326,7 @@ function FitCard({ book, fit }: { book: SearchResult; fit: FitResponse }) {
             </div>
           </div>
         </div>
-        <p className="text-sm leading-relaxed">{fit.why}</p>
+        <p className="text-sm leading-relaxed select-text">{fit.why}</p>
         {fit.headsUp && (
           <p className="rounded-xl bg-linen px-3 py-2 text-sm text-cocoa">
             <span className="font-medium">Heads up:</span> {fit.headsUp}

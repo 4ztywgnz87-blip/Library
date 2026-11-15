@@ -68,8 +68,35 @@ export function Layout() {
               }
               aria-label={label}
             >
-              <Icon width={primary ? 26 : 23} height={primary ? 26 : 23} />
-              {!primary && <span>{label}</span>}
+              {({ isActive }) =>
+                primary ? (
+                  <Icon width={26} height={26} />
+                ) : (
+                  <>
+                    {/* the icon hops when its tab opens */}
+                    <motion.span
+                      key={isActive ? 'on' : 'off'}
+                      initial={false}
+                      animate={isActive ? { y: [0, -4, 0], scale: [1, 1.12, 1] } : undefined}
+                      transition={{ duration: 0.4, ease: 'easeOut' }}
+                      className="block"
+                    >
+                      <Icon width={23} height={23} />
+                    </motion.span>
+                    <span>{label}</span>
+                    {/* a tiny heart under the open tab */}
+                    <motion.svg
+                      viewBox="0 0 10 9"
+                      className="h-[7px] w-[8px]"
+                      initial={false}
+                      animate={{ scale: isActive ? 1 : 0, opacity: isActive ? 1 : 0 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                    >
+                      <path d="M5 2C6 0 10 0 9.4 3 8.8 5.5 5 8 5 8S1.2 5.5.6 3C0 0 4 0 5 2z" fill="currentColor" />
+                    </motion.svg>
+                  </>
+                )
+              }
             </NavLink>
           ))}
         </div>

@@ -314,7 +314,7 @@ function PickCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg leading-snug font-semibold">{pick.title}</h3>
+              <h3 className="text-lg leading-snug font-semibold select-text">{pick.title}</h3>
               <p className="text-sm text-cocoa">{pick.author}</p>
             </div>
             {pick.score !== undefined && (
@@ -325,7 +325,7 @@ function PickCard({
             )}
           </div>
           {pick.seriesNote && <p className="mt-1 text-xs text-mocha">{pick.seriesNote}</p>}
-          <p className="mt-2 text-sm leading-relaxed text-ink/90">{pick.why}</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink/90 select-text">{pick.why}</p>
           {pick.headsUp && (
             <p className="mt-1.5 text-xs leading-relaxed text-cocoa">
               <span className="font-medium">Heads up:</span> {pick.headsUp}

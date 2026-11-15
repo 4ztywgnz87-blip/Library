@@ -89,8 +89,8 @@ export default function BookDetail() {
           >
             <Cover book={book} rounded="rounded-lg" />
           </motion.div>
-          <h1 className="mt-5 text-3xl leading-tight font-semibold">{book.title}</h1>
-          <p className="mt-1 text-cocoa">{book.authors.join(', ')}</p>
+          <h1 className="mt-5 text-3xl leading-tight font-semibold select-text">{book.title}</h1>
+          <p className="mt-1 text-cocoa select-text">{book.authors.join(', ')}</p>
           {book.series && (
             <p className="mt-1 text-sm text-mocha">
               {book.series.name}
@@ -292,7 +292,9 @@ function RatingCard({ book }: { book: Book }) {
             Edit
           </Button>
         </div>
-        {book.review && <p className="font-soft text-[15px] leading-relaxed text-ink/90 italic">“{book.review}”</p>}
+        {book.review && (
+          <p className="font-soft text-[15px] leading-relaxed text-ink/90 italic select-text">“{book.review}”</p>
+        )}
         {book.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {book.tags.map((t) => (
@@ -460,7 +462,7 @@ function AboutCard({ text }: { text: string }) {
   return (
     <Card>
       <p className="mb-2 text-xs tracking-wide text-mocha uppercase">About</p>
-      <p className={`text-sm leading-relaxed text-ink/90 ${open ? '' : 'line-clamp-5'}`}>{text}</p>
+      <p className={`text-sm leading-relaxed text-ink/90 select-text ${open ? '' : 'line-clamp-5'}`}>{text}</p>
       {text.length > 300 && (
         <button className="mt-2 text-sm text-wine" onClick={() => setOpen(!open)}>
           {open ? 'Show less' : 'Read more'}
@@ -516,7 +518,7 @@ function FitForYou({ book }: { book: Book }) {
           <span className="mt-0.5 text-[0.6rem] whitespace-nowrap text-mocha">{matchLabel(m.score)}</span>
         </div>
         <div className="min-w-0 text-sm">
-          <p className="leading-relaxed text-ink/90">{m.why}</p>
+          <p className="leading-relaxed text-ink/90 select-text">{m.why}</p>
           {m.headsUp && (
             <p className="mt-1.5 text-xs leading-relaxed text-cocoa">
               <span className="font-medium">Heads up:</span> {m.headsUp}

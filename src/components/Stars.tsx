@@ -61,7 +61,7 @@ export function StarsInput({
         animate={sparkle ? { scale: [1, 1.08, 1] } : undefined}
         transition={{ duration: 0.35 }}
         ref={ref}
-        className="flex touch-none gap-1 select-none"
+        className="relative flex touch-none gap-1 select-none"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           setDraft(valueAt(e.clientX));
@@ -90,6 +90,30 @@ export function StarsInput({
         {[0, 1, 2, 3, 4].map((i) => (
           <Star key={i} fill={Math.max(0, Math.min(1, shown - i))} size={size} />
         ))}
+        {/* a few golden sparkles fly out of the chosen star */}
+        {sparkle > 0 && value !== undefined && (
+          <span
+            className="pointer-events-none absolute"
+            style={{ left: `${((Math.ceil(value) - 0.5) / 5) * 100}%`, top: '50%' }}
+          >
+            {[0, 60, 120, 180, 240, 300].map((deg) => (
+              <motion.span
+                key={`${sparkle}-${deg}`}
+                className="absolute text-[10px] leading-none text-gold"
+                initial={{ x: 0, y: 0, opacity: 1, scale: 0.6 }}
+                animate={{
+                  x: Math.cos((deg * Math.PI) / 180) * (size * 0.75),
+                  y: Math.sin((deg * Math.PI) / 180) * (size * 0.75),
+                  opacity: 0,
+                  scale: 1.1,
+                }}
+                transition={{ duration: 0.7, ease: 'easeOut' }}
+              >
+                ✦
+              </motion.span>
+            ))}
+          </span>
+        )}
       </motion.div>
       <div className="flex h-5 items-center gap-3 text-sm text-cocoa">
         {shown > 0 ? (

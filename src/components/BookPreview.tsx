@@ -98,8 +98,8 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
               className="w-28 shrink-0"
             />
             <div className="min-w-0">
-              <h2 className="text-2xl leading-tight font-semibold">{details.title}</h2>
-              <p className="mt-1 text-cocoa">{details.author}</p>
+              <h2 className="text-2xl leading-tight font-semibold select-text">{details.title}</h2>
+              <p className="mt-1 text-cocoa select-text">{details.author}</p>
               {details.series && (
                 <p className="mt-1 text-sm text-mocha">
                   {details.series.name}
@@ -122,7 +122,7 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
                 </span>
               </div>
               <div className="min-w-0 text-sm">
-                <p className="mt-0.5 leading-relaxed text-ink/90">{book.match.why}</p>
+                <p className="mt-0.5 leading-relaxed text-ink/90 select-text">{book.match.why}</p>
                 {book.match.headsUp && (
                   <p className="mt-1.5 text-xs leading-relaxed text-cocoa">
                     <span className="font-medium">Heads up:</span> {book.match.headsUp}
@@ -133,7 +133,7 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
           )}
           {details.description ? (
             <div className="mt-5">
-              <p className={`text-sm leading-relaxed text-ink/90 ${open ? '' : 'line-clamp-6'}`}>
+              <p className={`text-sm leading-relaxed text-ink/90 select-text ${open ? '' : 'line-clamp-6'}`}>
                 {details.description}
               </p>
               {details.description.length > 320 && (

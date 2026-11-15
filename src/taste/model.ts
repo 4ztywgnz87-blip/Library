@@ -167,6 +167,9 @@ const SCALE_SIM_WEIGHT: Partial<Record<ScaleId, number>> = {
 // ---------- helpers ----------
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+/** "A Court of Thorns and Roses" and "Court of Thorns and Roses series" are the same series */
+const seriesNorm = (s: string) =>
+  norm(s.replace(/^(a|an|the)\s+/i, '').replace(/\s+(series|saga|trilogy|duology)$/i, ''));
 const lastName = (a: string) => (a.toLowerCase().match(/[a-z]+/g) ?? []).pop() ?? '';
 const groupOf = (f: FeatureId) => f.split(':')[0] as TagGroup | 'scale';
 const fmt = (r: number) =>
@@ -207,8 +210,8 @@ export interface Taste {
   author: Map<string, { dev: number; count: number; best?: LibraryBook; worst?: LibraryBook }>;
   favourites: Set<string>;
   quiz?: Quiz;
-  /** features she named in the quiz */
-  fromQuiz: Set<FeatureId>;
+  /** features she named in the quiz, with the quiz's own words for them */
+  fromQuiz: Map<FeatureId, string>;
 }
 
 export function learn(library: LibraryBook[], quiz?: Quiz): Taste {
@@ -282,19 +285,19 @@ export function learn(library: LibraryBook[], quiz?: Quiz): Taste {
         });
   }
   // the quiz
-  const fromQuiz = new Set<FeatureId>();
+  const fromQuiz = new Map<FeatureId, string>();
   if (quiz?.completedAt) {
     for (const t of quiz.lovedTropes)
       for (const f of QUIZ_TROPE_FEATURES[t] ?? [])
         if (!f.startsWith('scale:')) {
           bump(f, P.quizLove);
-          fromQuiz.add(f);
+          fromQuiz.set(f, t);
         }
     for (const t of quiz.hatedTropes)
       for (const f of QUIZ_TROPE_FEATURES[t] ?? [])
         if (!f.startsWith('scale:')) {
           bump(f, -P.quizHate);
-          fromQuiz.add(f);
+          fromQuiz.set(f, t);
         }
     if (quiz.endings === 'happy') {
       bump('ending:happily ever after', 0.25);
@@ -437,7 +440,7 @@ export function similarity(a: BookProfile, b: BookProfile, aAuthor: string, bAut
   const compsA = a.comps.map(norm);
   const compsB = b.comps.map(norm);
   if (compsA.includes(norm(b.title)) || compsB.includes(norm(a.title))) sim += 0.15;
-  if (a.series && b.series && norm(a.series.name) === norm(b.series.name)) sim += 0.25;
+  if (a.series && b.series && seriesNorm(a.series.name) === seriesNorm(b.series.name)) sim += 0.25;
   return Math.min(1, sim);
 }
 
@@ -446,6 +449,8 @@ export function similarity(a: BookProfile, b: BookProfile, aAuthor: string, bAut
 export interface Reason {
   /** effect in stars (+ helps, − hurts) */
   value: number;
+  /** a favourite she named in the quiz (these are told together, in one sentence) */
+  quiz?: string;
   text: string;
   kind: 'closest' | 'feature' | 'scale' | 'author' | 'series' | 'mood';
 }
@@ -538,8 +543,15 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
   }
   const tagTotal = soft(pos, P.tagPosMax) + soft(neg, P.tagNegMax);
   featureHits.sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
-  for (const h of featureHits.slice(0, 5))
-    reasons.push({ value: P.tagWeight * h.v, kind: 'feature', text: featureText(h.f, h.v, h.ev, t, simTo) });
+  for (const h of featureHits.slice(0, 6)) {
+    const text = featureText(h.f, h.v, h.ev, t, simTo);
+    reasons.push({
+      value: P.tagWeight * h.v,
+      kind: 'feature',
+      text,
+      quiz: h.v > 0 && text.endsWith('a favourite of yours from your quiz') ? quizSay(t.fromQuiz.get(h.f)!) : undefined,
+    });
+  }
 
   // 3. scales: her sweet spot, the trend in her ratings, and what her reviews ask for
   let scaleSum = 0;
@@ -618,7 +630,7 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
   if (seriesName) {
     const mine = t.read.filter((b) => {
       const n = b.series?.name ?? b.profile?.series?.name;
-      return n && norm(n) === norm(seriesName) && norm(b.title) !== norm(c.title);
+      return n && seriesNorm(n) === seriesNorm(seriesName) && norm(b.title) !== norm(c.title);
     });
     const ratedMine = mine.filter((b) => b.rating !== undefined && b.status === 'read');
     if (ratedMine.length) {
@@ -631,7 +643,17 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
         kind: 'series',
         text: `${verb} ${seriesName}, which you rate ${fmt(Math.round(avg * 4) / 4)}★ on average`,
       });
-    } else if (!mine.length && seriesNo && seriesNo > 1) {
+    } else if (mine.length) {
+      const furthest = Math.max(0, ...mine.map((b) => b.series?.number ?? b.profile?.series?.number ?? 0));
+      reasons.push({
+        value: 0.12,
+        kind: 'series',
+        text:
+          seriesNo && furthest && seriesNo > furthest
+            ? `It's the next part of ${seriesName}, which you've been reading`
+            : `You've read ${mine.length > 1 ? `${mine.length} books` : 'a book'} of ${seriesName} already`,
+      });
+    } else if (seriesNo && seriesNo > 1) {
       seriesDev = -0.5;
       reasons.push({ value: -0.5, kind: 'series', text: `It's book ${seriesNo} of ${seriesName}: start with book 1` });
     }
@@ -680,6 +702,11 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
 // ---------- the explanation ----------
 
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+/** "Morally grey hero" (quiz) → "a morally grey hero" */
+const quizSay = (label: string) => {
+  const l = lower(label);
+  return /\b(hero|heroine|setting)$/.test(l) ? `a ${l}` : l;
+};
 
 function listBooks(books: LibraryBook[]) {
   const s = books.map((b) => `${b.title}${b.rating !== undefined ? ` (${fmt(b.rating)}★)` : ''}`);
@@ -877,9 +904,26 @@ function explain(reasons: Reason[], t: Taste, c: Candidate, stars: number) {
   else if (closest) sentences.push(closest.text);
   let unlikes = 0;
   const used = new Set(sentences);
+  // favourites from her quiz in one sentence (and "fae" and "the fae realm setting" only once)
+  const quizNames: string[] = [];
+  for (const r of plus.filter((x) => x.quiz)) {
+    if (!quizNames.includes(r.quiz!)) quizNames.push(r.quiz!);
+  }
+  let quizSaid = false;
   for (const r of plus) {
     if (sentences.length >= 3) break;
     if (used.has(r.text) || r.kind === 'closest' || r.kind === 'series') continue;
+    if (r.quiz) {
+      if (quizSaid) continue;
+      quizSaid = true;
+      const list = quizNames.slice(0, 3);
+      sentences.push(
+        list.length > 1
+          ? `It has ${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}: all favourites from your quiz`
+          : `It has ${list[0]}, a favourite of yours from your quiz`,
+      );
+      continue;
+    }
     // at most one "unlike that book you didn't enjoy"
     if (r.text.includes(', unlike ') && unlikes++ > 0) continue;
     sentences.push(r.text);

@@ -11,16 +11,7 @@ import { groupSeries, seriesProgress } from '../lib/series';
 import { useSeriesParts } from '../lib/seriesTotals';
 import { useMemo, useState } from 'react';
 import { updateProfile, useProfile } from '../lib/profile';
-
-/** Greeting + a little emoji that fits the time of day */
-function greeting(): [string, string] {
-  const h = new Date().getHours();
-  if (h < 5) return ['Still up reading', '🌙'];
-  if (h < 12) return ['Good morning', '☕'];
-  if (h < 17) return ['Good afternoon', '🫖'];
-  if (h < 22) return ['Good evening', '🕯️'];
-  return ['Good night', '🌙'];
-}
+import { Greeting } from '../components/Greeting';
 
 export default function Home() {
   const books = useBooks();
@@ -48,12 +39,7 @@ export default function Home() {
 
   return (
     <div className="pt-safe mx-auto max-w-5xl px-4">
-      <header className="pt-8 pb-6">
-        <h1 className="text-4xl leading-tight font-semibold">
-          {greeting()[0]}
-          {name ? `, ${name}` : ''} <span className="inline-block">{greeting()[1]}</span>
-        </h1>
-      </header>
+      <Greeting name={name} books={books} />
 
       {books.length === 0 ? (
         <div className="space-y-4">
@@ -171,9 +157,11 @@ export default function Home() {
           {seriesToShow.length > 0 && (
             <section>
               <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="text-xl">Your series</h2>
+                <Link to="/series">
+                  <h2 className="text-xl">Your series</h2>
+                </Link>
                 <Link to="/series" className="text-sm text-wine">
-                  All {series.length}
+                  See all
                 </Link>
               </div>
               {/* grid-cols-1 = minmax(0, 1fr): long series names get "…" instead of stretching the card */}
