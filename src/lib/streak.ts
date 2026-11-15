@@ -20,12 +20,20 @@ export function addDays(key: string, n: number) {
   return dayKey(d);
 }
 
+/** The last list we loaded, so the streak card is there from the first frame instead of popping in */
+let lastDays: DayLog[] | undefined;
+
 /** Every day she logged reading (newest first), live-updating */
 export function useDays() {
-  return useLiveQuery(async () => {
-    const all = await db.days.toArray();
-    return all.filter((d) => !d.deleted && d.entries.length).sort((a, b) => (a.date < b.date ? 1 : -1));
-  }, []);
+  return useLiveQuery(
+    async () => {
+      const all = await db.days.toArray();
+      lastDays = all.filter((d) => !d.deleted && d.entries.length).sort((a, b) => (a.date < b.date ? 1 : -1));
+      return lastDays;
+    },
+    [],
+    lastDays,
+  );
 }
 
 export interface StreakImport {

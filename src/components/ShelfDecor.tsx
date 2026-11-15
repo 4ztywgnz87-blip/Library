@@ -808,3 +808,97 @@ export function HangingPlant({ className = '' }: { className?: string }) {
     </svg>
   );
 }
+
+/**
+ * A little desk globe on a wooden stand. Only the land drifts slowly across the sphere (it turns);
+ * the stand, the ring and the shading never move.
+ */
+export function Globe({ className = '' }: { className?: string }) {
+  const id = useId();
+  // one pattern of land, 40 wide; two copies side by side make it loop without a seam
+  const land = (
+    <>
+      <path d="M4 22c4-5 10-5 13-1 2 3-1 6 1 9 2 3-1 7-5 7-4 0-8-3-9-7 0-3-2-5 0-8z" fill="#8f9e7f" />
+      <path d="M24 16c4-2 8 0 9 4 1 3-2 4-1 7 1 3 5 3 4 7-1 3-6 4-9 2-3-2-2-6-4-8-2-3-1-9 1-12z" fill="#b9a779" />
+      <circle cx="21" cy="42" r="2" fill="#8f9e7f" />
+      <circle cx="3" cy="36" r="1.6" fill="#b9a779" />
+    </>
+  );
+  return (
+    <svg viewBox="0 0 50 72" className={className} aria-hidden>
+      <defs>
+        <clipPath id={`${id}clip`}>
+          <circle cx="25" cy="30" r="17.5" />
+        </clipPath>
+        <radialGradient id={`${id}sea`} cx="0.38" cy="0.32" r="0.8">
+          <stop offset="0" stopColor="#7fa8c9" />
+          <stop offset="1" stopColor="#4a7899" />
+        </radialGradient>
+        <radialGradient id={`${id}shade`} cx="0.4" cy="0.35" r="0.75">
+          <stop offset="0.55" stopColor="#000" stopOpacity="0" />
+          <stop offset="1" stopColor="#1d2f3d" stopOpacity="0.45" />
+        </radialGradient>
+      </defs>
+      {/* foot and stem */}
+      <ellipse cx="25" cy="68" rx="14" ry="4" fill="#6b4630" />
+      <ellipse cx="25" cy="66.5" rx="13" ry="3" fill="#8b5e3c" />
+      <rect x="23.4" y="49" width="3.2" height="17" fill="#a47148" />
+      <ellipse cx="25" cy="63.5" rx="4.5" ry="1.6" fill="#c49a5a" />
+      {/* the ring the globe turns in */}
+      <circle cx="25" cy="30" r="21" fill="none" stroke="#c49a5a" strokeWidth="1.8" />
+      {/* the sphere with its turning land */}
+      <circle cx="25" cy="30" r="17.5" fill={`url(#${id}sea)`} />
+      <g clipPath={`url(#${id}clip)`}>
+        <motion.g
+          initial={{ x: 0 }}
+          animate={{ x: -40 }}
+          transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+        >
+          <g transform="translate(-5 0)">{land}</g>
+          <g transform="translate(35 0)">{land}</g>
+          <g transform="translate(75 0)">{land}</g>
+        </motion.g>
+        <circle cx="25" cy="30" r="17.5" fill={`url(#${id}shade)`} />
+        <ellipse cx="18.5" cy="20.5" rx="5" ry="3" fill="#fff" opacity="0.22" transform="rotate(-35 18.5 20.5)" />
+      </g>
+      <circle cx="25" cy="30" r="17.5" fill="none" stroke="#35566f" strokeOpacity="0.35" strokeWidth="0.8" />
+      {/* the pins at both poles */}
+      <circle cx="25" cy="9" r="1.8" fill="#c49a5a" />
+      <circle cx="25" cy="51" r="1.8" fill="#c49a5a" />
+    </svg>
+  );
+}
+
+/** A small framed picture standing on the shelf: a moonlit hill */
+export function Painting({ className = '' }: { className?: string }) {
+  const id = useId();
+  return (
+    <svg viewBox="0 0 56 68" className={className} aria-hidden>
+      <defs>
+        <linearGradient id={`${id}sky`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#3f4e5a" />
+          <stop offset="1" stopColor="#d9a27a" />
+        </linearGradient>
+      </defs>
+      {/* little feet it stands on */}
+      <rect x="9" y="61" width="7" height="7" rx="1.5" fill="#5e3d28" />
+      <rect x="40" y="61" width="7" height="7" rx="1.5" fill="#5e3d28" />
+      {/* frame, mat and picture */}
+      <rect x="4" y="4" width="48" height="58" rx="2.5" fill="#8b5e3c" />
+      <rect x="7" y="7" width="42" height="52" rx="1.5" fill="#a47148" />
+      <rect x="10" y="10" width="36" height="46" fill="#f4ead9" />
+      <rect x="13" y="13" width="30" height="40" fill={`url(#${id}sky)`} />
+      <circle cx="33" cy="23" r="7" fill="#f6e7b8" opacity="0.25" />
+      <circle cx="33" cy="23" r="4.2" fill="#f6e7b8" />
+      <circle cx="19" cy="19" r="0.8" fill="#fff" opacity="0.85" />
+      <circle cx="26" cy="16" r="0.6" fill="#fff" opacity="0.7" />
+      <path d="M13 44c6-8 12-9 18-5 4 2 8 2 12-3v17H13z" fill="#8f9e7f" />
+      <path d="M13 49c7-4 14-3 20 0s8 2 10 0v4H13z" fill="#5f6b52" />
+      {/* a tiny lit window on the hill */}
+      <rect x="21" y="41" width="3.5" height="3" fill="#f6d27a" />
+      <path d="M20 41l3.2-2.4L26.5 41z" fill="#6b4630" />
+      {/* a soft shine over the glass */}
+      <path d="M13 13h14L13 30z" fill="#fff" opacity="0.1" />
+    </svg>
+  );
+}

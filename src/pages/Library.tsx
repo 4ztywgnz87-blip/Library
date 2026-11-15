@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { useFirstVisit } from '../lib/visited';
@@ -52,6 +52,14 @@ export default function Library() {
   // from the authors list: only this author's books
   const authorFilter = params.get('author') || undefined;
   const firstVisit = useFirstVisit('library');
+  // an arrow back to the top, once she has scrolled a long way down
+  const [farDown, setFarDown] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setFarDown(window.scrollY > 900);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const [query, setQuery] = useState('');
   const [genre, setGenre] = useState<string | null>(null);
   const [lang, setLang] = useState<'all' | 'en' | 'nl'>('all');
@@ -261,6 +269,32 @@ export default function Library() {
           </div>
         )}
       </div>
+      <AnimatePresence>
+        {farDown && (
+          <motion.button
+            key="up"
+            aria-label="Back to the top"
+            initial={{ opacity: 0, scale: 0.7, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.7, y: 10 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed right-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-20 grid h-12 w-12 place-items-center rounded-full bg-wine text-cream shadow-[var(--shadow-soft)] active:scale-95 md:bottom-8"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 19V6M6 11l6-6 6 6" />
+            </svg>
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

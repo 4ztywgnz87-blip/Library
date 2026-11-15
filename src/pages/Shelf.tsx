@@ -8,7 +8,17 @@ import { hashColor } from '../components/Cover';
 import type { Book, Status } from '../types';
 import { dayKey, useDays } from '../lib/streak';
 import { useFirstVisit, useSeenIds } from '../lib/visited';
-import { Bookend, Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
+import {
+  Bookend,
+  Candle,
+  DreamCloud,
+  FairyLights,
+  Globe,
+  HangingPlant,
+  Mug,
+  Painting,
+  ShelfCat,
+} from '../components/ShelfDecor';
 import {
   ChristmasTree,
   Cobweb,
@@ -20,6 +30,14 @@ import {
   Snowfall,
   useSeason,
 } from '../components/Seasonal';
+
+/** Something that stands on a shelf */
+interface DecorItem {
+  key: string;
+  el: ReactNode;
+  /** natural width in px, so its spot on the shelf is exactly that wide */
+  width: number;
+}
 
 const ROW = 146; // px per shelf row (spines + board): room above the tallest spines
 const BOARD = 12;
@@ -92,7 +110,7 @@ function Spine({
   delay: number;
   lean: boolean;
   scale?: number;
-  /** A row is filled exactly: its spines get a touch wider or narrower (0.8–1.18) */
+  /** A row is filled exactly: its spines get a touch wider or narrower (0.88–1.14) */
   widthFactor?: number;
   /** Leaning against something lower than the book (the bookend): its height in px */
   restHeight?: number;
@@ -194,11 +212,34 @@ function Spine({
   );
 }
 
+/**
+ * Which decorations stand on the shelves today: decided by the date, so it changes from day to day.
+ * Every shelf always keeps at least one (so never fewer than two in total); the others come and go.
+ */
+function decorToday(forced: string | null): Set<string> {
+  const shelves = [
+    ['candle', 'painting'],
+    ['mug', 'globe'],
+  ];
+  if (forced) return new Set(forced === 'all' ? shelves.flat() : forced.split(','));
+  const day = dayKey();
+  const roll = (k: string) => hash(`${day}|${k}`) % 100;
+  const on: string[] = [];
+  for (const shelf of shelves) {
+    const picked = shelf.filter((k) => roll(k) < 60);
+    // each shelf keeps at least one (that makes two in total, at the very least)
+    if (!picked.length) picked.push([...shelf].sort((a, b) => roll(a) - roll(b))[0]);
+    on.push(...picked);
+  }
+  return new Set(on);
+}
+
 function ShelfSection({
   status,
   label,
   books,
-  decor,
+  decors,
+  reserve,
   startDelay,
   entrance,
   seen,
@@ -206,7 +247,9 @@ function ShelfSection({
   status: Status;
   label: string;
   books: readonly Book[];
-  decor?: { el: ReactNode; width: number };
+  decors: DecorItem[];
+  /** width kept free for decoration, so the books keep the same size whatever stands there today */
+  reserve: number;
   startDelay: number;
   entrance: boolean;
   /** books she has already seen here: they don't animate in again */
@@ -229,34 +272,40 @@ function ShelfSection({
     const gap = !prev ? 0 : (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]) ? GROUP_GAP : 0;
     return sum + spineStyle(b).width + gap;
   }, 0);
-  const DECOR = (decor?.width ?? 0) + 20 + (books.length ? 18 : 0); // decoration + margins (+ bookend)
+  const bw = (64 * 24) / 84; // a bookend's width at full size
+  // each decoration needs its own width, margins and (in the middle of the shelf) a bookend
+  const decorsTotal = (list: DecorItem[]) => list.reduce((t, d) => t + d.width + 20 + (books.length ? 18 : 0), 0);
   const room = Math.max(1, available - 2);
-  // shrink just enough for books (+ decoration) to fit on one row, but not below MIN_SCALE
+  // shrink just enough for books (+ decorations) to fit on one row, but not below MIN_SCALE
+  const kept = reserve + 20 + (books.length ? 18 : 0);
   const scale = !available
     ? 1
-    : booksWidth + (decor ? DECOR : 0) <= room
+    : booksWidth + kept <= room
       ? 1
-      : Math.max(MIN_SCALE, Math.min(1, room / (booksWidth + (decor ? DECOR : 0)), room / booksWidth));
+      : Math.max(MIN_SCALE, Math.min(1, room / (booksWidth + kept), room / booksWidth));
   const row = Math.round((ROW - BOARD) * scale) + BOARD;
-  // the decoration only stands where there's room on the last row; it never gets a row of its own
+  // decorations only stand where there's room on the last row; they never get a row of their own
   const lastRowUsed = (booksWidth * scale) % room;
-  const showDecor = !!decor && (books.length === 0 || lastRowUsed + DECOR * scale <= room);
-  // Where the decoration stands: between two series/authors (a fixed spot per shelf), not always at the end
+  let shown = decors;
+  while (shown.length && books.length && lastRowUsed + decorsTotal(shown) * scale > room) shown = shown.slice(0, -1);
+  // The first one stands between two series/authors (a fixed spot per shelf), the next at the end of the shelf
   const groupOf = (b: Book) => b.series?.name ?? b.authors[0];
   const boundaries = books.map((_, i) => i).filter((i) => i > 0 && groupOf(books[i - 1]) !== groupOf(books[i]));
-  const decorAt = boundaries.length ? boundaries[hash(status) % boundaries.length] : books.length;
-  // When books follow the decoration, a bookend keeps them upright
-  const decorMid = showDecor && decorAt < books.length;
-  const decorEl = (
+  const ats = shown.map((_, k) =>
+    k === 0 && boundaries.length ? boundaries[hash(status) % boundaries.length] : books.length,
+  );
+  const atSet = new Set(ats);
+  const decorEl = (d: DecorItem, mid: boolean) => (
+    // in the middle of the shelf a bookend keeps the books after it upright
     <div
-      key="decor"
-      className={`ml-1.5 flex items-end gap-1 ${decorMid ? 'mr-0' : 'mr-1.5'}`}
+      key={`decor-${d.key}`}
+      className={`ml-1.5 flex items-end gap-1 ${mid ? 'mr-0' : 'mr-1.5'}`}
       style={{ height: row, paddingBottom: BOARD }}
     >
-      <div style={{ width: (decor?.width ?? 0) * scale }}>
-        <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom left' }}>{decor?.el}</div>
+      <div style={{ width: d.width * scale }}>
+        <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom left' }}>{d.el}</div>
       </div>
-      {decorMid && <Bookend className="shrink-0" style={{ height: 64 * scale, width: (64 * 24 * scale) / 84 }} />}
+      {mid && <Bookend className="shrink-0" style={{ height: 64 * scale, width: bw * scale }} />}
     </div>
   );
 
@@ -264,7 +313,7 @@ function ShelfSection({
   // almost fits, it joins the row and that row's spines get a touch narrower; when a small gap is
   // left, the row's spines get a touch wider (heights stay the same, so it doesn't show).
   type Item =
-    | { kind: 'decor'; w: number }
+    | { kind: 'decor'; w: number; d: DecorItem; mid: boolean }
     | {
         kind: 'book';
         b: Book;
@@ -277,7 +326,13 @@ function ShelfSection({
         factor: number;
       };
   const items: Item[] = [];
-  const decorW = (decor?.width ?? 0) * scale + 6 + (decorMid ? 4 + (64 * 24 * scale) / 84 : 6);
+  const decorItem = (d: DecorItem, mid: boolean): Item => ({
+    kind: 'decor',
+    d,
+    mid,
+    w: d.width * scale + 6 + (mid ? 4 + bw * scale : 6),
+  });
+  const endDecor = atSet.has(books.length);
   books.forEach((b, i) => {
     const prev = books[i - 1];
     const newGroup = prev && (prev.series?.name ?? prev.authors[0]) !== (b.series?.name ?? b.authors[0]);
@@ -285,25 +340,27 @@ function ShelfSection({
     // their foot slides a little to the right, so they get some room on that side.
     // Who leans: the last book of the shelf, or the book just before a decoration.
     const isLast = i === books.length - 1;
-    const lean =
-      (isLast && !(showDecor && decorAt === books.length) && !(showDecor && i === decorAt) && books.length > 2) ||
-      (showDecor && i === decorAt - 1 && i > 0);
-    // (a book right next to the bookend always stands upright: that's what the bookend is for)
-    const foot = lean && (!isLast || (showDecor && decorAt === books.length)) ? Math.ceil((row - BOARD) * 0.13) : 0;
-    if (showDecor && i === decorAt) items.push({ kind: 'decor', w: decorW });
+    const lean = (isLast && !endDecor && !atSet.has(i) && books.length > 2) || (atSet.has(i + 1) && i > 0);
+    // (a book right next to a bookend always stands upright: that's what the bookend is for)
+    const foot = lean && (!isLast || endDecor) ? Math.ceil((row - BOARD) * 0.13) : 0;
+    shown.forEach((d, k) => {
+      if (ats[k] === i) items.push(decorItem(d, true));
+    });
     items.push({
       kind: 'book',
       b,
       i,
       prev,
       w: Math.round(spineStyle(b).width * scale),
-      gap: newGroup && i !== decorAt ? GROUP_GAP : 0,
+      gap: newGroup && !atSet.has(i) ? GROUP_GAP : 0,
       foot,
       lean,
       factor: 1,
     });
   });
-  if (showDecor && decorAt >= books.length) items.push({ kind: 'decor', w: decorW });
+  shown.forEach((d, k) => {
+    if (ats[k] >= books.length) items.push(decorItem(d, false));
+  });
 
   const rows: Item[][] = [];
   let cur: Item[] = [];
@@ -319,7 +376,7 @@ function ShelfSection({
     if (!cur.length) return;
     if (fill) {
       const { flex, fixed } = widths(cur);
-      const f = Math.max(0.8, Math.min(1.18, (room - fixed - 1) / Math.max(1, flex)));
+      const f = Math.max(0.88, Math.min(1.14, (room - fixed - 1) / Math.max(1, flex)));
       cur = cur.map((it) => (it.kind === 'book' ? { ...it, factor: f } : it));
     }
     rows.push(cur);
@@ -331,8 +388,8 @@ function ShelfSection({
       cur.push(it);
       continue;
     }
-    // almost fits: squeeze it in (the row's books get up to 20% narrower)
-    if (it.kind === 'book' && flex * 0.8 + fixed <= room - 1) {
+    // almost fits: squeeze it in (the row's books get up to 12% narrower)
+    if (it.kind === 'book' && flex * 0.88 + fixed <= room - 1) {
       cur.push(it);
       close(true);
       continue;
@@ -340,9 +397,7 @@ function ShelfSection({
     close(true);
     cur.push(it);
   }
-  // the last row: books just stand there from the left, unless it is nearly full, then it fills up too
-  const lastW = widths(cur);
-  close(lastW.flex + lastW.fixed >= room * 0.8);
+  close(false); // the last row stays as it is: books just stand there, from the left
 
   return (
     // the shelf above casts a soft shadow onto the back panel, starting right under its board
@@ -370,7 +425,7 @@ function ShelfSection({
           backgroundRepeat: 'repeat-y',
         }}
       >
-        {books.length === 0 && !decor && (
+        {books.length === 0 && !shown.length && (
           <div className="flex items-end pb-3" style={{ height: row }}>
             <span className="text-xs text-cream/50 italic">empty for now</span>
           </div>
@@ -379,7 +434,7 @@ function ShelfSection({
           <div key={ri} className="flex w-full items-end">
             {r.map((it) =>
               it.kind === 'decor' ? (
-                decorEl
+                decorEl(it.d, it.mid)
               ) : (
                 <div
                   key={it.b.id}
@@ -445,10 +500,18 @@ export default function Shelf() {
   if (!books) return null;
   const wishCount = byStatus.wishlist.length;
 
-  // decorations with their natural width (px), so their spot on the shelf is exactly that wide
-  const decor: Partial<Record<Status, { el: ReactNode; width: number }>> = {
-    owned: { el: <Candle className="h-20 w-12" season={season} />, width: 48 },
-    read: { el: <Mug className="h-20 w-[68px]" season={season} />, width: 68 },
+  // Not every decoration stands there every day: what is on the shelves changes from day to day, but
+  // there are always at least two. (`?decor=all` or `?decor=globe,mug` shows a chosen set.)
+  const all: Record<string, DecorItem> = {
+    candle: { key: 'candle', el: <Candle className="h-20 w-12" season={season} />, width: 48 },
+    painting: { key: 'painting', el: <Painting className="h-[58px] w-12" />, width: 48 },
+    mug: { key: 'mug', el: <Mug className="h-20 w-[68px]" season={season} />, width: 68 },
+    globe: { key: 'globe', el: <Globe className="h-[72px] w-[50px]" />, width: 50 },
+  };
+  const today = decorToday(new URLSearchParams(location.search).get('decor'));
+  const decors: Partial<Record<Status, DecorItem[]>> = {
+    owned: ['candle', 'painting'].filter((k) => today.has(k)).map((k) => all[k]),
+    read: ['mug', 'globe'].filter((k) => today.has(k)).map((k) => all[k]),
   };
 
   return (
@@ -480,7 +543,7 @@ export default function Shelf() {
 
         {/* crown: a little arched pediment on a layered cornice with dentils */}
         <div className="relative z-10">
-          <div className="absolute bottom-full left-1/2 h-8 w-[46%] -translate-x-1/2">
+          <div className="absolute bottom-full left-1/2 h-10 w-[54%] -translate-x-1/2">
             <svg viewBox="0 0 200 22" className="h-full w-full" preserveAspectRatio="none" aria-hidden>
               <defs>
                 <linearGradient id="pediment" x1="0" y1="0" x2="0" y2="1">
@@ -501,7 +564,7 @@ export default function Shelf() {
             <Link
               to="/library"
               aria-label={`${bookCount} books in your library`}
-              className="absolute bottom-[5px] left-[40%] -translate-x-1/2 rounded-[3px] bg-gradient-to-b from-[#e2c48a] via-[#c9a465] to-[#a9824b] px-3 py-[2px] font-soft text-[11px] leading-none font-semibold whitespace-nowrap text-[#3b2a22] shadow-[0_1px_2px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.45)]"
+              className="absolute bottom-[6px] left-1/2 -translate-x-1/2 rounded-[3px] bg-gradient-to-b from-[#e2c48a] via-[#c9a465] to-[#a9824b] px-2.5 py-[2px] font-soft text-[10px] leading-none font-semibold whitespace-nowrap text-[#3b2a22] shadow-[0_1px_2px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.45)]"
             >
               {bookCount} {bookCount === 1 ? 'book' : 'books'}
             </Link>
@@ -567,7 +630,8 @@ export default function Shelf() {
                 status={shelf.status}
                 label={shelf.label}
                 books={shelf.books}
-                decor={decor[shelf.status]}
+                decors={decors[shelf.status] ?? []}
+                reserve={shelf.status === 'owned' ? 48 : 68}
                 startDelay={i * 0.15}
                 entrance={firstVisit}
                 seen={seenBefore}

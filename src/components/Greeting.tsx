@@ -120,7 +120,12 @@ function MomentIcon({ m }: { m: Moment }) {
         <rect x="19" y="18" width="10" height="22" rx="2" fill="#ffffff" stroke="#d9c3a5" strokeWidth="1.2" />
         <path d="M21.5 22v14" stroke="#efe3d1" strokeWidth="1.6" strokeLinecap="round" />
         {/* wax running down one side */}
-        <path d="M19 18h10v2.5c-1.5 1.8-2.5 1-3.5 2.8-.8-1.6-1.8-.6-3-1.8-1.2.8-2.5.3-3.5-1z" fill="#fffaf0" stroke="#e4d3bf" strokeWidth="0.8" />
+        <path
+          d="M19 18h10v2.5c-1.5 1.8-2.5 1-3.5 2.8-.8-1.6-1.8-.6-3-1.8-1.2.8-2.5.3-3.5-1z"
+          fill="#fffaf0"
+          stroke="#e4d3bf"
+          strokeWidth="0.8"
+        />
         <path d="M24 17v3" stroke="#3b2a22" strokeWidth="1.5" />
         <path d="M12 41h24" stroke="#d9c3a5" strokeWidth="2.4" strokeLinecap="round" />
       </svg>

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { TABS, useTabSwipe } from '../lib/swipe';
 import { BooksIcon, HomeIcon, PlusIcon, ShelfIcon, UserIcon } from './Icons';
@@ -15,8 +15,35 @@ const items = [
 
 export function Layout() {
   useTasteUpkeep(); // analyses new books and reads new reviews, in the background
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
+  const navType = useNavigationType();
   const navigate = useNavigate();
+
+  // Every page opens at the top (Home, Me, the Library…), and going back returns to where she was
+  const positions = useRef(new Map<string, number>());
+  const lastPath = useRef(pathname);
+  useEffect(() => {
+    history.scrollRestoration = 'manual';
+  }, []);
+  const currentKey = useRef(location.key);
+  useEffect(() => {
+    // (the key is a ref: the scroll to the top of a new page must not be stored under the page we just left)
+    const onScroll = () => positions.current.set(currentKey.current, window.scrollY);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  useLayoutEffect(() => {
+    currentKey.current = location.key;
+    const samePage = lastPath.current === pathname;
+    lastPath.current = pathname;
+    if (navType === 'POP') {
+      const y = positions.current.get(location.key) ?? 0;
+      window.scrollTo(0, y);
+      // the page may still be filling up: try again once it has
+      requestAnimationFrame(() => window.scrollTo(0, y));
+    } else if (!samePage) window.scrollTo(0, 0);
+  }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
   const hideNav = pathname.startsWith('/book/') || pathname === '/quiz';
 
   // Slide direction between the main screens (swipe or tab tap): +1 = from the right
