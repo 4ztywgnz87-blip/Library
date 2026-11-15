@@ -46,6 +46,7 @@
     -webkit-user-select: text;
     user-select: text;
   }
+
   h1,
   h2,
   h3 {
@@ -90,4 +91,12 @@
   opacity: 0.35;
   background-image: radial-gradient(rgb(139 94 60 / 0.07) 1px, transparent 1px);
   background-size: 18px 18px;
+}
+
+/* the iPhone zooms the whole page in when a field's text is smaller than 16px (and stays zoomed):
+   outside the layers on purpose, so it also wins over utility classes like text-sm */
+input,
+textarea,
+select {
+  font-size: 16px !important;
 }

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { updateBook } from '../lib/library';
 import { Cover } from '../components/Cover';
+import { PartyConfetti } from '../components/PageConfetti';
 import { Button, PageHeader } from '../components/ui';
 import { EmptyState } from '../components/SleepyCat';
 import { ConfirmSheet } from '../components/ConfirmSheet';
@@ -18,6 +19,7 @@ import type { Book } from '../types';
 export default function Wishlist() {
   const books = useBooks();
   const [gotIt, setGotIt] = useState<string | null>(null);
+  const [party, setParty] = useState(0);
   const wishes = useMemo(
     () => (books ?? []).filter((b) => b.status === 'wishlist').sort((a, b) => b.addedAt - a.addedAt),
     [books],
@@ -28,6 +30,7 @@ export default function Wishlist() {
     <div>
       <PageHeader back title="Wishlist" right={wishes.length > 0 ? <ShareActions wishes={wishes} /> : undefined} />
       <div className="mx-auto max-w-4xl px-4 pb-10">
+        {party > 0 && <PartyConfetti key={party} onDone={() => setParty(0)} />}
         <div className="h-2" />
         {wishes.length === 0 ? (
           <EmptyState title="Nothing on your wishlist">
@@ -66,6 +69,7 @@ export default function Wishlist() {
                     disabled={gotIt === b.id}
                     onClick={async () => {
                       setGotIt(b.id);
+                      setParty((n) => n + 1);
                       await updateBook(b.id, { status: 'owned' });
                       setGotIt(null);
                     }}

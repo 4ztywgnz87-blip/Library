@@ -156,3 +156,63 @@ export function PageConfetti({ onDone }: { onDone: () => void }) {
     document.body,
   );
 }
+
+/** A new book on the shelf: a party popper shoots coloured confetti up, and it floats back down */
+export function PartyConfetti({ onDone }: { onDone: () => void }) {
+  const bits = useMemo(() => {
+    const h = window.innerHeight;
+    return Array.from({ length: 70 }, (_, i) => {
+      const angle = (-90 + (Math.random() - 0.5) * 120) * (Math.PI / 180);
+      const power = h * (0.4 + Math.random() * 0.4);
+      const peakX = Math.cos(angle) * power * 0.75;
+      return {
+        kind: i % 3, // 0 rectangle, 1 dot, 2 streamer
+        peakX,
+        peakY: Math.sin(angle) * power,
+        sway: (Math.random() - 0.5) * 80,
+        spin: (Math.random() - 0.5) * 900,
+        delay: Math.random() * 0.12,
+        fall: 2 + Math.random() * 1.4,
+        color: ['#7A2E3A', '#f1bf6a', '#e05a73', '#8F9E7F', '#E7B9A8', '#7fa7d9', '#b07bd6'][i % 7],
+      };
+    });
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(onDone, 4000);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  const h = typeof window === 'undefined' ? 800 : window.innerHeight;
+  return createPortal(
+    <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden" aria-hidden>
+      <motion.span
+        className="absolute bottom-[12%] left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-[#f6d27a]"
+        initial={{ scale: 0.2, opacity: 0.9 }}
+        animate={{ scale: 2.2, opacity: 0 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+      />
+      {bits.map((b, i) => (
+        <motion.span
+          key={i}
+          className={`absolute bottom-[14%] left-1/2 ${
+            b.kind === 1 ? 'h-2 w-2 rounded-full' : b.kind === 2 ? 'h-4 w-1 rounded-full' : 'h-2.5 w-1.5 rounded-[1px]'
+          }`}
+          style={{ background: b.color }}
+          initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
+          animate={{
+            x: [0, b.peakX, b.peakX + b.sway, b.peakX - b.sway * 0.6, b.peakX + b.sway * 0.3],
+            y: [0, b.peakY, b.peakY + h * 0.3, b.peakY + h * 0.62, h * 0.3],
+            rotate: b.spin,
+            opacity: [1, 1, 1, 1, 0],
+          }}
+          transition={{
+            duration: 0.5 + b.fall,
+            delay: b.delay,
+            times: [0, 0.16, 0.5, 0.82, 1],
+            ease: ['easeOut', 'easeInOut', 'easeInOut', 'easeIn'],
+          }}
+        />
+      ))}
+    </div>,
+    document.body,
+  );
+}

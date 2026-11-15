@@ -138,7 +138,8 @@ export async function logReading(
   await db.days.put({
     date,
     entries,
-    note: note?.trim() || undefined,
+    // no note given (finishing from the book page): keep the note she already wrote for the day
+    note: note === undefined ? cur?.note : note.trim() || undefined,
     updatedAt: Date.now(),
     dirty: 1,
   });

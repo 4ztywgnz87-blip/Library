@@ -6,8 +6,30 @@ import { useEffect, useState, type CSSProperties } from 'react';
  */
 let locks = 0;
 let savedY = 0;
+
+/**
+ * With the keyboard open the iPhone can still pan the page by dragging. Only touches that can really
+ * scroll something inside a sheet are allowed through; everything else is stopped.
+ */
+function guardTouch(e: TouchEvent) {
+  let el = e.target as HTMLElement | null;
+  let inSheet = false;
+  while (el && el !== document.body) {
+    const cs = getComputedStyle(el);
+    if (cs.overscrollBehaviorY === 'contain') inSheet = true;
+    if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1 && inSheet)
+      return; // a scrollable part of the sheet
+    if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
+      if (el.scrollHeight > el.clientHeight + 1) return;
+    }
+    el = el.parentElement;
+  }
+  if (e.cancelable) e.preventDefault();
+}
+
 function lockScroll() {
   if (locks++ > 0) return;
+  document.addEventListener('touchmove', guardTouch, { passive: false });
   savedY = window.scrollY;
   const b = document.body.style;
   b.position = 'fixed';
@@ -18,6 +40,7 @@ function lockScroll() {
 }
 function unlockScroll() {
   if (--locks > 0) return;
+  document.removeEventListener('touchmove', guardTouch);
   const b = document.body.style;
   b.position = b.top = b.left = b.right = b.width = '';
   window.scrollTo(0, savedY);

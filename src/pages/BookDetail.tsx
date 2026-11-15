@@ -17,9 +17,9 @@ import { useMatches } from '../lib/taste';
 import { profileKey } from '../taste/vocab';
 import { MatchRing, matchLabel } from '../components/MatchRing';
 import { BookmarkRibbon, LogSheet, PageProgress, PagesEditor } from '../components/Streak';
-import { PageConfetti } from '../components/PageConfetti';
+import { PageConfetti, PartyConfetti } from '../components/PageConfetti';
 import { coverSrc } from '../lib/coverCache';
-import { dayKey, useDays } from '../lib/streak';
+import { dayKey, logReading, useDays } from '../lib/streak';
 
 const TAG_SUGGESTIONS = [
   'spicy 🌶️',
@@ -38,6 +38,7 @@ export default function BookDetail() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [celebrate, setCelebrate] = useState(0);
+  const [party, setParty] = useState(0);
   const [pickingEdition, setPickingEdition] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [logging, setLogging] = useState(false);
@@ -76,7 +77,16 @@ export default function BookDetail() {
 
   const set = (patch: Partial<Book>) => updateBook(book.id, patch);
 
+  // "I finished it!" on a book she is reading: she read today, so it also goes on today's streak
+  const finishToday = async () => {
+    setCelebrate((c) => c + 1);
+    setTimeout(() => ratingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+    await logReading(dayKey(), book, { finished: true });
+  };
+
   const setStatus = (status: Status) => {
+    // the book is hers now: confetti
+    if (book.status === 'wishlist' && status === 'owned') setParty((c) => c + 1);
     if (status === 'read' && book.status !== 'read') {
       setCelebrate((c) => c + 1);
       setTimeout(() => ratingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
@@ -145,7 +155,7 @@ export default function BookDetail() {
             {book.status === 'reading' && (
               <>
                 <PageProgress book={book} className="mt-4" />
-                <Button className="mt-4 w-full" onClick={() => setStatus('read')}>
+                <Button className="mt-4 w-full" onClick={() => void finishToday()}>
                   I finished it! 🎉
                 </Button>
                 <Button variant="soft" className="mt-2 w-full" onClick={() => setLogging(true)}>
@@ -275,6 +285,7 @@ export default function BookDetail() {
         />
       )}
 
+      {party > 0 && <PartyConfetti key={party} onDone={() => setParty(0)} />}
       <AnimatePresence>
         {celebrate > 0 && <PageConfetti key={celebrate} onDone={() => setCelebrate(0)} />}
       </AnimatePresence>
