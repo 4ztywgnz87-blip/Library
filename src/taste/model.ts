@@ -618,8 +618,12 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
           : e.wantedMore
             ? // missed it there: more than that book is a plus, as little or less a minus
               Math.max(-1, Math.min(1, (x - L) / 1.5))
-            : // enjoyed it there: about as much is a plus; lacking it only counts if she was emphatic
-              Math.max(e.strength >= 3 ? -0.5 : 0, Math.min(1, (x - Math.max(2, L - 2)) / 2));
+            : lowEnd(e)
+              ? // enjoyed how little of it there was ("such a light book" about a 1/5 dark book):
+                // about as little is a plus, much more of it a minus
+                Math.max(e.strength >= 3 ? -1 : -0.5, Math.min(1, (L + 1.5 - x) / 1.5))
+              : // enjoyed it there: about as much is a plus; lacking it only counts if she was emphatic
+                Math.max(e.strength >= 3 ? -0.5 : 0, Math.min(1, (x - Math.max(2, L - 2)) / 2));
       // "not enough of it" is a complaint within a kind of book: wanting more worldbuilding in a
       // fantasy says nothing about a thriller set in the real world
       const relevance = e.wantedMore ? Math.max(0.15, Math.min(1, (simTo(e.book) - 0.1) / 0.3)) : 1;
@@ -741,6 +745,9 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
   return { stars, score: starsToScore(stars), confidence, closest, reasons, why, headsUp };
 }
 
+/** A remark she liked about a book with little of it: she enjoyed the low end ("so light", "an easy read") */
+const lowEnd = (e: Evidence) => e.sign > 0 && !e.wantedMore && (e.level ?? 3) <= 2;
+
 // ---------- the explanation ----------
 
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
@@ -807,7 +814,9 @@ function scaleReason(
     return e.sign > 0
       ? e.wantedMore
         ? { value: said, text: `It ${phrase}, and you missed ${noun} in ${e.book.title} too (“${e.quote}”)` }
-        : { value: said, text: `It ${phrase}, and you love ${noun} (“${e.quote}” about ${e.book.title})` }
+        : lowEnd(e)
+          ? { value: said, text: `It ${phrase}, unlike ${e.book.title}, which you loved for it (“${e.quote}”)` }
+          : { value: said, text: `It ${phrase}, and you love ${noun} (“${e.quote}” about ${e.book.title})` }
       : { value: said, text: `It ${phrase}, which bothered you in ${e.book.title} (“${e.quote}”)` };
   }
   if (miss <= -0.15)

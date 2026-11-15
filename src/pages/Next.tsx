@@ -161,7 +161,7 @@ export default function Next() {
           {(
             [
               { id: 'shelf', title: 'From my shelf', sub: `${unread} unread waiting`, emoji: '📚' },
-              { id: 'buy', title: 'Something new', sub: 'For the bookshop', emoji: '🛍️' },
+              { id: 'buy', title: 'Something new', sub: 'From the bookshop', emoji: '🛍️' },
             ] as const
           ).map((o) => (
             <button
