@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
-import type { Book } from '../types';
+import { notOwned, type Book } from '../types';
 import { profileKey, type BookProfile } from '../taste/vocab';
 import {
   learn,
@@ -131,7 +131,7 @@ export function useTasteUpkeep() {
       // Books that teach Snug her taste (rated or reviewed) first, then the shelf she can still read.
       // A book she read but never rated says nothing about her taste, so it isn't analysed (no cost) until she rates it.
       const worth = books.filter(
-        (b) => b.status !== 'wishlist' && (b.status !== 'read' || b.rating !== undefined || !!b.review?.trim()),
+        (b) => !notOwned(b) && (b.status !== 'read' || b.rating !== undefined || !!b.review?.trim()),
       );
       const order = [...worth].sort(
         (a, b) =>

@@ -505,7 +505,7 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
                 <button
                   key={s.id}
                   onClick={() => setStatus(s.id)}
-                  className={`rounded-2xl border px-3 py-3 text-sm transition-all ${
+                  className={`rounded-2xl border px-3 py-3 text-sm transition-all ${s.id === 'radar' ? 'col-span-2' : ''} ${
                     status === s.id
                       ? 'border-wine bg-white font-medium text-wine shadow-[var(--shadow-soft)]'
                       : 'border-sand text-cocoa'
@@ -543,7 +543,7 @@ function AddSheet({ result, existingId, onClose }: { result: SearchResult; exist
             </div>
           )}
 
-          {status !== 'wishlist' && (
+          {status !== 'wishlist' && status !== 'radar' && (
             <div className="space-y-2">
               <p className="text-xs tracking-wide text-mocha uppercase">Cover</p>
               <CoverChoice

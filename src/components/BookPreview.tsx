@@ -5,10 +5,9 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { searchBooks } from '../lib/bookSearch';
 import { bookKey, findExisting, normalize } from '../lib/library';
-import { quickAdd } from '../lib/quickAdd';
 import type { Book } from '../types';
 import { Cover } from './Cover';
-import { Button } from './ui';
+import { WantButtons } from './WantButtons';
 import { CloseIcon } from './Icons';
 import { MatchRing, matchLabel } from './MatchRing';
 
@@ -37,12 +36,11 @@ function when(d?: string, upcoming?: boolean) {
   return t > Date.now() ? `Coming ${date}` : `Published ${date}`;
 }
 
-/** Details of a book she doesn't have yet, with "+ Wishlist" */
+/** Details of a book she doesn't have yet, with "+ Wishlist" and "👀 Radar" */
 export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () => void }) {
   const lift = useKeyboardLift();
   const [details, setDetails] = useState(book);
   const [owned, setOwned] = useState<Book | undefined>();
-  const [added, setAdded] = useState(false);
   const [open, setOpen] = useState(false);
   const [looking, setLooking] = useState(!(book.description && book.coverUrl));
 
@@ -162,21 +160,19 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
               Already in your library · open it
             </Link>
           ) : (
-            <Button
-              className="w-full py-3.5"
-              disabled={added}
-              onClick={async () => {
-                setAdded(true);
-                await quickAdd(details.title, details.author, 'wishlist', {
+            <div className="flex gap-2">
+              <WantButtons
+                size="large"
+                title={details.title}
+                author={details.author}
+                extra={{
                   coverUrl: details.coverUrl,
                   series: details.series,
                   isbn13: details.isbn13,
                   description: details.description,
-                });
-              }}
-            >
-              {added ? 'On your wishlist ✓' : '+ Add to wishlist'}
-            </Button>
+                }}
+              />
+            </div>
           )}
         </div>
       </motion.div>

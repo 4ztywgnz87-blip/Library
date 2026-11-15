@@ -70,4 +70,4 @@ export function shelfOrder(a: Book, b: Book) {
   return (a.series?.number ?? 0) - (b.series?.number ?? 0) || a.title.localeCompare(b.title);
 }
 
-export const statusOrder: Record<Status, number> = { reading: 0, owned: 1, wishlist: 2, read: 3 };
+export const statusOrder: Record<Status, number> = { reading: 0, owned: 1, wishlist: 2, radar: 3, read: 4 };

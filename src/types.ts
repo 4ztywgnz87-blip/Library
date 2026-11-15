@@ -1,5 +1,5 @@
 import type { ReviewInsight } from './taste/vocab';
-export type Status = 'reading' | 'owned' | 'read' | 'wishlist';
+export type Status = 'reading' | 'owned' | 'read' | 'wishlist' | 'radar';
 export type Lang = 'en' | 'nl';
 
 export const STATUSES: { id: Status; label: string; short: string }[] = [
@@ -7,7 +7,11 @@ export const STATUSES: { id: Status; label: string; short: string }[] = [
   { id: 'owned', label: 'To read', short: 'To read' },
   { id: 'read', label: 'Read', short: 'Read' },
   { id: 'wishlist', label: 'Wishlist', short: 'Wishlist' },
+  { id: 'radar', label: 'On my radar', short: 'Radar' },
 ];
+
+/** Books she doesn't have: the wishlist, and the ones she only keeps an eye on (her radar) */
+export const notOwned = (b: { status: Status }) => b.status === 'wishlist' || b.status === 'radar';
 
 export const GENRES = [
   'Romantasy',

@@ -12,7 +12,7 @@ import { getMeta, setMeta } from '../db';
 import { quickAdd } from '../lib/quickAdd';
 import { sameBook, searchBooks } from '../lib/bookSearch';
 import type { SeriesBook } from '../shared';
-import { STATUSES } from '../types';
+import { STATUSES, notOwned } from '../types';
 import { Cover } from '../components/Cover';
 import { StarsDisplay } from '../components/Stars';
 import { Button, Card, PageHeader } from '../components/ui';
@@ -72,7 +72,7 @@ export function SeriesList() {
   const groups = useMemo(() => groupSeries(books ?? []), [books]);
   const parts = useSeriesParts(groups);
   if (!books) return null;
-  const wishOnly = (g: (typeof groups)[number]) => g.books.every((b) => b.status === 'wishlist');
+  const wishOnly = (g: (typeof groups)[number]) => g.books.every(notOwned);
   const mine = groups.filter((g) => !wishOnly(g));
   const dreams = groups.filter(wishOnly);
   return (

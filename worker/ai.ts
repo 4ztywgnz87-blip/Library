@@ -249,6 +249,7 @@ function describeLibrary(books: Book[]) {
     `CURRENTLY READING:\n${by('reading').join('\n') || '-'}`,
     `OWNED BUT NOT READ YET:\n${by('owned').join('\n') || '-'}`,
     `WISHLIST:\n${by('wishlist').join('\n') || '-'}`,
+    `ON HER RADAR (curious about, not on the wishlist yet):\n${by('radar').join('\n') || '-'}`,
   ].join('\n\n');
 }
 

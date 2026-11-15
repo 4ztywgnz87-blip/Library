@@ -1,5 +1,5 @@
 import { getMeta, setMeta } from '../db';
-import type { Book } from '../types';
+import { notOwned, type Book } from '../types';
 import { bookKey } from './library';
 import {
   googleBooks,
@@ -39,7 +39,7 @@ export function autoAuthors(books: Book[]): AutoAuthor[] {
   const stats = new Map<string, { count: number; best?: Book }>();
   for (const b of books) {
     const a = b.authors[0];
-    if (!a || b.status === 'wishlist') continue;
+    if (!a || notOwned(b)) continue;
     const s = stats.get(a) ?? { count: 0 };
     s.count++;
     if (b.rating !== undefined && (!s.best || b.rating > s.best.rating!)) s.best = b;

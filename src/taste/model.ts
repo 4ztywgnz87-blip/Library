@@ -31,7 +31,7 @@ export interface LibraryBook {
   id: string;
   title: string;
   author: string;
-  status: 'reading' | 'owned' | 'read' | 'wishlist';
+  status: 'reading' | 'owned' | 'read' | 'wishlist' | 'radar';
   rating?: number;
   series?: { name: string; number?: number };
   profile?: BookProfile;

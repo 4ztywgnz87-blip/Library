@@ -4,7 +4,7 @@ import { updateBook } from '../lib/library';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import type { Book } from '../types';
+import { notOwned, type Book } from '../types';
 import type { DayLog } from '../db';
 import { Cover } from './Cover';
 import { Button } from './ui';
@@ -188,7 +188,7 @@ export function LogSheet({
   const options = useMemo(() => {
     const rank = (b: Book) => (b.status === 'reading' ? 0 : b.status === 'owned' ? 1 : b.status === 'read' ? 2 : 3);
     return books
-      .filter((b) => b.status !== 'wishlist')
+      .filter((b) => !notOwned(b))
       .sort((a, b) => rank(a) - rank(b) || (b.startedAt ?? 0) - (a.startedAt ?? 0) || a.title.localeCompare(b.title));
   }, [books]);
   const logged = new Map((log?.entries ?? []).map((e) => [e.bookId, e]));

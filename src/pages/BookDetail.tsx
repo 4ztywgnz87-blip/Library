@@ -4,7 +4,7 @@ import { seriesPath } from '../lib/series';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBook } from '../lib/hooks';
 import { deleteBook, updateBook } from '../lib/library';
-import { STATUSES, type Book, type Status } from '../types';
+import { STATUSES, notOwned, type Book, type Status } from '../types';
 import { useGenreList } from '../lib/profile';
 import { Cover } from '../components/Cover';
 import { StarsDisplay, StarsInput, formatRating } from '../components/Stars';
@@ -89,7 +89,7 @@ export default function BookDetail() {
 
   const setStatus = (status: Status) => {
     // the book is hers now: confetti
-    if (book.status === 'wishlist' && status === 'owned') setParty((c) => c + 1);
+    if (notOwned(book) && status === 'owned') setParty((c) => c + 1);
     if (status === 'read' && book.status !== 'read') {
       setCelebrate((c) => c + 1);
       setTimeout(() => ratingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
@@ -139,12 +139,12 @@ export default function BookDetail() {
           {/* Status */}
           <Card>
             <p className="mb-3 text-xs tracking-wide text-mocha uppercase">Status</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {STATUSES.map((s) => (
                 <button
                   key={s.id}
                   onClick={() => setStatus(s.id)}
-                  className={`rounded-2xl border px-3 py-2.5 text-sm transition-all ${
+                  className={`rounded-2xl border px-3 py-2.5 text-sm transition-all ${s.id === 'radar' ? 'col-span-2 sm:col-span-1' : ''} ${
                     book.status === s.id
                       ? 'border-wine bg-white font-medium text-wine shadow-[var(--shadow-soft)]'
                       : 'border-sand text-cocoa'
@@ -186,10 +186,15 @@ export default function BookDetail() {
                 Got it! 🎉
               </Button>
             )}
+            {book.status === 'radar' && (
+              <Button className="mt-4 w-full" onClick={() => setStatus('wishlist')}>
+                Move to my wishlist 💛
+              </Button>
+            )}
           </Card>
 
           {/* How well it fits her (books she hasn't read yet) */}
-          {(book.status === 'owned' || book.status === 'wishlist') && <FitForYou book={book} />}
+          {(book.status === 'owned' || notOwned(book)) && <FitForYou book={book} />}
 
           {/* Rating & review */}
           {book.status === 'read' && (
@@ -218,7 +223,7 @@ export default function BookDetail() {
           </Card>
 
           {/* Lending (books she has, not the wishlist) */}
-          {book.status !== 'wishlist' && <LendCard book={book} />}
+          {!notOwned(book) && <LendCard book={book} />}
 
           {/* Genres */}
           <Card>

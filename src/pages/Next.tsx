@@ -9,11 +9,11 @@ import { normalize } from '../lib/library';
 import type { Mood } from '../taste/model';
 import { sameBook, searchBooks } from '../lib/bookSearch';
 import { updateBook } from '../lib/library';
-import { quickAdd } from '../lib/quickAdd';
 import { MOODS, type Pick, type RecommendRequest } from '../shared';
 import type { Book } from '../types';
 import { useGenreList } from '../lib/profile';
 import { Cover } from '../components/Cover';
+import { WantButtons } from '../components/WantButtons';
 import { Button, Card, Chip, PageHeader } from '../components/ui';
 import { SparkleIcon } from '../components/Icons';
 import { BookPreview, type PreviewBook } from '../components/BookPreview';
@@ -281,7 +281,6 @@ function PickCard({
   const navigate = useNavigate();
   const own = pick.bookId ? books?.find((b) => b.id === pick.bookId) : undefined;
   const [cover, setCover] = useState<string | undefined>();
-  const [done, setDone] = useState(false);
   const preview = useHistoryModal<PreviewBook>('book');
 
   // New books: borrow a cover from the book search
@@ -333,7 +332,7 @@ function PickCard({
               <span className="font-medium">Heads up:</span> {pick.headsUp}
             </p>
           )}
-          <div className="mt-3 flex items-center gap-1">
+          <div className="mt-3 flex flex-wrap items-center gap-1">
             {source === 'shelf' && own ? (
               <Button
                 className="px-4 py-2 text-xs whitespace-nowrap"
@@ -345,16 +344,7 @@ function PickCard({
                 Start reading
               </Button>
             ) : (
-              <Button
-                className="px-4 py-2 text-xs whitespace-nowrap"
-                disabled={done}
-                onClick={async () => {
-                  setDone(true);
-                  await quickAdd(pick.title, pick.author, 'wishlist', cover ? { coverUrl: cover } : {});
-                }}
-              >
-                {done ? 'On your wishlist ✓' : '+ Wishlist'}
-              </Button>
+              <WantButtons title={pick.title} author={pick.author} extra={cover ? { coverUrl: cover } : {}} />
             )}
             <Button variant="ghost" className="px-3 py-2 text-xs whitespace-nowrap" onClick={onNotForMe}>
               Not for me

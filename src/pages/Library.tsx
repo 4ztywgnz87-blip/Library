@@ -6,7 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { setMeta } from '../db';
-import { STATUSES, type Book, type Status } from '../types';
+import { STATUSES, notOwned, type Book, type Status } from '../types';
 import { Cover } from '../components/Cover';
 import { StarsDisplay } from '../components/Stars';
 import { Chip } from '../components/ui';
@@ -102,7 +102,7 @@ export default function Library() {
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: books?.length ?? 0 };
     for (const b of books ?? []) c[b.status] = (c[b.status] ?? 0) + 1;
-    c.have = (books?.length ?? 0) - (c.wishlist ?? 0);
+    c.have = (books?.length ?? 0) - (c.wishlist ?? 0) - (c.radar ?? 0);
     return c;
   }, [books]);
 
@@ -117,7 +117,7 @@ export default function Library() {
     const q = normalize(query);
     const filtered = books.filter(
       (b) =>
-        (tab === 'all' || (tab === 'have' ? b.status !== 'wishlist' : b.status === tab)) &&
+        (tab === 'all' || (tab === 'have' ? !notOwned(b) : b.status === tab)) &&
         (!year || (b.status === 'read' && !!b.finishedAt && new Date(b.finishedAt).getFullYear() === year)) &&
         (!authorFilter || normalize(b.authors.join(' ')).includes(normalize(authorFilter))) &&
         (!genre || b.genres.includes(genre)) &&

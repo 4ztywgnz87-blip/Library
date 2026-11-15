@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Book } from '../types';
+import { notOwned, type Book } from '../types';
 import { authorNews, followedAuthors, type AuthorNews } from './authors';
 import { looseKey } from './library';
 import { useProfile } from './profile';
@@ -29,7 +29,7 @@ export function useAuthorNews(books: Book[] | undefined, favourites: string[]) {
 export function useHave(books: Book[] | undefined) {
   return useMemo(() => {
     const m = new Map<string, Book>();
-    for (const b of books ?? []) if (b.status !== 'wishlist') m.set(looseKey(b), b);
+    for (const b of books ?? []) if (!notOwned(b)) m.set(looseKey(b), b);
     return m;
   }, [books]);
 }

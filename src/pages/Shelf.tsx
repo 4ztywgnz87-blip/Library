@@ -5,7 +5,7 @@ import { useBooks } from '../lib/hooks';
 import { shelfOrder } from '../lib/library';
 import { isLight, updateSpineColors } from '../lib/coverColor';
 import { hashColor } from '../components/Cover';
-import type { Book, Status } from '../types';
+import { notOwned, type Book, type Status } from '../types';
 import { dayKey, useDays } from '../lib/streak';
 import { useFirstVisit, useSeenIds } from '../lib/visited';
 import {
@@ -486,7 +486,7 @@ export default function Shelf() {
           ? 'peek'
           : undefined;
   // the books slide onto the shelf once per visit; coming back, nothing moves
-  const bookCount = (books ?? []).filter((b) => b.status !== 'wishlist').length;
+  const bookCount = (books ?? []).filter((b) => !notOwned(b)).length;
   const firstVisit = useFirstVisit('shelf');
   const [dropped, setDropped] = useState<Record<string, string[]>>({});
   const seenBefore = useSeenIds(
@@ -494,7 +494,7 @@ export default function Shelf() {
     (books ?? []).map((b) => b.id),
   );
   const byStatus = useMemo(() => {
-    const m: Record<Status, Book[]> = { reading: [], owned: [], read: [], wishlist: [] };
+    const m: Record<Status, Book[]> = { reading: [], owned: [], read: [], wishlist: [], radar: [] };
     for (const b of books ?? []) m[b.status].push(b);
     for (const k of Object.keys(m) as Status[]) m[k].sort(shelfOrder);
     return m;

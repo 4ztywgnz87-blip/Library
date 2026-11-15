@@ -7,7 +7,7 @@ import { matchFor, useTaste } from '../lib/taste';
 import { shrinkPhoto } from '../lib/photo';
 import { sameBook, searchBooks, type SearchResult } from '../lib/bookSearch';
 import { bookKey, normalize } from '../lib/library';
-import { quickAdd } from '../lib/quickAdd';
+import { WantButtons } from '../components/WantButtons';
 import type { FitResponse } from '../shared';
 import { STATUSES, type Book } from '../types';
 import { Cover } from '../components/Cover';
@@ -288,7 +288,6 @@ function OwnedRow({ book }: { book: Book }) {
 }
 
 function FitCard({ book, fit }: { book: SearchResult; fit: FitResponse }) {
-  const [added, setAdded] = useState(false);
   const v = VERDICT[fit.verdict];
   const r = 34;
   const circ = 2 * Math.PI * r;
@@ -338,18 +337,9 @@ function FitCard({ book, fit }: { book: SearchResult; fit: FitResponse }) {
             An early guess: the more books you rate, the better Snug knows your taste.
           </p>
         )}
-        <Button
-          className="w-full"
-          disabled={added}
-          onClick={async () => {
-            setAdded(true);
-            await quickAdd(book.title, book.authors[0] ?? '', 'wishlist', {
-              coverUrl: book.coverUrl,
-            });
-          }}
-        >
-          {added ? 'On your wishlist ✓' : '+ Add to wishlist'}
-        </Button>
+        <div className="flex gap-2">
+          <WantButtons size="large" title={book.title} author={book.authors[0] ?? ''} extra={{ coverUrl: book.coverUrl }} />
+        </div>
       </Card>
     </motion.div>
   );

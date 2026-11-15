@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { updateBook } from '../lib/library';
 import { Cover } from '../components/Cover';
 import { PartyConfetti } from '../components/PageConfetti';
-import { Button, PageHeader } from '../components/ui';
+import { Button, PageHeader, Segmented } from '../components/ui';
 import { EmptyState } from '../components/SleepyCat';
 import { ConfirmSheet } from '../components/ConfirmSheet';
 import { ShareIcon } from '../components/Icons';
@@ -15,27 +15,56 @@ import { useMeta } from '../lib/hooks';
 import { useKeyboardLift } from '../lib/keyboard';
 import type { Book } from '../types';
 
-/** Books she doesn't have yet: her dream list */
+/** Books she doesn't have yet: her dream list, and (second tab) the books she keeps on her radar */
 export default function Wishlist() {
   const books = useBooks();
+  const [params, setParams] = useSearchParams();
+  const tab: 'wishlist' | 'radar' = params.get('tab') === 'radar' ? 'radar' : 'wishlist';
+  const radar = tab === 'radar';
   const [gotIt, setGotIt] = useState<string | null>(null);
   const [party, setParty] = useState(0);
-  const wishes = useMemo(
-    () => (books ?? []).filter((b) => b.status === 'wishlist').sort((a, b) => b.addedAt - a.addedAt),
-    [books],
-  );
+  const lists = useMemo(() => {
+    const newest = (s: 'wishlist' | 'radar') =>
+      (books ?? []).filter((b) => b.status === s).sort((a, b) => b.addedAt - a.addedAt);
+    return { wishlist: newest('wishlist'), radar: newest('radar') };
+  }, [books]);
+  const wishes = lists[tab];
   if (!books) return null;
 
   return (
     <div>
-      <PageHeader back title="Wishlist" right={wishes.length > 0 ? <ShareActions wishes={wishes} /> : undefined} />
+      <PageHeader
+        back
+        title={radar ? 'On my radar' : 'Wishlist'}
+        right={!radar && wishes.length > 0 ? <ShareActions wishes={wishes} /> : undefined}
+      />
       <div className="mx-auto max-w-4xl px-4 pb-10">
         {party > 0 && <PartyConfetti key={party} onDone={() => setParty(0)} />}
-        <div className="h-2" />
+        <div className="mx-auto mt-1 mb-5 max-w-sm">
+          <Segmented
+            value={tab}
+            onChange={(t) => setParams(t === 'radar' ? { tab: 'radar' } : {}, { replace: true })}
+            options={[
+              { id: 'wishlist', label: `💛 Wishlist ${lists.wishlist.length}` },
+              { id: 'radar', label: `👀 Radar ${lists.radar.length}` },
+            ]}
+          />
+        </div>
+        {radar && wishes.length > 0 && (
+          <p className="-mt-2 mb-5 text-center text-xs text-mocha">
+            Books you're curious about, without wanting them yet. Not shared, just for you.
+          </p>
+        )}
         {wishes.length === 0 ? (
-          <EmptyState title="Nothing on your wishlist">
-            Add books you want with “+ Wishlist” anywhere in Snug.
-          </EmptyState>
+          radar ? (
+            <EmptyState title="Nothing on your radar">
+              Curious about a book but not ready to wish for it? Tap “👀 Radar” on a tip or a search result.
+            </EmptyState>
+          ) : (
+            <EmptyState title="Nothing on your wishlist">
+              Add books you want with “+ Wishlist” anywhere in Snug.
+            </EmptyState>
+          )
         ) : (
           <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5">
             <AnimatePresence>
@@ -50,7 +79,7 @@ export default function Wishlist() {
                   <Link to={`/book/${b.id}`} className="block active:scale-[0.98]">
                     <div className="relative">
                       <Cover book={b} />
-                      {!b.buyUrl && (
+                      {!radar && !b.buyUrl && (
                         <span className="absolute inset-x-1 bottom-1 rounded-full bg-ink/70 px-1.5 py-0.5 text-center text-[0.6rem] text-cream">
                           no link yet
                         </span>
@@ -63,19 +92,34 @@ export default function Wishlist() {
                       {b.authors[0]}
                     </p>
                   </Link>
-                  <Button
-                    variant="soft"
-                    className="mt-2 w-full px-3 py-2 text-xs"
-                    disabled={gotIt === b.id}
-                    onClick={async () => {
-                      setGotIt(b.id);
-                      setParty((n) => n + 1);
-                      await updateBook(b.id, { status: 'owned' });
-                      setGotIt(null);
-                    }}
-                  >
-                    Got it! 🎉
-                  </Button>
+                  {radar ? (
+                    <Button
+                      variant="soft"
+                      className="mt-2 w-full px-3 py-2 text-xs"
+                      disabled={gotIt === b.id}
+                      onClick={async () => {
+                        setGotIt(b.id);
+                        await updateBook(b.id, { status: 'wishlist' });
+                        setGotIt(null);
+                      }}
+                    >
+                      + Wishlist
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="soft"
+                      className="mt-2 w-full px-3 py-2 text-xs"
+                      disabled={gotIt === b.id}
+                      onClick={async () => {
+                        setGotIt(b.id);
+                        setParty((n) => n + 1);
+                        await updateBook(b.id, { status: 'owned' });
+                        setGotIt(null);
+                      }}
+                    >
+                      Got it! 🎉
+                    </Button>
+                  )}
                 </motion.div>
               ))}
             </AnimatePresence>
