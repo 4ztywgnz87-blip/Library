@@ -15,6 +15,8 @@ export interface ReaderProfile {
   /** Books she said "not for me" to */
   notForMe: string[];
   completedAt?: number;
+  /** A streak brought over from another app: `count` days, the last of which was `until` (YYYY-MM-DD) */
+  streakImport?: { count: number; until: string };
   updatedAt: number;
 }
 

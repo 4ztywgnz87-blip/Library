@@ -12,6 +12,7 @@ import { useSeriesParts } from '../lib/seriesTotals';
 import { useMemo, useState } from 'react';
 import { updateProfile, useProfile } from '../lib/profile';
 import { Greeting } from '../components/Greeting';
+import { PageProgress, StreakCard } from '../components/Streak';
 
 export default function Home() {
   const books = useBooks();
@@ -60,6 +61,8 @@ export default function Home() {
         </div>
       ) : (
         <div className="space-y-8">
+          <StreakCard books={books} />
+
           {/* Currently reading */}
           <section>
             <h2 className="mb-3 text-xl">Currently reading</h2>
@@ -87,7 +90,8 @@ export default function Home() {
                               {b.series.number ? ` · #${b.series.number}` : ''}
                             </p>
                           )}
-                          <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-wine">
+                          <PageProgress book={b} className="mt-2" />
+                          <span className="mt-auto inline-flex items-center gap-1 pt-2 text-sm font-medium text-wine">
                             Finished it? Rate it <ChevronIcon width={16} height={16} />
                           </span>
                         </div>

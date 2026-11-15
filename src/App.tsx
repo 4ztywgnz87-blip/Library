@@ -14,6 +14,7 @@ import Quiz from './pages/Quiz';
 import Stats from './pages/Stats';
 import Wishlist from './pages/Wishlist';
 import NewBooksPage from './pages/NewBooksPage';
+import StreakPage from './pages/StreakPage';
 import { startBackgroundSync } from './lib/sync';
 import { backfillSeries, harmonizeSeriesGenres } from './lib/seriesLookup';
 
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="stats" element={<Stats />} />
           <Route path="wishlist" element={<Wishlist />} />
           <Route path="new-books" element={<NewBooksPage />} />
+          <Route path="streak" element={<StreakPage />} />
           <Route path="*" element={<Home />} />
         </Route>
       </Routes>

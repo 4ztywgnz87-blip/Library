@@ -10,6 +10,16 @@ export interface Meta {
 /** Local copy of everything, so the library works offline. `dirty` = not yet synced. */
 export type LocalBook = Book & { dirty: 0 | 1 };
 
+/** One day of her reading log: which books, up to which page. `dirty` = not yet synced */
+export interface DayLog {
+  /** YYYY-MM-DD, her own time zone */
+  date: string;
+  entries: { bookId: string; title: string; page?: number; finished?: boolean }[];
+  updatedAt: number;
+  deleted?: boolean;
+  dirty: 0 | 1;
+}
+
 /** Snug's analysis of a book (fetched once, kept on the device) */
 export interface StoredProfile {
   key: string;
@@ -20,6 +30,7 @@ export const db = new Dexie('snug') as Dexie & {
   books: EntityTable<LocalBook, 'id'>;
   meta: EntityTable<Meta, 'key'>;
   profiles: EntityTable<StoredProfile, 'key'>;
+  days: EntityTable<DayLog, 'date'>;
 };
 
 db.version(1).stores({
@@ -27,6 +38,7 @@ db.version(1).stores({
   meta: 'key',
 });
 db.version(2).stores({ profiles: 'key' });
+db.version(3).stores({ days: 'date, dirty' });
 
 export async function getMeta<T>(key: string, fallback: T): Promise<T> {
   const row = await db.meta.get(key);

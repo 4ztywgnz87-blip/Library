@@ -63,6 +63,8 @@ export interface Book {
   /** The rating card was saved at least once (also without stars) */
   ratingSaved?: boolean;
   review?: string;
+  /** The page she has reached (from her reading log) */
+  currentPage?: number;
   /** What Snug read from her review (once per review), for her match scores */
   reviewInsight?: ReviewInsight;
   tags: string[];
@@ -76,7 +78,7 @@ export interface Book {
 
 /** Shape of a record as it travels between app and server */
 export interface SyncRecord {
-  kind: 'book' | 'profile';
+  kind: 'book' | 'profile' | 'day';
   id: string;
   data: unknown;
   updatedAt: number;

@@ -16,6 +16,8 @@ import { lookupSeries, setGenreForSeries } from '../lib/seriesLookup';
 import { useMatches } from '../lib/taste';
 import { profileKey } from '../taste/vocab';
 import { MatchRing, matchLabel } from '../components/MatchRing';
+import { LogSheet, PageProgress } from '../components/Streak';
+import { dayKey, useDays } from '../lib/streak';
 
 const TAG_SUGGESTIONS = [
   'spicy 🌶️',
@@ -36,6 +38,8 @@ export default function BookDetail() {
   const [celebrate, setCelebrate] = useState(0);
   const [pickingEdition, setPickingEdition] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [logging, setLogging] = useState(false);
+  const days = useDays();
   const ratingRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -120,10 +124,28 @@ export default function BookDetail() {
             </div>
             {/* the obvious next step, one tap */}
             {book.status === 'reading' && (
-              <Button className="mt-4 w-full" onClick={() => setStatus('read')}>
-                I finished it! 🎉
-              </Button>
+              <>
+                <PageProgress book={book} className="mt-4" />
+                <div className="mt-4 flex gap-3">
+                  <Button variant="soft" className="flex-1" onClick={() => setLogging(true)}>
+                    {book.currentPage ? 'Update page' : 'Log my page'}
+                  </Button>
+                  <Button className="flex-1" onClick={() => setStatus('read')}>
+                    I finished it! 🎉
+                  </Button>
+                </div>
+              </>
             )}
+            <AnimatePresence>
+              {logging && (
+                <LogSheet
+                  date={dayKey()}
+                  books={[book]}
+                  log={days?.find((d) => d.date === dayKey())}
+                  onClose={() => setLogging(false)}
+                />
+              )}
+            </AnimatePresence>
             {book.status === 'owned' && (
               <Button className="mt-4 w-full" onClick={() => setStatus('reading')}>
                 Start reading 📖

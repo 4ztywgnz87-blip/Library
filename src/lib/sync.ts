@@ -1,4 +1,4 @@
-import { db, getMeta, setMeta, type LocalBook } from '../db';
+import { db, getMeta, setMeta, type DayLog, type LocalBook } from '../db';
 import type { Book, SyncRecord } from '../types';
 import type { ReaderProfile } from '../shared';
 
@@ -25,6 +25,10 @@ export async function syncNow(): Promise<void> {
         updatedAt: book.updatedAt,
         deleted: !!book.deleted,
       }));
+      // Her reading log, one record per day
+      const dirtyDays = await db.days.where('dirty').equals(1).toArray();
+      for (const { dirty: _d, ...day } of dirtyDays)
+        changes.push({ kind: 'day', id: day.date, data: day, updatedAt: day.updatedAt, deleted: !!day.deleted });
       // Her reader profile (quiz, favourite authors) travels as one record
       const profile = await getMeta<ReaderProfile | null>('profile', null);
       const profileDirty = await getMeta<boolean>('profileDirty', false);
@@ -40,7 +44,11 @@ export async function syncNow(): Promise<void> {
       if (!res.ok) return;
       const { now, records } = (await res.json()) as { now: number; records: SyncRecord[] };
 
-      await db.transaction('rw', db.books, db.meta, async () => {
+      await db.transaction('rw', db.books, db.meta, db.days, async () => {
+        for (const d of dirtyDays) {
+          const cur = await db.days.get(d.date);
+          if (cur && cur.updatedAt === d.updatedAt) await db.days.update(d.date, { dirty: 0 });
+        }
         // Pushed rows are clean now, unless edited again while syncing
         for (const b of dirty) {
           const cur = await db.books.get(b.id);
@@ -54,6 +62,12 @@ export async function syncNow(): Promise<void> {
           if (r.kind === 'profile') {
             const cur = await getMeta<ReaderProfile | null>('profile', null);
             if (!cur || cur.updatedAt < r.updatedAt) await setMeta('profile', r.data);
+            continue;
+          }
+          if (r.kind === 'day') {
+            const cur = await db.days.get(r.id);
+            if (cur && cur.updatedAt > r.updatedAt) continue;
+            await db.days.put({ ...(r.data as Omit<DayLog, 'dirty'>), deleted: r.deleted, dirty: 0 });
             continue;
           }
           if (r.kind !== 'book') continue;
