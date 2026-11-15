@@ -1,7 +1,17 @@
 import { Hono, type Context } from 'hono';
 import type { Book, SyncRecord } from '../src/types';
 import type { ReaderProfile } from '../src/shared';
-import { AiLimitError, aiStatus, bookSeries, findCoverCorners, identifyCover, suggestBooks, seriesInfo } from './ai';
+import {
+  AiLimitError,
+  aiPaused,
+  aiStatus,
+  bookSeries,
+  setAiPaused,
+  findCoverCorners,
+  identifyCover,
+  suggestBooks,
+  seriesInfo,
+} from './ai';
 import { ASSETS } from './assets.gen';
 import { findBookSeries, seriesParts } from './series';
 import { bookProfiles, reviewInsight } from './profiles';
@@ -145,6 +155,7 @@ app.get('/ai/book-series', async (c) => {
   const author = c.req.query('author') ?? '';
   if (!title || !author) return c.json({});
   const known = (c.req.query('known') ?? '').split('|').filter(Boolean).slice(0, 12);
+  if (await aiPaused(c.env)) return c.json({ paused: true }); // the app tries again after the pause
   try {
     return c.json(await bookSeries(c.env, title, author, known));
   } catch (err) {
@@ -253,6 +264,13 @@ async function aiRoute<T>(c: Context<{ Bindings: Env }>, run: () => Promise<T>) 
 }
 
 app.get('/ai/status', async (c) => c.json(await aiStatus(c.env)));
+
+/** Pause or resume the automatic AI work (analysing books, reading reviews, series look-ups) */
+app.post('/ai/pause', async (c) => {
+  const { paused } = await c.req.json<{ paused?: boolean }>();
+  await setAiPaused(c.env, !!paused);
+  return c.json({ paused: !!paused });
+});
 
 app.post('/ai/identify', async (c) => {
   const { image, mediaType = 'image/jpeg' } = await c.req.json<{

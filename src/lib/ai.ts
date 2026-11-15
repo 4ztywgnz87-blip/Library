@@ -48,3 +48,12 @@ export async function aiStatus(): Promise<AiStatus | null> {
     return null;
   }
 }
+
+export async function setAiPause(paused: boolean): Promise<boolean> {
+  const res = await fetch('/api/ai/pause', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paused }),
+  });
+  return res.ok ? ((await res.json()) as { paused: boolean }).paused : !paused;
+}

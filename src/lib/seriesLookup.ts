@@ -48,7 +48,7 @@ async function guessSeriesFromLibrary(book: Pick<Book, 'id' | 'title' | 'authors
  * translated editions or lesser known books. The author's series she already has are passed along,
  * so the same series keeps the same spelling.
  */
-async function askSeries(book: Pick<Book, 'id' | 'title' | 'authors'>): Promise<SeriesInfo | undefined> {
+async function askSeries(book: Pick<Book, 'id' | 'title' | 'authors'>): Promise<SeriesInfo | 'paused' | undefined> {
   const author = book.authors[0] ?? '';
   if (!author) return undefined;
   const mine = await db.books
@@ -59,7 +59,8 @@ async function askSeries(book: Pick<Book, 'id' | 'title' | 'authors'>): Promise<
   try {
     const res = await fetch(`/api/ai/book-series?${params}`);
     if (!res.ok) return undefined;
-    const found = (await res.json()) as { name?: string; number?: number };
+    const found = (await res.json()) as { name?: string; number?: number; paused?: boolean };
+    if (found.paused) return 'paused';
     if (!found.name) return undefined;
     // a number another part of the series already has can't be right: better none than a wrong one
     const taken = mine.some(
@@ -96,11 +97,17 @@ export async function lookupSeries(
       ? { name: found.name, number: found.number, key: found.key }
       : undefined;
     if (!series) series = await guessSeriesFromLibrary(book);
-    if (!series) series = await askSeries(book);
+    let paused = false;
+    if (!series) {
+      const asked = await askSeries(book);
+      if (asked === 'paused') paused = true;
+      else series = asked;
+    }
 
     const current = await db.books.get(book.id);
     if (!current) return undefined;
-    const patch: Partial<Book> = { seriesChecked: true, lookupVersion: LOOKUP_VERSION };
+    // while the AI is paused the check isn't finished: it is asked again later
+    const patch: Partial<Book> = paused ? {} : { seriesChecked: true, lookupVersion: LOOKUP_VERSION };
     if (!current.series && series) patch.series = series;
     // Genres: stores often only say "Fiction"; add what readers shelve it under and what the
     // rest of the series has. Only when she hasn't picked specific genres herself.

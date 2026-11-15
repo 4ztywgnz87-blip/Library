@@ -128,8 +128,12 @@ export function useTasteUpkeep() {
   useEffect(() => {
     if (!books?.length || !navigator.onLine) return;
     const t = setTimeout(async () => {
-      // read books first (they teach her taste), then the rest of her shelf
-      const order = [...books].sort(
+      // Books that teach Snug her taste (rated or reviewed) first, then the shelf she can still read.
+      // A book she read but never rated says nothing about her taste, so it isn't analysed (no cost) until she rates it.
+      const worth = books.filter(
+        (b) => b.status !== 'wishlist' && (b.status !== 'read' || b.rating !== undefined || !!b.review?.trim()),
+      );
+      const order = [...worth].sort(
         (a, b) =>
           Number(b.status === 'read' || b.status === 'reading') - Number(a.status === 'read' || a.status === 'reading'),
       );

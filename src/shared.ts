@@ -106,4 +106,6 @@ export interface AiStatus {
   mode: 'mock' | 'live';
   usedToday: number;
   limit: number;
+  /** the automatic AI work is paused (adding lots of books) */
+  paused?: boolean;
 }

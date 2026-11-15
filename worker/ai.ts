@@ -23,12 +23,32 @@ export class AiLimitError extends Error {}
 export const isLive = (env: AiEnv) => env.AI_MODE === 'live' && !!env.ANTHROPIC_API_KEY;
 const today = () => new Date().toISOString().slice(0, 10);
 
+/**
+ * "Pause": while she adds lots of books, the automatic AI work stops (analysing books, reading
+ * reviews, looking up series). Things she asks for herself (tips, a cover photo) still work.
+ */
+export async function aiPaused(env: AiEnv) {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'ai_paused'")
+    .first<{ value: string }>()
+    .catch(() => null);
+  return row?.value === '1';
+}
+
+export async function setAiPaused(env: AiEnv, paused: boolean) {
+  await env.DB.prepare(
+    "INSERT INTO settings (key, value) VALUES ('ai_paused', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+  )
+    .bind(paused ? '1' : '0')
+    .run();
+}
+
 export async function aiStatus(env: AiEnv) {
   const row = await env.DB.prepare('SELECT count FROM ai_usage WHERE day = ?').bind(today()).first<{ count: number }>();
   return {
     mode: isLive(env) ? 'live' : 'mock',
     usedToday: row?.count ?? 0,
     limit: Number(env.AI_DAILY_LIMIT ?? 40),
+    paused: await aiPaused(env),
   } as const;
 }
 
@@ -386,7 +406,7 @@ const SERIES_RULES =
 
 export async function seriesInfo(env: AiEnv, name: string, author: string): Promise<SeriesResponse> {
   if (!isLive(env)) return { books: [], mock: true };
-  const result = await cached(env, ['series2', name.toLowerCase(), author.toLowerCase()], 14, async () => {
+  const result = await cached(env, ['series2', name.toLowerCase(), author.toLowerCase()], 30, async () => {
     // first choice: look it up on the web (accurate titles, and the newest releases)
     const text = await askWithSearch(
       env,
@@ -438,7 +458,7 @@ export async function bookSeries(
   author: string,
   known: string[] = [],
 ): Promise<{ name?: string; number?: number }> {
-  if (!isLive(env)) return {};
+  if (!isLive(env) || (await aiPaused(env))) return {};
   const result = await cached(env, ['bookseries4', title.toLowerCase(), author.toLowerCase()], 90, () =>
     ask(
       env,

@@ -7,6 +7,7 @@ import { Card } from '../components/ui';
 import { FavouriteAuthorsCard } from '../components/FavouriteAuthors';
 import { useLending } from '../lib/lending';
 import { Link } from 'react-router-dom';
+import { aiStatus, setAiPause } from '../lib/ai';
 import { updateProfile, useProfile } from '../lib/profile';
 
 export default function Profile() {
@@ -65,6 +66,8 @@ export default function Profile() {
             <span className="text-sm font-medium text-wine">{profile.completedAt ? 'Retake' : 'Start'}</span>
           </Card>
         </Link>
+
+        <AiPauseCard />
 
         <Card className="space-y-2">
           <p className="text-xs tracking-wide text-mocha uppercase">Backup</p>
@@ -135,5 +138,38 @@ function LentLink() {
         </div>
       </Card>
     </Link>
+  );
+}
+
+/** Adding lots of books at once? Pause the automatic AI work, then switch it on again afterwards */
+function AiPauseCard() {
+  const [paused, setPaused] = useState<boolean | null>(null);
+  useEffect(() => {
+    void aiStatus().then((s) => setPaused(s ? !!s.paused : null));
+  }, []);
+  if (paused === null) return null;
+  return (
+    <Card className="flex items-center gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="font-soft text-lg">Adding lots of books?</p>
+        <p className="text-sm text-cocoa">
+          {paused
+            ? 'AI is paused: new books aren’t analysed or looked up for now. Switch it off when you’re done and Snug catches up.'
+            : 'Pause the automatic AI work (scores, series look-ups) while you add a lot of books at once.'}
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={paused}
+        aria-label="Pause AI"
+        onClick={async () => setPaused(await setAiPause(!paused))}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${paused ? 'bg-wine' : 'bg-sand'}`}
+      >
+        <span
+          className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${paused ? 'translate-x-5' : ''}`}
+        />
+      </button>
+    </Card>
   );
 }

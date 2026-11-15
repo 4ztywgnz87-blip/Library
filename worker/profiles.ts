@@ -12,7 +12,7 @@ import {
   type ScaleId,
   type TagGroup,
 } from '../src/taste/vocab';
-import { AiLimitError, ask, googleDescription, isLive, TIPS_MODEL, type AiEnv } from './ai';
+import { AiLimitError, aiPaused, ask, googleDescription, isLive, TIPS_MODEL, type AiEnv } from './ai';
 
 // ---------- analysing a book, once ----------
 
@@ -111,6 +111,8 @@ export async function bookProfiles(
   /** only hand back analyses that already exist (free): nothing new is analysed */
   lookupOnly = false,
 ): Promise<{ profiles: Record<string, BookProfile>; pending: number }> {
+  // paused (she is adding lots of books): only hand back what is already known
+  if (await aiPaused(env)) lookupOnly = true;
   const wanted = new Map(books.map((b) => [profileKey(b.title, b.author), b]));
   const have = await stored(env, [...wanted.keys()]);
   const out: Record<string, BookProfile> = Object.fromEntries(have);
@@ -239,6 +241,7 @@ export async function reviewInsight(
     hash: string;
   },
 ): Promise<ReviewInsight | null> {
+  if (await aiPaused(env)) return null;
   if (!isLive(env)) return { hash: input.hash, summary: '', likes: [], dislikes: [] };
   const p = input.profile;
   const res = await ask(
