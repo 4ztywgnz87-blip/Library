@@ -166,9 +166,7 @@ export default function SharedWishlist({ token }: { token: string }) {
               const taken = !peeking && w.claimedBy && !w.mine;
               const byMe = !peeking && w.mine;
               const lang = LANG[w.language] ?? LANG.en;
-              const find =
-                w.buyUrl ||
-                `https://www.bol.com/be/nl/s/?searchtext=${encodeURIComponent(w.isbn13 ?? `${w.title} ${w.author}`)}`;
+              const find = w.buyUrl;
               return (
                 <motion.article
                   key={w.id}
@@ -226,9 +224,9 @@ export default function SharedWishlist({ token }: { token: string }) {
                             I'll get this
                           </Button>
                         ))}
-                      {!taken && (
+                      {!taken && find && (
                         <a href={find} target="_blank" rel="noreferrer" className="text-xs text-wine underline">
-                          {w.buyUrl ? 'Buy it here' : 'Find it online'}
+                          Buy it here
                         </a>
                       )}
                     </div>

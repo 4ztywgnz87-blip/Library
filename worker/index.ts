@@ -374,7 +374,8 @@ app.get('/wish/:token', async (c) => {
     .all<{ book_id: string; name: string; email: string | null }>();
   const claimed = new Map(claims.map((r) => [r.book_id, r]));
   const wishes = books
-    .filter((b) => b.status === 'wishlist' && !b.deleted)
+    // only books she gave a link for: she decides exactly which edition people buy
+    .filter((b) => b.status === 'wishlist' && !b.deleted && b.buyUrl)
     .sort((a, b) => b.addedAt - a.addedAt)
     .map((b) => {
       const cl = showClaims ? claimed.get(b.id) : undefined;

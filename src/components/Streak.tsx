@@ -313,23 +313,27 @@ export function LogSheet({
               </div>
 
               {!finished && (
-                <label className="mt-4 block text-xs text-cocoa">
-                  Up to page <span className="text-mocha">(optional)</span>
+                <div className="mt-4">
+                  <label htmlFor="log-page" className="block text-xs text-cocoa">
+                    Up to page <span className="text-mocha">(optional)</span>
+                  </label>
                   <div className="mt-1 flex items-center gap-2">
                     <input
+                      id="log-page"
                       inputMode="numeric"
                       value={page}
                       onChange={(e) => setPage(e.target.value.replace(/\D/g, ''))}
                       placeholder={bounds?.min ? `last time: ${bounds.min}` : 'e.g. 120'}
-                      className={`w-full rounded-2xl border bg-white/80 px-3 py-2.5 text-base text-ink ${
+                      className={`min-w-0 flex-1 rounded-2xl border bg-white/80 px-3 py-2.5 text-base text-ink ${
                         valid ? 'border-sand' : 'border-wine'
                       }`}
                     />
+                    {/* outside the label, so a tap goes to the page count and not to the page field */}
                     <span className="shrink-0 text-sm text-mocha">
-                      of <PagesEditor book={book} />
+                      of <PagesEditor book={book} className="-m-2 p-2" />
                     </span>
                   </div>
-                </label>
+                </div>
               )}
               {!finished && tooLow && bounds?.minDate && (
                 <p className="mt-2 text-xs text-wine">
@@ -442,23 +446,17 @@ export function PageProgress({ book, className = '' }: { book: Book; className?:
  */
 export function BookmarkRibbon({ book }: { book: Book }) {
   if (book.status !== 'reading') return null;
-  const pct = book.currentPage && book.pageCount ? Math.min(1, book.currentPage / book.pageCount) : 0;
   return (
     <motion.div
-      className="pointer-events-none absolute top-0 right-[14%] z-10 w-[13%] origin-top drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]"
-      initial={{ height: '0%' }}
-      animate={{ height: `${8 + pct * 84}%`, rotate: [0, 1.2, -0.8, 0] }}
-      transition={{
-        height: { type: 'spring', stiffness: 60, damping: 14, delay: 0.3 },
-        rotate: { duration: 5, repeat: Infinity, ease: 'easeInOut' },
-      }}
-      aria-label={`Page ${book.currentPage} of ${book.pageCount}`}
+      className="pointer-events-none absolute top-0 right-[24%] z-10 h-[17%] w-[11%] origin-top drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]"
+      animate={{ rotate: [0, 1.5, -1, 0] }}
+      transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+      aria-hidden
     >
       <div
         className="h-full w-full bg-gradient-to-r from-[#8e3445] via-[#a8455a] to-[#7a2e3a]"
-        style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 7px), 0 100%)' }}
+        style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 5px), 0 100%)' }}
       >
-        {/* a little stitched edge */}
         <div className="mx-auto h-full w-[60%] border-x border-dashed border-white/25" />
       </div>
     </motion.div>

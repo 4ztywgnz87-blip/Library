@@ -223,11 +223,16 @@ export default function BookDetail() {
 
           <SeriesCard book={book} />
 
+          {/* Pages: her own copy may have a different count than the database */}
+          <Card className="flex items-center justify-between gap-3">
+            <p className="text-xs tracking-wide text-mocha uppercase">Pages</p>
+            <PagesEditor book={book} className="text-sm text-ink" />
+          </Card>
+
           {/* About */}
           {book.description && <AboutCard text={book.description} />}
 
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2 text-xs text-mocha">
-            <PagesEditor book={book} />
             {book.publishedDate && <span>Published {book.publishedDate.slice(0, 4)}</span>}
             {book.isbn13 && <span>ISBN {book.isbn13}</span>}
           </div>
@@ -280,13 +285,17 @@ export default function BookDetail() {
 /** Year she finished a book in; undefined = "earlier / don't remember" */
 const finishedYear = (b: Book) => (b.finishedAt ? new Date(b.finishedAt).getFullYear() : undefined);
 
+/** Something worth keeping: stars, a few words or tags (a year alone doesn't count) */
+const hasReview = (b: Pick<Book, 'rating' | 'review' | 'tags'>) =>
+  b.rating !== undefined || !!b.review?.trim() || b.tags.length > 0;
+
 /**
  * Rating, review and tags. Once saved they are shown read-only, and "Edit" unlocks them,
  * so nothing changes by accident.
  */
 function RatingCard({ book }: { book: Book }) {
-  // Opens ready to rate, unless she already saved this card once (e.g. only a year, no stars)
-  const [editing, setEditing] = useState(book.rating === undefined && !book.ratingSaved);
+  // Opens ready to rate, unless there is already a real rating or review to show
+  const [editing, setEditing] = useState(!hasReview(book));
   const [rating, setRating] = useState(book.rating);
   const [review, setReview] = useState(book.review ?? '');
   const [tags, setTags] = useState(book.tags);
@@ -311,7 +320,8 @@ function RatingCard({ book }: { book: Book }) {
           : year === now
             ? Date.now()
             : Date.UTC(year, 6, 1);
-    await updateBook(book.id, { rating, review: review.trim() || undefined, tags, finishedAt, ratingSaved: true });
+    const next = { rating, review: review.trim() || undefined, tags };
+    await updateBook(book.id, { ...next, finishedAt, ratingSaved: hasReview(next) });
     setEditing(false);
   };
 

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useSearchParams } from 'react-router-dom';
 import type { Book } from '../types';
@@ -143,12 +144,19 @@ function MomentIcon({ m }: { m: Moment }) {
   );
 }
 
+/** The greeting writes itself in once per visit; coming back to Home shows it straight away */
+let greeted = false;
+
 export function Greeting({ name, books }: { name?: string; books: Book[] }) {
   // (`?moment=morning` shows another time of day, to preview it)
   const [params] = useSearchParams();
   const forced = params.get('moment') as Moment | null;
   const m = forced && forced in WORDS ? forced : moment(new Date().getHours());
   const words = `${WORDS[m]}${name ? `, ${name}` : ''}`.split(' ');
+  const [animate] = useState(!greeted);
+  useEffect(() => {
+    greeted = true;
+  }, []);
   return (
     <header className="pt-8 pb-6">
       <div>
@@ -158,7 +166,7 @@ export function Greeting({ name, books }: { name?: string; books: Book[] }) {
               <motion.span
                 key={i}
                 className="mr-[0.25em] inline-block"
-                initial={{ opacity: 0, y: 8 }}
+                initial={animate ? { opacity: 0, y: 8 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.08 * i, duration: 0.45, ease: 'easeOut' }}
               >
@@ -172,7 +180,7 @@ export function Greeting({ name, books }: { name?: string; books: Book[] }) {
                 {word}
                 <motion.span
                   className="inline-block align-middle"
-                  initial={{ opacity: 0, scale: 0.6, rotate: -10 }}
+                  initial={animate ? { opacity: 0, scale: 0.6, rotate: -10 } : false}
                   animate={{ opacity: 1, scale: 1, rotate: 0 }}
                   transition={{ delay: 0.08 * words.length + 0.1, type: 'spring', stiffness: 200, damping: 14 }}
                 >
@@ -185,7 +193,7 @@ export function Greeting({ name, books }: { name?: string; books: Book[] }) {
         {books.length > 0 && (
           <motion.p
             className="mt-1 text-sm text-cocoa"
-            initial={{ opacity: 0 }}
+            initial={animate ? { opacity: 0 } : false}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.08 * words.length + 0.3, duration: 0.6 }}
           >
