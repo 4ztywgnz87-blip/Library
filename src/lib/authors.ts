@@ -78,8 +78,13 @@ export function followedAuthors(books: Book[], favourites: string[], muted: stri
 function recent(date: string | undefined) {
   if (!date) return false;
   const t = Date.parse(date.length === 4 ? `${date}-07-01` : date);
-  return !Number.isNaN(t) && t > Date.now() - 180 * DAY;
+  // not older than ~6 months, and not an impossible date (a stray "3430" in a listing)
+  return !Number.isNaN(t) && t > Date.now() - 180 * DAY && t < Date.now() + 3 * 365 * DAY;
 }
+
+const noArticle = (t: string) => t.replace(/^(the|a|an|de|het|een)\s+/i, '');
+/** "Witch" and "The Witch" are one book */
+const newsKey = (i: { title: string; author: string }) => bookKey({ title: noArticle(i.title), authors: [i.author] });
 
 // ---------- telling real new books from translations, re-issues and placeholders ----------
 
@@ -160,7 +165,7 @@ async function fromGoogle(author: string): Promise<AuthorNews[]> {
 }
 
 /** Open Library works: one per book, with the original title */
-async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
+async function fromOpenLibrary(author: string): Promise<{ items: AuthorNews[]; older: Set<string> }> {
   const params = new URLSearchParams({
     author,
     sort: 'new',
@@ -190,13 +195,24 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
     }
     return String(y);
   };
-  return json.docs
+  // books first published before this year: a Google edition dated this year is just a new printing
+  const older = new Set(
+    json.docs
+      .filter((d) => d.first_publish_year && d.first_publish_year < year)
+      .map((d) => newsKey({ title: baseTitle(d.title), author })),
+  );
+  const items = json.docs
     .filter(
       (d) =>
         d.first_publish_year &&
         d.first_publish_year >= year &&
-        // English/Dutch, or no language known yet (brand new)
-        (!d.language?.length || d.language.some((l) => l === 'eng' || l === 'dut')) &&
+        d.first_publish_year <= year + 3 &&
+        // English or Dutch. No language listed is only believable for a book that isn't out yet: the
+        // entries without a language that are already "out" are foreign editions (Portuguese, Polish…)
+        (d.language?.some((l) => l === 'eng' || l === 'dut') ||
+          (!d.language?.length &&
+            (d.first_publish_year > year ||
+              Date.parse(exactDate(d.publish_date, d.first_publish_year)) > Date.now()))) &&
         isRealNewBook(d.title, d.author_name, author),
     )
     .map((d) => {
@@ -212,26 +228,35 @@ async function fromOpenLibrary(author: string): Promise<AuthorNews[]> {
         genres: mapGenres(d.subject?.slice(0, 20) ?? []),
       };
     });
+  return { items, older };
 }
 
 /** New and upcoming books by an author, from both sources combined (cached for a day) */
 export async function authorNews(author: string): Promise<AuthorNews[]> {
-  const cacheKey = `authorNews7:${author.toLowerCase()}`; // v7: series from the blurb, also for brand-new books
+  const cacheKey = `authorNews9:${author.toLowerCase()}`; // v8: no foreign editions, no re-issues, no duplicates
   const cached = await getMeta<{ at: number; items: AuthorNews[] } | null>(cacheKey, null);
   if (cached && Date.now() - cached.at < DAY) return cached.items;
 
-  const [google, ol] = await Promise.all([fromGoogle(author).catch(() => []), fromOpenLibrary(author).catch(() => [])]);
+  const [googleItems, olResult] = await Promise.all([
+    fromGoogle(author).catch(() => [] as AuthorNews[]),
+    fromOpenLibrary(author).catch(() => ({ items: [] as AuthorNews[], older: new Set<string>() })),
+  ]);
+  // Google dates the edition: a new printing of an old book isn't a new book
+  const google = googleItems.filter((i) => i.upcoming || !olResult.older.has(newsKey(i)));
+  const ol = olResult.items;
 
   // One entry per book: Google gives exact dates and descriptions, Open Library the canonical
   // title and often a cover; fill in each other's gaps
   const byBook = new Map<string, AuthorNews>();
   for (const i of [...google, ...ol]) {
-    const k = bookKey({ title: i.title, authors: [i.author] });
+    const k = newsKey(i);
     const prev = byBook.get(k);
     if (!prev) {
       byBook.set(k, { ...i });
       continue;
     }
+    // "Witch" and "The Witch": the title with the article is the real one
+    if (i.title.length > prev.title.length && noArticle(i.title) === prev.title) prev.title = i.title;
     prev.coverUrl ??= i.coverUrl;
     prev.description ??= i.description;
     prev.isbn13 ??= i.isbn13;

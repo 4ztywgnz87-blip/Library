@@ -7,6 +7,7 @@ import { isLight, updateSpineColors } from '../lib/coverColor';
 import { hashColor } from '../components/Cover';
 import type { Book, Status } from '../types';
 import { dayKey, useDays } from '../lib/streak';
+import { useFirstVisit } from '../lib/visited';
 import { Bookend, Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
 import {
   ChristmasTree,
@@ -78,6 +79,7 @@ function fitTitle(title: string, length: number, thickness: number) {
 
 function Spine({
   book,
+  entrance,
   delay,
   lean,
   scale = 1,
@@ -85,6 +87,8 @@ function Spine({
   restHeight,
 }: {
   book: Book;
+  /** slides onto the shelf (first visit only) */
+  entrance: boolean;
   delay: number;
   lean: boolean;
   scale?: number;
@@ -134,7 +138,7 @@ function Spine({
     <motion.button
       title={`${book.title} · ${book.authors[0] ?? ''}${book.status === 'reading' ? ' · reading now' : ''}`}
       aria-label={book.title}
-      initial={{ opacity: 0, y: 20 }}
+      initial={entrance ? { opacity: 0, y: 20 } : false}
       animate={{ opacity: 1, y: 0, rotate: lean ? -7 : 0 }}
       transition={{ delay, type: 'spring', stiffness: 260, damping: 22 }}
       whileHover={{ y: -8 }}
@@ -196,12 +200,14 @@ function ShelfSection({
   books,
   decor,
   startDelay,
+  entrance,
 }: {
   status: Status;
   label: string;
   books: readonly Book[];
   decor?: { el: ReactNode; width: number };
   startDelay: number;
+  entrance: boolean;
 }) {
   const navigate = useNavigate();
 
@@ -379,6 +385,7 @@ function ShelfSection({
                     book={it.b}
                     scale={scale}
                     widthFactor={it.factor}
+                    entrance={entrance}
                     delay={startDelay + Math.min(it.i * 0.025, 0.6)}
                     lean={it.lean}
                     // it rests on the top corner of the book to its left: pivot exactly there
@@ -410,6 +417,8 @@ export default function Shelf() {
         : days && new Date().getHours() >= 17
           ? 'peek'
           : undefined;
+  // the books slide onto the shelf once per visit; coming back, nothing moves
+  const firstVisit = useFirstVisit('shelf');
   const byStatus = useMemo(() => {
     const m: Record<Status, Book[]> = { reading: [], owned: [], read: [], wishlist: [] };
     for (const b of books ?? []) m[b.status].push(b);
@@ -545,6 +554,7 @@ export default function Shelf() {
                 books={shelf.books}
                 decor={decor[shelf.status]}
                 startDelay={i * 0.15}
+                entrance={firstVisit}
               />
             ))}
           </div>

@@ -38,7 +38,8 @@ function AuthorsCard() {
     ...favs.map((n) => ({ name: n, fav: true })),
     ...auto.filter((a) => !isFav(a.name) && !isMuted(a.name)).map((a) => ({ name: a.name, fav: false })),
   ];
-  const stopped = auto.filter((a) => isMuted(a.name) && !isFav(a.name));
+  // everyone she stopped following (also former favourites), so it can be undone
+  const stopped = muted.filter((n, i) => muted.findIndex((m) => same(m, n)) === i && !isFav(n));
 
   const add = () => {
     const n = name.trim();
@@ -86,8 +87,8 @@ function AuthorsCard() {
                 onClick={() =>
                   updateProfile({
                     favouriteAuthors: favs.filter((f) => !same(f, r.name)),
-                    // an author Snug would follow anyway is muted, so it really stops
-                    mutedAuthors: reason ? [...muted, r.name] : muted,
+                    // moved to "Not following" below, where it can be switched on again
+                    mutedAuthors: muted.some((m) => same(m, r.name)) ? muted : [...muted, r.name],
                   })
                 }
               >
@@ -119,21 +120,31 @@ function AuthorsCard() {
         </button>
       </form>
       {stopped.length > 0 && (
-        <p className="text-xs text-mocha">
-          Not following:{' '}
-          {stopped.map((a, i) => (
-            <span key={a.name}>
-              {i > 0 && ', '}
-              {a.name}{' '}
-              <button
-                className="underline"
-                onClick={() => updateProfile({ mutedAuthors: muted.filter((m) => !same(m, a.name)) })}
-              >
-                follow again
-              </button>
-            </span>
-          ))}
-        </p>
+        <div className="pt-2">
+          <p className="mb-1 text-xs tracking-wide text-mocha uppercase">Not following</p>
+          <ul className="divide-y divide-linen">
+            {stopped.map((n) => (
+              <li key={n} className="flex items-center gap-2 py-2">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{n}</span>
+                  <span className="block text-xs text-mocha">{reasonOf(n) ?? 'Removed by you'}</span>
+                </span>
+                <button
+                  className="rounded-full bg-linen px-3 py-1.5 text-xs"
+                  onClick={() =>
+                    updateProfile({
+                      mutedAuthors: muted.filter((m) => !same(m, n)),
+                      // an author Snug wouldn't follow by itself comes back as a favourite
+                      favouriteAuthors: reasonOf(n) || isFav(n) ? favs : [...favs, n],
+                    })
+                  }
+                >
+                  Follow again
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </Card>
   );

@@ -96,7 +96,9 @@ export default function Lent() {
                 <div key={`${h.book.id}-${i}`} className="py-2.5 text-sm">
                   <div className="flex items-center gap-3">
                     <div className="min-w-0 flex-1">
-                      <span className="font-medium">{h.book.title}</span>
+                      <Link to={`/book/${h.book.id}`} className="font-medium underline-offset-2 hover:underline">
+                        {h.book.title}
+                      </Link>
                       <span className="text-cocoa"> · {h.to}</span>
                       <span className="block text-xs text-mocha">
                         {dateLabel(h.since)} → {dateLabel(h.returnedAt)}

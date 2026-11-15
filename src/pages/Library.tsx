@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useFirstVisit } from '../lib/visited';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBooks, useMeta } from '../lib/hooks';
@@ -43,6 +44,7 @@ export default function Library() {
   const tab = (params.get('tab') as Status | 'all') || 'all';
   // from the stats: only the books she finished in this year
   const year = Number(params.get('year')) || undefined;
+  const firstVisit = useFirstVisit('library');
   const [query, setQuery] = useState('');
   const [genre, setGenre] = useState<string | null>(null);
   const [lang, setLang] = useState<'all' | 'en' | 'nl'>('all');
@@ -194,7 +196,7 @@ export default function Library() {
               <motion.div
                 key={b.id}
                 layout
-                initial={{ opacity: 0, y: 10 }}
+                initial={firstVisit ? { opacity: 0, y: 10 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.02, 0.3) }}
               >
