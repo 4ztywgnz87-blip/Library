@@ -74,12 +74,16 @@ export function followedAuthors(books: Book[], favourites: string[], muted: stri
   });
 }
 
-/** Published in the last ~6 months, or coming out */
+/** How far back a book still counts as new (a year), and how far ahead an announcement counts (2.5 years) */
+const NEW_WINDOW = 365 * DAY;
+const AHEAD_WINDOW = 913 * DAY;
+
+/** Published in the last year, or coming out */
 function recent(date: string | undefined) {
   if (!date) return false;
   const t = Date.parse(date.length === 4 ? `${date}-07-01` : date);
-  // not older than ~6 months; anything announced counts, except impossible dates (a stray "3430")
-  return !Number.isNaN(t) && t > Date.now() - 180 * DAY && t < Date.now() + 5 * 365 * DAY;
+  // not older than a year, and not further ahead than 2.5 years (that's a typo in a listing, like "3430")
+  return !Number.isNaN(t) && t > Date.now() - NEW_WINDOW && t < Date.now() + AHEAD_WINDOW;
 }
 
 const noArticle = (t: string) => t.replace(/^(the|a|an|de|het|een)\s+/i, '');
@@ -210,7 +214,7 @@ async function fromOpenLibrary(author: string): Promise<{ items: AuthorNews[]; o
       (d) =>
         d.first_publish_year &&
         d.first_publish_year >= year &&
-        d.first_publish_year <= year + 5 &&
+        d.first_publish_year <= year + 3 &&
         // English or Dutch, and known to be: an entry without a language is left out
         d.language?.some((l) => l === 'eng' || l === 'dut') &&
         isRealNewBook(d.title, d.author_name, author),
@@ -270,7 +274,7 @@ async function firstPublished(title: string, author: string): Promise<number | n
 
 /** New and upcoming books by an author, from both sources combined (cached for a day) */
 export async function authorNews(author: string): Promise<AuthorNews[]> {
-  const cacheKey = `authorNews10:${author.toLowerCase()}`; // v8: no foreign editions, no re-issues, no duplicates
+  const cacheKey = `authorNews11:${author.toLowerCase()}`; // v8: no foreign editions, no re-issues, no duplicates
   const cached = await getMeta<{ at: number; items: AuthorNews[] } | null>(cacheKey, null);
   if (cached && Date.now() - cached.at < DAY) return cached.items;
 
@@ -304,7 +308,7 @@ export async function authorNews(author: string): Promise<AuthorNews[]> {
   const merged = [...byBook.values()];
 
   // A new printing of an old book isn't a new book: when the earliest edition is older than the
-  // "new" window, it's the same old book (only books that are still to come are always kept)
+  // "new" window (a year), it's the same old book (only books that are still to come are always kept)
   const items: AuthorNews[] = [];
   for (const item of merged) {
     if (item.upcoming) {
@@ -312,7 +316,7 @@ export async function authorNews(author: string): Promise<AuthorNews[]> {
       continue;
     }
     const first = await firstPublished(item.title, item.author);
-    if (first === null || first > Date.now() - 180 * DAY) items.push(item);
+    if (first === null || first > Date.now() - NEW_WINDOW) items.push(item);
   }
 
   // Still no cover: borrow one, but only from an English/Dutch edition with exactly this title

@@ -24,7 +24,7 @@ export const newsPreview = (i: AuthorNews, cover?: string, s?: Match): PreviewBo
 export function useScoredNews(books: Book[] | undefined, favourites: string[]) {
   const items = useAuthorNews(books, favourites);
   const have = useHave(books);
-  const toScore = (items ?? []).filter((i) => !have.has(keyOf(i))).slice(0, 30);
+  const toScore = (items ?? []).filter((i) => !have.has(keyOf(i))).slice(0, 40);
   const matches = useMatches(
     toScore.map((i) => ({
       title: i.title,

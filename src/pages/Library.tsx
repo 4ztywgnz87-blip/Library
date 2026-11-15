@@ -49,6 +49,8 @@ export default function Library() {
   const tab = (params.get('tab') as Status | 'all') || 'all';
   // from the stats: only the books she finished in this year
   const year = Number(params.get('year')) || undefined;
+  // from the authors list: only this author's books
+  const authorFilter = params.get('author') || undefined;
   const firstVisit = useFirstVisit('library');
   const [query, setQuery] = useState('');
   const [genre, setGenre] = useState<string | null>(null);
@@ -89,12 +91,13 @@ export default function Library() {
       (b) =>
         (tab === 'all' || b.status === tab) &&
         (!year || (b.status === 'read' && !!b.finishedAt && new Date(b.finishedAt).getFullYear() === year)) &&
+        (!authorFilter || normalize(b.authors.join(' ')).includes(normalize(authorFilter))) &&
         (!genre || b.genres.includes(genre)) &&
         (lang === 'all' || b.language === lang) &&
         (!q || normalize([b.title, ...b.authors, b.series?.name ?? ''].join(' ')).includes(q)),
     );
     return sortBooks(filtered, sort);
-  }, [books, sortReady, tab, year, query, genre, lang, sort]);
+  }, [books, sortReady, tab, year, authorFilter, query, genre, lang, sort]);
 
   const filtersActive = !!genre || lang !== 'all';
 
@@ -141,6 +144,23 @@ export default function Library() {
             </Chip>
           ))}
         </div>
+
+        {authorFilter && (
+          <div className="-mt-1 mb-3">
+            <button
+              onClick={() =>
+                setParams((p) => {
+                  const next = new URLSearchParams(p);
+                  next.delete('author');
+                  return next;
+                })
+              }
+              className="inline-flex items-center gap-1.5 rounded-full bg-wine px-3 py-1.5 text-xs text-cream"
+            >
+              {authorFilter} · {visible.length} <CloseIcon width={14} height={14} />
+            </button>
+          </div>
+        )}
 
         {year && (
           <div className="-mt-1 mb-3">

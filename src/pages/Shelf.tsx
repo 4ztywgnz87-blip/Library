@@ -92,7 +92,7 @@ function Spine({
   delay: number;
   lean: boolean;
   scale?: number;
-  /** A row is filled exactly: its spines get a touch wider or narrower (0.88–1.14) */
+  /** A row is filled exactly: its spines get a touch wider or narrower (0.8–1.18) */
   widthFactor?: number;
   /** Leaning against something lower than the book (the bookend): its height in px */
   restHeight?: number;
@@ -319,7 +319,7 @@ function ShelfSection({
     if (!cur.length) return;
     if (fill) {
       const { flex, fixed } = widths(cur);
-      const f = Math.max(0.88, Math.min(1.14, (room - fixed - 1) / Math.max(1, flex)));
+      const f = Math.max(0.8, Math.min(1.18, (room - fixed - 1) / Math.max(1, flex)));
       cur = cur.map((it) => (it.kind === 'book' ? { ...it, factor: f } : it));
     }
     rows.push(cur);
@@ -331,8 +331,8 @@ function ShelfSection({
       cur.push(it);
       continue;
     }
-    // almost fits: squeeze it in (the row's books get up to 12% narrower)
-    if (it.kind === 'book' && flex * 0.88 + fixed <= room - 1) {
+    // almost fits: squeeze it in (the row's books get up to 20% narrower)
+    if (it.kind === 'book' && flex * 0.8 + fixed <= room - 1) {
       cur.push(it);
       close(true);
       continue;
@@ -340,7 +340,9 @@ function ShelfSection({
     close(true);
     cur.push(it);
   }
-  close(false); // the last row stays as it is: books just stand there, from the left
+  // the last row: books just stand there from the left, unless it is nearly full, then it fills up too
+  const lastW = widths(cur);
+  close(lastW.flex + lastW.fixed >= room * 0.8);
 
   return (
     // the shelf above casts a soft shadow onto the back panel, starting right under its board
@@ -421,6 +423,7 @@ export default function Shelf() {
           ? 'peek'
           : undefined;
   // the books slide onto the shelf once per visit; coming back, nothing moves
+  const bookCount = (books ?? []).filter((b) => b.status !== 'wishlist').length;
   const firstVisit = useFirstVisit('shelf');
   const seenBefore = useSeenIds(
     'shelf',
@@ -477,27 +480,32 @@ export default function Shelf() {
 
         {/* crown: a little arched pediment on a layered cornice with dentils */}
         <div className="relative z-10">
-          <svg
-            viewBox="0 0 200 22"
-            className="absolute bottom-full left-1/2 h-5 w-[44%] -translate-x-1/2"
-            preserveAspectRatio="none"
-            aria-hidden
-          >
-            <defs>
-              <linearGradient id="pediment" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#c08a5d" />
-                <stop offset="1" stopColor="#9a6a45" />
-              </linearGradient>
-            </defs>
-            <path d="M0 22C46 22 60 1 100 1s54 21 100 21z" fill="url(#pediment)" />
-            <path
-              d="M14 21C56 20 66 4 100 4s44 16 86 17"
-              stroke="#fff"
-              strokeOpacity="0.18"
-              strokeWidth="1.5"
-              fill="none"
-            />
-          </svg>
+          <div className="absolute bottom-full left-1/2 h-8 w-[46%] -translate-x-1/2">
+            <svg viewBox="0 0 200 22" className="h-full w-full" preserveAspectRatio="none" aria-hidden>
+              <defs>
+                <linearGradient id="pediment" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#c08a5d" />
+                  <stop offset="1" stopColor="#9a6a45" />
+                </linearGradient>
+              </defs>
+              <path d="M0 22C46 22 60 1 100 1s54 21 100 21z" fill="url(#pediment)" />
+              <path
+                d="M14 21C56 20 66 4 100 4s44 16 86 17"
+                stroke="#fff"
+                strokeOpacity="0.18"
+                strokeWidth="1.5"
+                fill="none"
+              />
+            </svg>
+            {/* a little brass plate in the arch: how many books she has (the wishlist doesn't count) */}
+            <Link
+              to="/library"
+              aria-label={`${bookCount} books in your library`}
+              className="absolute bottom-[5px] left-[40%] -translate-x-1/2 rounded-[3px] bg-gradient-to-b from-[#e2c48a] via-[#c9a465] to-[#a9824b] px-3 py-[2px] font-soft text-[11px] leading-none font-semibold whitespace-nowrap text-[#3b2a22] shadow-[0_1px_2px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.45)]"
+            >
+              {bookCount} {bookCount === 1 ? 'book' : 'books'}
+            </Link>
+          </div>
           <div className="-mx-4 h-2.5 rounded-t-md bg-gradient-to-b from-[#c99466] to-[#a7754d] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" />
           {season === 'christmas' && (
             <SnowCap className="pointer-events-none absolute -top-2 -left-4 z-10 h-3.5 w-[calc(100%+2rem)]" />

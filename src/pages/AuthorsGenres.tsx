@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useBooks } from '../lib/hooks';
 import { updateProfile, useProfile } from '../lib/profile';
 import { autoAuthors } from '../lib/authors';
@@ -64,7 +65,12 @@ function AuthorsCard() {
           return (
             <li key={r.name} className="flex items-center gap-2 py-2">
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{r.name}</span>
+                <Link
+                  to={`/library?author=${encodeURIComponent(r.name)}`}
+                  className="block truncate text-sm font-medium underline-offset-2 hover:underline"
+                >
+                  {r.name}
+                </Link>
                 <span className="block text-xs text-mocha">
                   {r.fav ? `Favourite${reason ? ` · ${reason}` : ''}` : `Followed by Snug · ${reason}`}
                 </span>
@@ -126,7 +132,12 @@ function AuthorsCard() {
             {stopped.map((n) => (
               <li key={n} className="flex items-center gap-2 py-2">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{n}</span>
+                  <Link
+                    to={`/library?author=${encodeURIComponent(n)}`}
+                    className="block truncate text-sm font-medium underline-offset-2 hover:underline"
+                  >
+                    {n}
+                  </Link>
                   <span className="block text-xs text-mocha">{reasonOf(n) ?? 'Removed by you'}</span>
                 </span>
                 <button

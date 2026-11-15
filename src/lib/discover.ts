@@ -7,7 +7,7 @@ import { useProfile } from './profile';
 /** New and upcoming books by the authors she follows, newest first (undefined while loading) */
 export function useAuthorNews(books: Book[] | undefined, favourites: string[]) {
   const muted = useProfile().mutedAuthors ?? [];
-  const authors = books ? followedAuthors(books, favourites, muted).slice(0, 14) : [];
+  const authors = books ? followedAuthors(books, favourites, muted).slice(0, 30) : [];
   const authorsKey = authors.join('|');
   const [items, setItems] = useState<AuthorNews[] | undefined>(undefined);
   useEffect(() => {
