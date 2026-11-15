@@ -344,7 +344,16 @@ export function Mug({ className = '', season }: { className?: string; season?: S
  * "z"s drift up towards the dream cloud, and now and then the tail gives a lazy flick. The tail
  * keeps its shape and only rotates around where it joins the body, so nothing can flicker.
  */
-export function ShelfCat({ className = '', season }: { className?: string; season?: Season }) {
+export function ShelfCat({
+  className = '',
+  season,
+  mood,
+}: {
+  className?: string;
+  season?: Season;
+  /** content: she read today (a little heart floats up) · peek: not yet, and it's evening (one eye open) */
+  mood?: 'content' | 'peek';
+}) {
   const id = useId();
   return (
     <svg viewBox="0 0 150 80" className={className} aria-hidden style={{ overflow: 'visible' }}>
@@ -412,14 +421,32 @@ export function ShelfCat({ className = '', season }: { className?: string; seaso
         fill="none"
         strokeLinecap="round"
       />
-      {/* closed, sleepy eyes */}
+      {/* closed, sleepy eyes (or one peeking open: "did you read yet?") */}
       <path
-        d="M30.5 45.5q4.5 3.2 9 0M50.5 45.5q4.5 3.2 9 0"
+        d={mood === 'peek' ? 'M30.5 45.5q4.5 3.2 9 0' : 'M30.5 45.5q4.5 3.2 9 0M50.5 45.5q4.5 3.2 9 0'}
         stroke="#3b2a22"
         strokeWidth="1.6"
         strokeLinecap="round"
         fill="none"
       />
+      {mood === 'peek' && (
+        <motion.g
+          style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+          animate={{ scaleY: [1, 1, 0.12, 1, 1] }}
+          transition={{ duration: 4.5, repeat: Infinity, times: [0, 0.8, 0.84, 0.88, 1] }}
+        >
+          <ellipse cx="55" cy="45.2" rx="3.7" ry="4.3" fill="#3b2a22" />
+          <circle cx="56.4" cy="43.6" r="1.35" fill="#fff" />
+          <circle cx="53.9" cy="46.7" r="0.6" fill="#fff" opacity="0.8" />
+        </motion.g>
+      )}
+      {/* rosy cheeks when she's content */}
+      {mood === 'content' && (
+        <>
+          <ellipse cx="29" cy="52" rx="3.4" ry="2" fill="#e7a3a0" opacity="0.55" />
+          <ellipse cx="61" cy="52" rx="3.4" ry="2" fill="#e7a3a0" opacity="0.55" />
+        </>
+      )}
       {/* whiskers */}
       <path
         d="M33 57l-14-2M33 60l-13 2M57 57l14-2M57 60l13 2"
@@ -429,23 +456,34 @@ export function ShelfCat({ className = '', season }: { className?: string; seaso
         strokeLinecap="round"
       />
       {season && <CatHat season={season} />}
+      {/* she read today: a little heart floats up now and then */}
+      {mood === 'content' && (
+        <motion.path
+          d="M0 2.2c-1.6-2.6-5-1.4-4.4 1.2.4 1.8 4.4 4.6 4.4 4.6s4-2.8 4.4-4.6C5 .8 1.6-.4 0 2.2z"
+          fill="#e05a73"
+          initial={{ opacity: 0, x: 66, y: 22, scale: 0.6 }}
+          animate={{ opacity: [0, 1, 1, 0], x: [66, 70, 66, 71], y: [22, 12, 2, -8], scale: [0.6, 1, 1, 0.9] }}
+          transition={{ duration: 3.2, repeat: Infinity, repeatDelay: 2.5, ease: 'easeOut' }}
+        />
+      )}
       {/* z z z, drifting up and away from the head (left of the ear) */}
-      {[0, 1, 2].map((i) => (
-        <motion.text
-          key={i}
-          x="12"
-          y="30"
-          fontFamily="Fraunces Variable, serif"
-          fontWeight="600"
-          fontSize={10 + i * 3}
-          fill="#8a7565"
-          initial={{ opacity: 0, x: 0, y: 0 }}
-          animate={{ opacity: [0, 0.95, 0], x: [0, -7, -14], y: [0, -14, -28] }}
-          transition={{ duration: 3.6, repeat: Infinity, delay: i * 1.2, ease: 'easeOut' }}
-        >
-          z
-        </motion.text>
-      ))}
+      {mood !== 'peek' &&
+        [0, 1, 2].map((i) => (
+          <motion.text
+            key={i}
+            x="12"
+            y="30"
+            fontFamily="Fraunces Variable, serif"
+            fontWeight="600"
+            fontSize={10 + i * 3}
+            fill="#8a7565"
+            initial={{ opacity: 0, x: 0, y: 0 }}
+            animate={{ opacity: [0, 0.95, 0], x: [0, -7, -14], y: [0, -14, -28] }}
+            transition={{ duration: 3.6, repeat: Infinity, delay: i * 1.2, ease: 'easeOut' }}
+          >
+            z
+          </motion.text>
+        ))}
     </svg>
   );
 }

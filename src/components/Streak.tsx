@@ -45,8 +45,9 @@ export function Flame({
         d="M20 22c2 5 7 7 7 14a7 7 0 0 1-14 0c0-4 2-6 3-7 .5 2 2 3 3 3-.5-4 0-7 1-10z"
         fill={lit ? '#f6d27a' : '#f1e8da'}
         style={{ transformBox: 'view-box', transformOrigin: '20px 43px' }}
-        animate={move ? { scaleY: [1, 1.1, 0.95, 1] } : undefined}
-        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+        // moves with the big flame (same rhythm), a touch livelier but never past its edge
+        animate={move ? { scaleY: [1, 1.04, 0.97, 1], scaleX: [1, 0.98, 1, 1] } : undefined}
+        transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
       />
     </svg>
   );
@@ -230,7 +231,8 @@ export function LogSheet({
     await logReading(date, book, { page: page ? Math.round(n) : undefined, finished, note });
     onClose();
     // finished it: straight to her stars and review
-    if (finished && !logged.get(book.id)?.finished) setTimeout(() => navigate(`/book/${book.id}?rate=1`), 250);
+    if (finished && !logged.get(book.id)?.finished)
+      setTimeout(() => navigate(`/book/${book.id}?rate=1&done=1`, { replace: false }), 250);
   };
 
   return createPortal(
@@ -428,5 +430,34 @@ export function PageProgress({ book, className = '' }: { book: Book; className?:
         {book.pageCount ? ` of ${book.pageCount} · ${pct}%` : ''}
       </p>
     </div>
+  );
+}
+
+/**
+ * A fabric bookmark ribbon hanging from the top of the cover: the further she is in the book,
+ * the further it hangs down
+ */
+export function BookmarkRibbon({ book }: { book: Book }) {
+  if (book.status !== 'reading' || !book.currentPage || !book.pageCount) return null;
+  const pct = Math.min(1, book.currentPage / book.pageCount);
+  return (
+    <motion.div
+      className="pointer-events-none absolute top-0 right-[14%] z-10 w-[13%] origin-top drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]"
+      initial={{ height: '0%' }}
+      animate={{ height: `${8 + pct * 84}%`, rotate: [0, 1.2, -0.8, 0] }}
+      transition={{
+        height: { type: 'spring', stiffness: 60, damping: 14, delay: 0.3 },
+        rotate: { duration: 5, repeat: Infinity, ease: 'easeInOut' },
+      }}
+      aria-label={`Page ${book.currentPage} of ${book.pageCount}`}
+    >
+      <div
+        className="h-full w-full bg-gradient-to-r from-[#8e3445] via-[#a8455a] to-[#7a2e3a]"
+        style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 7px), 0 100%)' }}
+      >
+        {/* a little stitched edge */}
+        <div className="mx-auto h-full w-[60%] border-x border-dashed border-white/25" />
+      </div>
+    </motion.div>
   );
 }

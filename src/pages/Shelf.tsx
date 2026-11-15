@@ -6,6 +6,7 @@ import { shelfOrder } from '../lib/library';
 import { isLight, updateSpineColors } from '../lib/coverColor';
 import { hashColor } from '../components/Cover';
 import type { Book, Status } from '../types';
+import { dayKey, useDays } from '../lib/streak';
 import { Bookend, Candle, DreamCloud, FairyLights, HangingPlant, Mug, ShelfCat } from '../components/ShelfDecor';
 import {
   ChristmasTree,
@@ -397,6 +398,18 @@ export default function Shelf() {
   const books = useBooks();
   // the bookcase dresses up for Christmas, Halloween, Valentine's and Easter
   const season = useSeason();
+  // the cat keeps an eye on her streak: content once she's read today, one eye open in the evening if not
+  const days = useDays();
+  const forcedMood = new URLSearchParams(location.search).get('cat');
+  const readToday = days?.some((d) => d.date === dayKey());
+  const catMood: 'content' | 'peek' | undefined =
+    forcedMood === 'content' || forcedMood === 'peek'
+      ? forcedMood
+      : readToday
+        ? 'content'
+        : days && new Date().getHours() >= 17
+          ? 'peek'
+          : undefined;
   const byStatus = useMemo(() => {
     const m: Record<Status, Book[]> = { reading: [], owned: [], read: [], wishlist: [] };
     for (const b of books ?? []) m[b.status].push(b);
@@ -443,7 +456,7 @@ export default function Shelf() {
           >
             <DreamCloud count={wishCount} className="w-full" />
           </Link>
-          <ShelfCat className="absolute right-[6%] bottom-[-3px] z-20 h-[78px]" season={season} />
+          <ShelfCat className="absolute right-[6%] bottom-[-3px] z-20 h-[78px]" season={season} mood={catMood} />
         </div>
 
         {/* crown: a little arched pediment on a layered cornice with dentils */}

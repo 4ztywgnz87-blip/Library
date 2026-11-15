@@ -16,7 +16,8 @@ import { lookupSeries, setGenreForSeries } from '../lib/seriesLookup';
 import { useMatches } from '../lib/taste';
 import { profileKey } from '../taste/vocab';
 import { MatchRing, matchLabel } from '../components/MatchRing';
-import { LogSheet, PageProgress } from '../components/Streak';
+import { BookmarkRibbon, LogSheet, PageProgress } from '../components/Streak';
+import { PageConfetti } from '../components/PageConfetti';
 import { dayKey, useDays } from '../lib/streak';
 
 const TAG_SUGGESTIONS = [
@@ -34,13 +35,27 @@ export default function BookDetail() {
   const { id } = useParams();
   const book = useBook(id);
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [celebrate, setCelebrate] = useState(0);
   const [pickingEdition, setPickingEdition] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [logging, setLogging] = useState(false);
   const days = useDays();
   const ratingRef = useRef<HTMLDivElement>(null);
+
+  // just finished it from her reading log: celebrate here
+  useEffect(() => {
+    if (!params.get('done')) return;
+    setCelebrate((c) => c + 1);
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        next.delete('done');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [params, setParams]);
 
   useEffect(() => {
     if (params.get('rate') && ratingRef.current) {
@@ -91,7 +106,10 @@ export default function BookDetail() {
             animate={{ opacity: 1, y: 0, rotate: 0 }}
             className="w-40 sm:w-48"
           >
-            <Cover book={book} rounded="rounded-lg" />
+            <div className="relative">
+              <Cover book={book} rounded="rounded-lg" />
+              <BookmarkRibbon book={book} />
+            </div>
           </motion.div>
           <h1 className="mt-5 text-3xl leading-tight font-semibold select-text">{book.title}</h1>
           <p className="mt-1 text-cocoa select-text">{book.authors.join(', ')}</p>
@@ -252,7 +270,9 @@ export default function BookDetail() {
         />
       )}
 
-      <AnimatePresence>{celebrate > 0 && <Petals key={celebrate} onDone={() => setCelebrate(0)} />}</AnimatePresence>
+      <AnimatePresence>
+        {celebrate > 0 && <PageConfetti key={celebrate} onDone={() => setCelebrate(0)} />}
+      </AnimatePresence>
     </div>
   );
 }
@@ -495,34 +515,6 @@ function AboutCard({ text }: { text: string }) {
 }
 
 /** Little burst of petals when she finishes a book */
-function Petals({ onDone }: { onDone: () => void }) {
-  const petals = Array.from({ length: 18 }, (_, i) => ({
-    x: (Math.random() - 0.5) * 320,
-    y: -180 - Math.random() * 220,
-    r: Math.random() * 360,
-    color: ['#7A2E3A', '#C49A5A', '#E7B9A8', '#8F9E7F'][i % 4],
-    delay: Math.random() * 0.15,
-  }));
-  useEffect(() => {
-    const t = setTimeout(onDone, 1800);
-    return () => clearTimeout(t);
-  }, [onDone]);
-  return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-1/3 z-50 flex justify-center">
-      {petals.map((p, i) => (
-        <motion.span
-          key={i}
-          className="absolute h-3 w-2 rounded-[50%_50%_50%_0]"
-          style={{ background: p.color }}
-          initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
-          animate={{ x: p.x, y: [0, p.y, p.y + 260], opacity: [1, 1, 0], rotate: p.r }}
-          transition={{ duration: 1.6, delay: p.delay, ease: 'easeOut' }}
-        />
-      ))}
-    </div>
-  );
-}
-
 /** "How well it fits you": worked out on the device from her ratings, reviews and quiz */
 function FitForYou({ book }: { book: Book }) {
   const author = book.authors[0] ?? '';

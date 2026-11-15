@@ -201,3 +201,36 @@ export function pagesPerDay(days: DayLog[]) {
   }
   return out;
 }
+
+/**
+ * Her streaks for one year. A streak that began the year before counts in full: it's the same streak.
+ * `longest` is the longest streak that was still going at some point this year; `current` is today's
+ * streak (only for the year we're in).
+ */
+export function yearStreaks(
+  days: Pick<DayLog, 'date'>[],
+  imported: StreakImport | undefined,
+  year: number,
+  today = dayKey(),
+) {
+  const read = new Set(days.map((d) => d.date));
+  const runBack = (from: string) => {
+    let n = 0;
+    let d = from;
+    for (;;) {
+      if (imported && d === imported.until) return n + imported.count;
+      if (!read.has(d)) return n;
+      n++;
+      d = addDays(d, -1);
+    }
+  };
+  const first = `${year}-01-01`;
+  const end = `${year}-12-31` < today ? `${year}-12-31` : today;
+  const ends = [...read].filter((d) => d >= first && d <= end);
+  if (imported && imported.until >= first && imported.until <= end) ends.push(imported.until);
+  let longest = 0;
+  for (const d of ends) if (!read.has(addDays(d, 1)) || d === end) longest = Math.max(longest, runBack(d));
+  const thisYear = end === today;
+  const current = thisYear ? streakOf(days, imported, today).current : 0;
+  return { longest: Math.max(longest, current), current, thisYear };
+}

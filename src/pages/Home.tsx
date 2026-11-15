@@ -12,7 +12,7 @@ import { useSeriesParts } from '../lib/seriesTotals';
 import { useMemo, useState } from 'react';
 import { updateProfile, useProfile } from '../lib/profile';
 import { Greeting } from '../components/Greeting';
-import { PageProgress, StreakCard } from '../components/Streak';
+import { BookmarkRibbon, PageProgress, StreakCard } from '../components/Streak';
 import { wrappedSeason, wrappedYear } from './Wrapped';
 
 export default function Home() {
@@ -100,7 +100,10 @@ export default function Home() {
                   <motion.div key={b.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                     <Link to={`/book/${b.id}`}>
                       <Card className="flex gap-4 transition-transform active:scale-[0.99]">
-                        <Cover book={b} className="w-24 shrink-0" />
+                        <div className="relative w-24 shrink-0">
+                          <Cover book={b} />
+                          <BookmarkRibbon book={b} />
+                        </div>
                         <div className="flex min-w-0 flex-col py-1">
                           <h3 className="text-lg leading-snug font-semibold">{b.title}</h3>
                           <p className="text-sm text-cocoa">{b.authors.join(', ')}</p>

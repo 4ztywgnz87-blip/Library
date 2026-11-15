@@ -133,19 +133,41 @@ export async function wrapCard(s: WrapSummary): Promise<Blob> {
   if (s.longestStreak) stats.push([String(s.longestStreak), 'day streak']);
   stats.forEach(([v, l], i) => stat(v, l, (W / (stats.length * 2)) * (i * 2 + 1), 1000, stats.length > 2 ? 104 : 120));
 
+  // the highlights in a soft, centred panel, each with a small label above it
   const rows: [string, string][] = [];
-  if (s.topGenre) rows.push(['Genre of the year', s.topGenre]);
-  if (s.topAuthor) rows.push(['Favourite author', s.topAuthor]);
-  if (s.favourite) rows.push(['Book of the year', s.favourite.title]);
-  let y = 1190;
-  ctx.textAlign = 'left';
-  for (const [k, v] of rows) {
-    ctx.fillStyle = 'rgba(246,239,230,0.65)';
-    ctx.font = '400 36px "Inter Variable", sans-serif';
-    ctx.fillText(k, 140, y);
-    ctx.fillStyle = '#f6efe6';
-    ctx.font = '600 56px "Fraunces Variable", serif';
-    y += wrap(ctx, v, 140, y + 62, W - 280, 62, 2) * 62 + 70;
+  if (s.topGenre) rows.push(['GENRE OF THE YEAR', s.topGenre]);
+  if (s.topAuthor) rows.push(['FAVOURITE AUTHOR', s.topAuthor]);
+  if (s.favourite) rows.push(['BOOK OF THE YEAR', s.favourite.title]);
+  if (rows.length) {
+    ctx.font = '600 54px "Fraunces Variable", serif';
+    const lines = rows.map(([, v]) => (ctx.measureText(v).width > W - 320 ? 2 : 1));
+    const blockH = rows.reduce((t, _, i) => t + 44 + lines[i] * 62, 0) + (rows.length - 1) * 46;
+    const top = 1130;
+    roundRect(ctx, 110, top, W - 220, blockH + 110, 48);
+    ctx.fillStyle = 'rgba(246,239,230,0.09)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(246,239,230,0.18)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.textAlign = 'center';
+    let y = top + 55 + 30;
+    rows.forEach(([k, v], i) => {
+      ctx.fillStyle = 'rgba(246,239,230,0.6)';
+      ctx.font = '500 28px "Inter Variable", sans-serif';
+      ctx.letterSpacing = '4px';
+      ctx.fillText(k, W / 2, y);
+      ctx.letterSpacing = '0px';
+      ctx.fillStyle = '#f6efe6';
+      ctx.font = '600 54px "Fraunces Variable", serif';
+      y += wrap(ctx, v, W / 2, y + 66, W - 320, 62, 2) * 62 + 44;
+      if (i < rows.length - 1) {
+        // a little star between the highlights
+        ctx.fillStyle = 'rgba(246,239,230,0.45)';
+        ctx.font = '400 26px "Inter Variable", sans-serif';
+        ctx.fillText('✦', W / 2, y + 6);
+        y += 46;
+      }
+    });
   }
 
   ctx.textAlign = 'center';

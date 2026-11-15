@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { useProfile } from '../lib/profile';
-import { dayKey, streakOf, useDays } from '../lib/streak';
+import { dayKey, streakOf, useDays, yearStreaks } from '../lib/streak';
 import { Cover } from '../components/Cover';
 import { CloseIcon } from '../components/Icons';
 import { formatRating } from '../components/Stars';
@@ -394,9 +394,10 @@ export default function Wrapped() {
     const inYear = days.filter((d) => d.date.startsWith(`${year}-`));
     const imp = profile.streakImport?.until.startsWith(`${year}-`) ? profile.streakImport : undefined;
     const st = streakOf(inYear, imp, `${year}-12-31` < dayKey() ? `${year}-12-31` : dayKey());
-    // unbroken all year: the streak simply kept growing
-    const unbroken = st.current > 0 && st.current === st.longest;
-    if (inYear.length >= 1 || imp)
+    const ys = yearStreaks(days, profile.streakImport, year);
+    // still going and never longer than now: the streak simply kept growing
+    const growing = ys.thisYear && ys.current > 0 && ys.current >= ys.longest;
+    if (ys.longest > 0)
       out.push({
         key: 'streak',
         bg: 'from-[#A0644B] to-[#9C7A4C]',
@@ -411,14 +412,21 @@ export default function Wrapped() {
             </motion.div>
             <Pop delay={0.3}>
               <p className="mt-4 text-cream/85">
-                {unbroken ? 'This year your streak grew to' : 'Your longest streak this year was'}
+                {growing ? 'This year your streak grew to' : 'Your longest streak this year was'}
               </p>
             </Pop>
-            <Count to={st.longest} className="font-soft my-1 text-8xl leading-none font-semibold" />
+            <Count to={ys.longest} className="font-soft my-1 text-8xl leading-none font-semibold" />
             <Pop delay={0.6}>
-              <p className="text-xl">days in a row{unbroken ? ', and counting' : ''}</p>
+              <p className="text-xl">{growing ? 'days, and still counting' : 'days in a row'}</p>
             </Pop>
-            <Pop delay={1.2}>
+            {!growing && ys.current > 0 && (
+              <Pop delay={1}>
+                <p className="mt-6 rounded-full bg-cream/15 px-4 py-2 text-cream">
+                  Your current streak: <b>{ys.current}</b> day{ys.current === 1 ? '' : 's'} 🔥
+                </p>
+              </Pop>
+            )}
+            <Pop delay={1.4}>
               <p className="mt-6 text-cream/85">You picked up a book on {st.totalDays} days this year.</p>
             </Pop>
           </Center>
@@ -474,7 +482,7 @@ export default function Wrapped() {
         topGenre: genres[0]?.key,
         topAuthor: authors[0] && authors[0].n >= 2 ? authors[0].key : undefined,
         favourite: rated[0],
-        longestStreak: inYear.length >= 3 || imp ? st.longest : undefined,
+        longestStreak: ys.longest || undefined,
         // her favourites first on the picture
         covers: [...rated, ...read.filter((b) => !b.rating)],
       },

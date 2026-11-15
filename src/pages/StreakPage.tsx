@@ -111,8 +111,9 @@ export default function StreakPage() {
                   className="relative flex h-10 items-center justify-center disabled:opacity-30"
                 >
                   {inRun && (
+                    // one long pill: it starts and ends in a circle a little bigger than the day's own
                     <span
-                      className={`absolute inset-y-1 bg-[#f4bf78] ${start ? 'left-1 rounded-l-full' : '-left-px'} ${end ? 'right-1 rounded-r-full' : '-right-px'}`}
+                      className={`absolute top-1/2 h-9 -translate-y-1/2 bg-[#f4bf78] ${start ? 'left-[calc(50%-18px)] rounded-l-full' : '-left-px'} ${end ? 'right-[calc(50%-18px)] rounded-r-full' : '-right-px'}`}
                     />
                   )}
                   <span
