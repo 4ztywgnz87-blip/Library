@@ -1,15 +1,15 @@
 import { useKeyboardLift } from '../lib/keyboard';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { searchBooks, fetchOpenLibraryDescription, findDescription, type SearchResult } from '../lib/bookSearch';
 import { useMatches } from '../lib/taste';
 import { profileKey } from '../taste/vocab';
 import { MatchRing, matchLabel } from '../components/MatchRing';
-import { bookKey, newId, saveBook } from '../lib/library';
+import { bookKey, newId, normalize, saveBook } from '../lib/library';
 import { useBooks } from '../lib/hooks';
-import { STATUSES, type Lang, type Status } from '../types';
+import { STATUSES, type Book, type Lang, type Status } from '../types';
 import { Cover } from '../components/Cover';
 import { Button, PageHeader, Segmented } from '../components/ui';
 import { CoverChoice } from '../components/CoverChoice';
@@ -101,6 +101,20 @@ export default function Add() {
     return m;
   }, [books]);
 
+  // Her own books matching what she types: instant, and works offline too (like "In a bookshop?")
+  const mine = useMemo(() => {
+    const q = normalize(query);
+    if (q.length < 2 || !books) return [];
+    const digits = query.replace(/[^0-9Xx]/g, '');
+    return books
+      .filter(
+        (b) =>
+          normalize([b.title, ...b.authors, b.series?.name ?? ''].join(' ')).includes(q) ||
+          (digits.length >= 10 && b.isbn13 === digits),
+      )
+      .slice(0, 5);
+  }, [query, books]);
+
   // Search while typing (debounced, cancels older searches)
   useEffect(() => {
     const q = query.trim();
@@ -108,6 +122,12 @@ export default function Add() {
       setResults([]);
       setError(null);
       setLoading(false);
+      return;
+    }
+    if (!navigator.onLine) {
+      setResults([]);
+      setLoading(false);
+      setError("You're offline: only your own books are searched right now.");
       return;
     }
     const ctrl = new AbortController();
@@ -207,9 +227,26 @@ export default function Add() {
         )}
 
         <div className="mt-5">
+          {mine.length > 0 && (
+            <div className="mb-4">
+              <p className="mb-1 text-xs tracking-wide text-wine uppercase">Already in your library</p>
+              <ul className="divide-y divide-sand/70 rounded-2xl bg-white/70 px-3">
+                {mine.map((b) => (
+                  <OwnRow key={b.id} book={b} />
+                ))}
+              </ul>
+            </div>
+          )}
           {loading && results.length === 0 && !reading && <LoadingTea />}
-          {error && <p className="py-8 text-center text-sm text-cocoa">{error}</p>}
-          {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
+          {error && (
+            <p className={`${mine.length ? 'py-3' : 'py-8'} text-center text-sm text-cocoa`}>
+              {error}
+              {!mine.length && query.trim().length >= 2 && !navigator.onLine && (
+                <span className="mt-1 block text-mocha">None of your books match.</span>
+              )}
+            </p>
+          )}
+          {!loading && !error && query.trim().length >= 2 && results.length === 0 && !mine.length && (
             <p className="py-8 text-center text-sm text-cocoa">No books found. Try the author's name too?</p>
           )}
           {query.trim().length < 2 && !reading && recent.length > 0 && (
@@ -321,6 +358,31 @@ export default function Add() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/** One of her own books, found while typing on the Add screen */
+function OwnRow({ book }: { book: Book }) {
+  return (
+    <li>
+      <Link to={`/book/${book.id}`} className="flex items-center gap-3 py-2.5 active:opacity-70">
+        <Cover book={book} className="w-10 shrink-0" rounded="rounded" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">{book.title}</span>
+          <span className="block truncate text-xs text-cocoa">
+            {[
+              book.authors[0],
+              book.series && `${book.series.name}${book.series.number ? ` #${book.series.number}` : ''}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+        </span>
+        <span className="shrink-0 rounded-full bg-blush px-2 py-0.5 text-xs text-wine">
+          {STATUSES.find((s) => s.id === book.status)?.short}
+        </span>
+      </Link>
+    </li>
   );
 }
 
