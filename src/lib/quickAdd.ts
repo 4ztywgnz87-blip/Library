@@ -25,6 +25,15 @@ export async function quickAdd(
       (r) => normalize(r.title).startsWith(normalize(title)) && normalize(r.authors.join(' ')).includes(surname),
     );
 
+  // a cover from another English or Dutch edition of the same book, when the matched one has none
+  const coverFrom =
+    match?.coverUrl ??
+    results.find((r) => bookKey(r) === want && r.coverUrl && (r.language === 'en' || r.language === 'nl'))?.coverUrl;
+  // empty values in `extra` (e.g. a cover we didn't have) must not wipe what the search found
+  const given = Object.fromEntries(
+    Object.entries(extra).filter(([, v]) => v !== undefined && v !== ''),
+  ) as Partial<Book>;
+
   const now = Date.now();
   const {
     source: _s,
@@ -39,7 +48,8 @@ export async function quickAdd(
   };
   const saved = await saveBook({
     ...data,
-    ...extra,
+    coverUrl: coverFrom,
+    ...given,
     id: newId(),
     status,
     language: language ?? 'en',
@@ -47,7 +57,7 @@ export async function quickAdd(
     tags: [],
     addedAt: now,
     updatedAt: now,
-    series: extra.series ?? data.series,
+    series: given.series ?? data.series,
   });
   if (!saved.series || !saved.genres.length) void lookupSeries(saved);
   return saved;

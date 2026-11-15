@@ -21,6 +21,13 @@ export function coverSrc(url?: string) {
   return url;
 }
 
+/** The cover Open Library has for this exact edition (404 when it has none, so it can fall back) */
+export function isbnCover(isbn?: string) {
+  return isbn && /^\d{13}$/.test(isbn)
+    ? coverSrc(`https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`)
+    : undefined;
+}
+
 const kept = new Map<string, HTMLImageElement>();
 
 /** Has this cover been shown before (so it can appear without fading in)? */

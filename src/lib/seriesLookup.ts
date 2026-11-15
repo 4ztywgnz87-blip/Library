@@ -1,7 +1,9 @@
 import { db } from '../db';
 import type { Book, SeriesInfo } from '../types';
 import { normalize, updateBook } from './library';
-import { findDescription, looksForeign, mapGenres, mergeGenres } from './bookSearch';
+import { findDescription, looksForeign, mapGenres, mergeGenres, searchBooks } from './bookSearch';
+import { isbnCover } from './coverCache';
+import { bookKey } from './library';
 
 /** First words of a title, e.g. "a court of" for "A Court of Mist and Fury" */
 export const titleStart = (t: string, words = 3) => normalize(t).split(' ').slice(0, words).join(' ');
@@ -183,5 +185,41 @@ export async function repairDescriptions(max = 10) {
   for (const b of bad) {
     const description = await findDescription({ title: b.title, authors: b.authors, olKey: b.olKey });
     await updateBook(b.id, { description });
+  }
+}
+
+/** Does this image address really load? */
+const loads = (src: string) =>
+  new Promise<boolean>((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth > 1);
+    img.onerror = () => resolve(false);
+    img.src = src;
+  });
+
+/**
+ * Books without a cover: look for one (Open Library's cover for the ISBN, or another English or
+ * Dutch edition found by title). A book that stays without cover isn't tried again for a week.
+ */
+export async function backfillCovers(max = 8) {
+  if (!navigator.onLine) return;
+  const week = 7 * 86_400_000;
+  const todo = (
+    await db.books
+      .filter((b) => !b.deleted && !b.coverUrl && !b.customCover && Date.now() - (b.coverTriedAt ?? 0) > week)
+      .toArray()
+  ).slice(0, max);
+  for (const b of todo) {
+    let found: string | undefined;
+    const viaIsbn = isbnCover(b.isbn13);
+    if (viaIsbn && (await loads(viaIsbn))) found = `https://covers.openlibrary.org/b/isbn/${b.isbn13}-L.jpg`;
+    if (!found) {
+      const results = await searchBooks(`${b.title} ${b.authors[0] ?? ''}`).catch(() => []);
+      const want = bookKey(b);
+      found = results.find(
+        (r) => r.coverUrl && bookKey(r) === want && (r.language === 'en' || r.language === 'nl'),
+      )?.coverUrl;
+    }
+    await updateBook(b.id, found ? { coverUrl: found } : { coverTriedAt: Date.now() });
   }
 }

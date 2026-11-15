@@ -33,22 +33,6 @@ export default function Add() {
   const [picked, setPickedState] = useState<SearchResult | null>(null);
   const books = useBooks();
   const inputRef = useRef<HTMLInputElement>(null);
-  // a match score next to every result Snug already knows (free: nothing new is analysed for a search)
-  const resultMatches = useMatches(
-    useMemo(
-      () =>
-        results.map((r) => ({
-          title: r.title,
-          author: r.authors[0] ?? '',
-          description: r.description,
-          genres: r.genres,
-          series: r.series,
-        })),
-      [results],
-    ),
-    {},
-    { free: true },
-  );
   // The scanner and the add-sheet get their own history entry (?m=…), so swiping back on the
   // iPhone closes them instead of leaving the Add screen
   const modal = params.get('m');
@@ -319,10 +303,6 @@ export default function Add() {
                         </span>
                       )}
                     </div>
-                    {(() => {
-                      const m = resultMatches.get(profileKey(r.title, r.authors[0] ?? ''));
-                      return m ? <MatchRing score={m.score} size={40} /> : null;
-                    })()}
                   </button>
                 </li>
               );

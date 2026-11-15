@@ -269,36 +269,40 @@ async function searchOpenLibrary(query: string, signal?: AbortSignal): Promise<S
   });
   const res = await openLibrarySearch(params, signal);
   const json = (await res.json()) as { docs: OLDoc[] };
-  return json.docs
-    .filter((d) => d.author_name?.length)
-    .map((d) => {
-      const { title, series } = parseSeries(d.title, d.subtitle);
-      const langs = d.language ?? [];
-      const r: SearchResult = {
-        source: 'openlibrary' as const,
-        title,
-        subtitle: d.subtitle,
-        authors: d.author_name!,
-        coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : undefined,
-        genres: mapGenres(d.subject?.slice(0, 40) ?? []),
-        pageCount: d.number_of_pages_median,
-        publishedDate: d.first_publish_year?.toString(),
-        isbn13: d.isbn?.find((i) => i.length === 13),
-        olKey: d.key,
-        series,
-        // Open Library lists the languages of all editions; the title tells which one this is
-        language:
-          langs.length === 1 && langs[0] === 'dut'
-            ? 'nl'
-            : langs.length === 1 && langs[0] === 'eng'
-              ? 'en'
-              : (guessLang(`${d.title} ${d.subtitle ?? ''}`) ??
-                (langs.includes('eng') ? 'en' : langs.includes('dut') ? 'nl' : undefined)),
-      };
-      // how many readers have it on their shelves (log scale), plus a little for many editions
-      popularity.set(r, Math.log10((d.readinglog_count ?? 0) + 1) * 10 + Math.min(5, (d.edition_count ?? 1) / 4));
-      return r;
-    });
+  return (
+    json.docs
+      .filter((d) => d.author_name?.length)
+      // only English and Dutch: a work that is only listed in other languages is a foreign edition
+      .filter((d) => !d.language?.length || d.language.includes('eng') || d.language.includes('dut'))
+      .map((d) => {
+        const { title, series } = parseSeries(d.title, d.subtitle);
+        const langs = d.language ?? [];
+        const r: SearchResult = {
+          source: 'openlibrary' as const,
+          title,
+          subtitle: d.subtitle,
+          authors: d.author_name!,
+          coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : undefined,
+          genres: mapGenres(d.subject?.slice(0, 40) ?? []),
+          pageCount: d.number_of_pages_median,
+          publishedDate: d.first_publish_year?.toString(),
+          isbn13: d.isbn?.find((i) => i.length === 13),
+          olKey: d.key,
+          series,
+          // Open Library lists the languages of all editions; the title tells which one this is
+          language:
+            langs.length === 1 && langs[0] === 'dut'
+              ? 'nl'
+              : langs.length === 1 && langs[0] === 'eng'
+                ? 'en'
+                : (guessLang(`${d.title} ${d.subtitle ?? ''}`) ??
+                  (langs.includes('eng') ? 'en' : langs.includes('dut') ? 'nl' : undefined)),
+        };
+        // how many readers have it on their shelves (log scale), plus a little for many editions
+        popularity.set(r, Math.log10((d.readinglog_count ?? 0) + 1) * 10 + Math.min(5, (d.edition_count ?? 1) / 4));
+        return r;
+      })
+  );
 }
 
 /** Fetches a longer description from Open Library when we only have the basics */

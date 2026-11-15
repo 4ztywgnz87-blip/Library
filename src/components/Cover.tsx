@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Book } from '../types';
-import { coverSrc, isLoaded, keep } from '../lib/coverCache';
+import { coverSrc, isbnCover, isLoaded, keep } from '../lib/coverCache';
 
 const PALETTE = ['#7A2E3A', '#8B5E3C', '#5F6B52', '#A0644B', '#4E3B47', '#9C7A4C', '#6B4A3A', '#3F4E5A'];
 
@@ -10,7 +10,7 @@ export function hashColor(s: string) {
   return PALETTE[Math.abs(h) % PALETTE.length];
 }
 
-type CoverBook = Pick<Book, 'title' | 'authors' | 'coverUrl'> & { customCover?: string };
+type CoverBook = Pick<Book, 'title' | 'authors' | 'coverUrl'> & { customCover?: string; isbn13?: string };
 
 /** Book cover with a soft shadow, or a pretty generated cover when there's no image */
 export function Cover({
@@ -22,8 +22,15 @@ export function Cover({
   className?: string;
   rounded?: string;
 }) {
-  const [failed, setFailed] = useState(false);
-  const src = book.customCover || coverSrc(book.coverUrl);
+  // the cover we have first; if it doesn't load (or there is none), the one Open Library has for this ISBN
+  const sources = [book.customCover || coverSrc(book.coverUrl), isbnCover(book.isbn13)].filter(
+    (x, i, all): x is string => !!x && all.indexOf(x) === i,
+  );
+  const sourcesKey = sources.join('|');
+  const [tried, setTried] = useState(0);
+  useEffect(() => setTried(0), [sourcesKey]);
+  const src = sources[tried];
+  const failed = tried >= sources.length;
   const known = !!src && isLoaded(src);
   return (
     <div
@@ -35,8 +42,12 @@ export function Cover({
           alt={book.title}
           loading={known ? 'eager' : 'lazy'}
           decoding={known ? 'sync' : 'async'}
-          onLoad={() => src && keep(src)}
-          onError={() => setFailed(true)}
+          onLoad={(e) => {
+            // Open Library answers an unknown cover with a 1×1 picture instead of an error
+            if (e.currentTarget.naturalWidth <= 2) setTried((n) => n + 1);
+            else if (src) keep(src);
+          }}
+          onError={() => setTried((n) => n + 1)}
           className="h-full w-full object-cover"
         />
       ) : (

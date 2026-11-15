@@ -18,7 +18,7 @@ import StreakPage from './pages/StreakPage';
 import SharedWishlist from './pages/SharedWishlist';
 import Wrapped from './pages/Wrapped';
 import { startBackgroundSync } from './lib/sync';
-import { backfillSeries, harmonizeSeriesGenres, repairDescriptions } from './lib/seriesLookup';
+import { backfillSeries, harmonizeSeriesGenres, repairDescriptions, backfillCovers } from './lib/seriesLookup';
 
 export default function App() {
   // a shared wishlist link: show only that, without syncing her library into a guest's browser
@@ -35,7 +35,8 @@ function MainApp() {
       () =>
         void backfillSeries()
           .then(harmonizeSeriesGenres)
-          .then(() => repairDescriptions()),
+          .then(() => repairDescriptions())
+          .then(() => backfillCovers()),
       4000,
     );
     return () => {
