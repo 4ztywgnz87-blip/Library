@@ -88,7 +88,21 @@ export const PARAMS = {
   /** > 0: learn all tag weights together (ridge regression) instead of one by one */
   ridge: 4,
   dataShrink: 3,
+  /**
+   * > 0: a remark counts by how she rated the book it's about. Something she "loved" in a book she
+   * gave less than her usual rating didn't make it a favourite; something that "bothered" her in a
+   * book she still gave 5★ hardly mattered. (0 = every remark counts the same)
+   */
+  remarkByRating: 0,
 };
+
+/** How much a remark counts: full when the rating agrees with it, little when it goes against it */
+function remarkWeight(sign: 1 | -1, rating: number | undefined, mean: number) {
+  const P = PARAMS;
+  if (!P.remarkByRating || rating === undefined) return 1;
+  const agree = sign > 0 ? rating - mean : mean - rating; // a "like" in a book rated above her average agrees
+  return Math.max(0.15, Math.min(1, 0.6 + agree / P.remarkByRating));
+}
 
 /**
  * All tags at once: which tags explain her ratings, given the other tags in the same books
@@ -190,6 +204,8 @@ interface Evidence {
   level?: number;
   /** she missed it in that book ("not enough romance"), rather than enjoyed it there */
   wantedMore?: boolean;
+  /** how much this remark counts, given how she rated that book (see `remarkWeight`) */
+  w?: number;
 }
 
 interface ScaleTaste {
@@ -267,7 +283,7 @@ export function learn(library: LibraryBook[], quiz?: Quiz): Taste {
   for (const b of read) {
     for (const l of b.insight?.likes ?? [])
       if (!l.feature.startsWith('scale:'))
-        bump(l.feature, P.reviewLike * l.strength * against(l.feature, 1), {
+        bump(l.feature, P.reviewLike * l.strength * against(l.feature, 1) * remarkWeight(1, b.rating, mean), {
           book: b,
           rating: b.rating,
           quote: l.quote,
@@ -276,7 +292,7 @@ export function learn(library: LibraryBook[], quiz?: Quiz): Taste {
         });
     for (const l of b.insight?.dislikes ?? [])
       if (!l.feature.startsWith('scale:'))
-        bump(l.feature, -P.reviewDislike * l.strength * against(l.feature, -1), {
+        bump(l.feature, -P.reviewDislike * l.strength * against(l.feature, -1) * remarkWeight(-1, b.rating, mean), {
           book: b,
           rating: b.rating,
           quote: l.quote,
@@ -368,10 +384,20 @@ export function learn(library: LibraryBook[], quiz?: Quiz): Taste {
             strength: l.strength,
             level,
             wantedMore: l.wantedMore,
+            // missing something is a complaint: it agrees with a lower rating
+            w: remarkWeight(l.wantedMore ? -1 : 1, b.rating, mean),
           });
       for (const l of b.insight?.dislikes ?? [])
         if (l.feature === `scale:${k}`)
-          evidence.push({ book: b, rating: b.rating, quote: l.quote, sign: -1, strength: l.strength, level });
+          evidence.push({
+            book: b,
+            rating: b.rating,
+            quote: l.quote,
+            sign: -1,
+            strength: l.strength,
+            level,
+            w: remarkWeight(-1, b.rating, mean),
+          });
     }
     scale.set(k, { sweet, spread, slope, avg, evidence });
   }
@@ -593,7 +619,7 @@ export function predict(t: Taste, c: Candidate, wish: { mood?: Mood; genre?: str
       // "not enough of it" is a complaint within a kind of book: wanting more worldbuilding in a
       // fantasy says nothing about a thriller set in the real world
       const relevance = e.wantedMore ? Math.max(0.15, Math.min(1, (simTo(e.book) - 0.1) / 0.3)) : 1;
-      const v = P.scaleDirection * e.strength * effect * relevance;
+      const v = P.scaleDirection * e.strength * effect * relevance * (e.w ?? 1);
       said += v;
       if (!saidBy || Math.abs(v) * (0.5 + simTo(e.book)) > Math.abs(saidByValue) * (0.5 + simTo(saidBy.book))) {
         saidBy = e;
