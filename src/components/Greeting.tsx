@@ -1,4 +1,5 @@
 import { motion } from 'motion/react';
+import { useSearchParams } from 'react-router-dom';
 import type { Book } from '../types';
 
 type Moment = 'morning' | 'afternoon' | 'evening' | 'night';
@@ -45,7 +46,7 @@ function MomentIcon({ m }: { m: Moment }) {
     return (
       <svg viewBox="0 0 48 48" className="h-11 w-11" aria-hidden>
         <motion.g
-          style={{ originX: '24px', originY: '26px' }}
+          style={{ transformBox: 'view-box', transformOrigin: '24px 26px' }}
           animate={{ rotate: 360 }}
           transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
         >
@@ -68,7 +69,8 @@ function MomentIcon({ m }: { m: Moment }) {
           cy="26"
           r="9"
           fill="#f1bf6a"
-          animate={{ r: [9, 9.6, 9] }}
+          style={{ transformBox: 'view-box', transformOrigin: '24px 26px' }}
+          animate={{ scale: [1, 1.06, 1] }}
           transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
         />
         <path d="M6 38h36" stroke="#d9c3a5" strokeWidth="2.4" strokeLinecap="round" />
@@ -110,7 +112,7 @@ function MomentIcon({ m }: { m: Moment }) {
         <motion.path
           d="M24 6c3 4 3.5 7 0 11-3.5-4-3-7 0-11z"
           fill="#f0a64b"
-          style={{ originX: '24px', originY: '17px' }}
+          style={{ transformBox: 'view-box', transformOrigin: '24px 17px' }}
           animate={{ scaleY: [1, 1.12, 0.95, 1], rotate: [0, -3, 2, 0] }}
           transition={{ duration: 1.8, repeat: Infinity }}
         />
@@ -142,12 +144,23 @@ function MomentIcon({ m }: { m: Moment }) {
 }
 
 export function Greeting({ name, books }: { name?: string; books: Book[] }) {
-  const m = moment(new Date().getHours());
+  // (`?moment=morning` shows another time of day, to preview it)
+  const [params] = useSearchParams();
+  const forced = params.get('moment') as Moment | null;
+  const m = forced && forced in WORDS ? forced : moment(new Date().getHours());
   const words = `${WORDS[m]}${name ? `, ${name}` : ''}`.split(' ');
   return (
-    <header className="flex items-start justify-between gap-3 pt-8 pb-6">
+    <header className="flex items-center gap-3 pt-8 pb-6">
+      <motion.div
+        className="shrink-0 rounded-full bg-white/70 p-1.5 shadow-[var(--shadow-soft)]"
+        initial={{ opacity: 0, scale: 0.8, rotate: -8 }}
+        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+        transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 14 }}
+      >
+        <MomentIcon m={m} />
+      </motion.div>
       <div className="min-w-0">
-        <h1 className="text-4xl leading-tight font-semibold">
+        <h1 className="text-[2rem] leading-tight font-semibold">
           {words.map((w, i) => (
             <motion.span
               key={i}
@@ -162,7 +175,7 @@ export function Greeting({ name, books }: { name?: string; books: Book[] }) {
         </h1>
         {books.length > 0 && (
           <motion.p
-            className="mt-1.5 text-sm text-cocoa"
+            className="mt-1 text-sm text-cocoa"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.08 * words.length + 0.3, duration: 0.6 }}
@@ -171,14 +184,6 @@ export function Greeting({ name, books }: { name?: string; books: Book[] }) {
           </motion.p>
         )}
       </div>
-      <motion.div
-        className="mt-1 shrink-0"
-        initial={{ opacity: 0, scale: 0.8, rotate: -8 }}
-        animate={{ opacity: 1, scale: 1, rotate: 0 }}
-        transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 14 }}
-      >
-        <MomentIcon m={m} />
-      </motion.div>
     </header>
   );
 }

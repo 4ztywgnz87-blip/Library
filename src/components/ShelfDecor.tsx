@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { CatHat, SEASON_LIGHTS, type Season } from './Seasonal';
 
 /** A terracotta pot with a leafy plant that sways gently */
@@ -294,15 +294,6 @@ export function Mug({ className = '', season }: { className?: string; season?: S
               strokeLinecap="round"
               opacity="0.9"
             />
-            <path d="M50 52V34c0-5 8-5 8 0" stroke="#fff" strokeWidth="3.2" fill="none" strokeLinecap="round" />
-            <path
-              d="M50 52V34c0-5 8-5 8 0"
-              stroke="#d64545"
-              strokeWidth="3.2"
-              fill="none"
-              strokeLinecap="round"
-              strokeDasharray="2.5 2.5"
-            />
           </>
         ) : season === 'halloween' ? (
           <>
@@ -394,10 +385,14 @@ export function ShelfCat({ className = '', season }: { className?: string; seaso
       <ellipse cx="34" cy="74" rx="9" ry="4.5" fill="#f2e3cf" />
       <ellipse cx="52" cy="75" rx="9" ry="4.5" fill="#f2e3cf" />
       {/* head */}
-      <path d="M22 34l2-17 12 10z" fill="#a87449" />
-      <path d="M54 27l12-10 2 17z" fill="#a87449" />
-      <path d="M25.5 29l1.2-8 6 5z" fill="#e7b9a8" />
-      <path d="M57 26l6-5 1.2 8z" fill="#e7b9a8" />
+      {season !== 'christmas' && (
+        <>
+          <path d="M22 34l2-17 12 10z" fill="#a87449" />
+          <path d="M54 27l12-10 2 17z" fill="#a87449" />
+          <path d="M25.5 29l1.2-8 6 5z" fill="#e7b9a8" />
+          <path d="M57 26l6-5 1.2 8z" fill="#e7b9a8" />
+        </>
+      )}
       <ellipse cx="45" cy="47" rx="25" ry="21" fill={`url(#${id}fur)`} />
       <path
         d="M40 27c2 3 2 6 0 9M46 26c1 3 1 6 0 9M52 27c-1 3-1 6 0 9"
@@ -614,12 +609,24 @@ const wateredToday = () => {
   }
 };
 
-/** Tap the plant to water it: drops fall, the vines do a happy little dance and it flowers for the day */
+/**
+ * Tap the plant to water it: drops fall, the vines do a happy little dance and four little flowers
+ * open between the leaves (they stay for the day). Tap again and they close, one by one.
+ */
 export function HangingPlant({ className = '' }: { className?: string }) {
   const id = useId();
   const [waters, setWaters] = useState(0);
   const [bloom, setBloom] = useState(wateredToday);
-  const water = () => {
+  const tap = () => {
+    if (bloom) {
+      setBloom(false);
+      try {
+        localStorage.removeItem('snug-plant-watered');
+      } catch {
+        /* nothing to forget */
+      }
+      return;
+    }
     setWaters((n) => n + 1);
     setTimeout(() => setBloom(true), 900);
     try {
@@ -628,19 +635,19 @@ export function HangingPlant({ className = '' }: { className?: string }) {
       /* no storage: it just flowers until the app closes */
     }
   };
-  // a five-petal flower that pops open
-  const flower = (x: number, y: number, delay: number, color: string) => (
+  // a small five-petal flower on the stem, in the gap between two leaves; `n` = its turn (0–3)
+  const flower = (x: number, y: number, n: number, color: string) => (
     <motion.g
-      key={`${x}-${y}`}
+      key={`f${n}`}
       initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ delay, type: 'spring', stiffness: 260, damping: 12 }}
+      animate={{ scale: 1, opacity: 1, transition: { delay: n * 0.18, type: 'spring', stiffness: 260, damping: 12 } }}
+      exit={{ scale: 0, opacity: 0, transition: { delay: (3 - n) * 0.22, duration: 0.25 } }}
       style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
     >
       {[0, 72, 144, 216, 288].map((r) => (
-        <ellipse key={r} cx={x} cy={y - 3} rx="2.2" ry="3.2" fill={color} transform={`rotate(${r} ${x} ${y})`} />
+        <ellipse key={r} cx={x} cy={y - 2.4} rx="1.8" ry="2.6" fill={color} transform={`rotate(${r} ${x} ${y})`} />
       ))}
-      <circle cx={x} cy={y} r="1.6" fill="#f3d27a" />
+      <circle cx={x} cy={y} r="1.3" fill="#f3d27a" />
     </motion.g>
   );
   // heart-shaped leaf at (x, y), turned by `r` degrees
@@ -662,7 +669,7 @@ export function HangingPlant({ className = '' }: { className?: string }) {
   ) => (
     <motion.g
       style={{ transformOrigin: `${originX}px 46px`, transformBox: 'view-box', willChange: 'transform' }}
-      key={`v${waters}`}
+      key={`v${originX}-${waters}`}
       animate={waters ? { rotate: [-2.5, 7, -6, 4, -2.5, 2.5, -2.5] } : { rotate: [-2.5, 2.5, -2.5] }}
       transition={
         waters
@@ -674,7 +681,7 @@ export function HangingPlant({ className = '' }: { className?: string }) {
       {leaves.map(([x, y, r, s, sh], i) => (
         <g key={i}>{leaf(x, y, r, s, sh)}</g>
       ))}
-      {flowers}
+      <AnimatePresence>{flowers}</AnimatePresence>
     </motion.g>
   );
   return (
@@ -682,8 +689,8 @@ export function HangingPlant({ className = '' }: { className?: string }) {
       viewBox="0 0 90 160"
       className={className}
       role="button"
-      aria-label="Water the plant"
-      onClick={water}
+      aria-label={bloom ? 'Plant in bloom' : 'Water the plant'}
+      onClick={tap}
       style={{ overflow: 'visible', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
     >
       <defs>
@@ -709,7 +716,7 @@ export function HangingPlant({ className = '' }: { className?: string }) {
         ],
         0,
         26,
-        bloom && [flower(23, 70, 0, '#f2a7b8'), flower(17, 112, 0.45, '#f7c6d0')],
+        bloom && [flower(20.5, 72, 0, '#f2a7b8'), flower(14.6, 132, 3, '#f7c6d0')],
       )}
       {vine(
         'M42 49c3 18 2 36 5 56 2 12 1 22-1 30',
@@ -721,7 +728,7 @@ export function HangingPlant({ className = '' }: { className?: string }) {
         ],
         0.8,
         42,
-        bloom && flower(47, 92, 0.15, '#f7c6d0'),
+        bloom && flower(45.6, 94, 1, '#f7c6d0'),
       )}
       {vine(
         'M60 48c7 12 10 26 10 42',
@@ -732,7 +739,7 @@ export function HangingPlant({ className = '' }: { className?: string }) {
         ],
         1.6,
         60,
-        bloom && flower(66, 68, 0.3, '#f2a7b8'),
+        bloom && flower(66.6, 67, 2, '#f2a7b8'),
       )}
       {/* water drops after a tap */}
       {waters > 0 &&

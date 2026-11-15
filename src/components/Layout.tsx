@@ -84,16 +84,6 @@ export function Layout() {
                       <Icon width={23} height={23} />
                     </motion.span>
                     <span>{label}</span>
-                    {/* a tiny heart under the open tab */}
-                    <motion.svg
-                      viewBox="0 0 10 9"
-                      className="h-[7px] w-[8px]"
-                      initial={false}
-                      animate={{ scale: isActive ? 1 : 0, opacity: isActive ? 1 : 0 }}
-                      transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                    >
-                      <path d="M5 2C6 0 10 0 9.4 3 8.8 5.5 5 8 5 8S1.2 5.5.6 3C0 0 4 0 5 2z" fill="currentColor" />
-                    </motion.svg>
                   </>
                 )
               }

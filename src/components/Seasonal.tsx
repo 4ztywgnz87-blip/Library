@@ -198,13 +198,22 @@ export function EggBasket({ className = '' }: { className?: string }) {
 
 export function CatHat({ season }: { season: Season }) {
   if (season === 'christmas')
+    // (the cat's ears are left out under the hat, so it sits right on the head)
     return (
       <g>
-        <path d="M26 30C30 12 52 4 70 10c8 3 12 10 16 18-6-3-12-4-16-1-8-6-24-5-44 3z" fill="#c8344d" />
-        <path d="M24 30c12-6 30-8 46-4" stroke="#fff" strokeWidth="6" strokeLinecap="round" fill="none" />
+        <path d="M23 35C24 16 42 4 60 9c10 3 17 10 23 19-6-3-12-3-16 1-10-5-28-4-44 6z" fill="#c8344d" />
+        <path
+          d="M47 8c6 0 11 2 15 5"
+          stroke="#fff"
+          strokeOpacity="0.25"
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path d="M22.5 37A24.5 20.5 0 0 1 67.5 37" stroke="#fff" strokeWidth="7" strokeLinecap="round" fill="none" />
         <motion.circle
-          cx="86"
-          cy="28"
+          cx="84"
+          cy="29"
           r="5"
           fill="#fff"
           animate={{ y: [0, 1.5, 0] }}
@@ -227,18 +236,18 @@ export function CatHat({ season }: { season: Season }) {
         <circle cx="0" cy="0" r="2.6" fill="#c8344d" />
       </g>
     );
-  // easter: bunny ears on a headband
+  // easter: bunny ears on a headband that follows the top of the head
   return (
     <g>
-      <path d="M26 30c8-6 30-8 40-2" stroke="#f3d6dc" strokeWidth="3" fill="none" />
-      <g transform="rotate(-12 36 26)">
-        <ellipse cx="36" cy="8" rx="5.5" ry="16" fill="#fff" />
-        <ellipse cx="36" cy="9" rx="2.6" ry="11" fill="#f6c8d6" />
+      <g transform="rotate(-9 39 28)">
+        <ellipse cx="39" cy="12" rx="5.2" ry="15" fill="#fff" />
+        <ellipse cx="39" cy="13" rx="2.4" ry="10" fill="#f6c8d6" />
       </g>
-      <g transform="rotate(14 56 24)">
-        <ellipse cx="56" cy="6" rx="5.5" ry="16" fill="#fff" />
-        <ellipse cx="56" cy="7" rx="2.6" ry="11" fill="#f6c8d6" />
+      <g transform="rotate(9 51 28)">
+        <ellipse cx="51" cy="12" rx="5.2" ry="15" fill="#fff" />
+        <ellipse cx="51" cy="13" rx="2.4" ry="10" fill="#f6c8d6" />
       </g>
+      <path d="M23.5 37A23.8 20 0 0 1 66.5 37" stroke="#f3d6dc" strokeWidth="3" strokeLinecap="round" fill="none" />
     </g>
   );
 }
@@ -263,13 +272,13 @@ export function Cobweb({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 60 60" className={className} aria-hidden>
       <g stroke="#e9e1d6" strokeOpacity="0.55" strokeWidth="0.8" fill="none">
-        <path d="M60 0L10 50M60 0L30 58M60 0L2 26M60 0L50 60" />
-        <path d="M48 0c-1 6 2 10 8 12M36 0c-2 12 6 22 24 24M24 0c-3 18 10 34 36 36" />
+        <path d="M60 0L56.8 36.9 M60 0L42.6 32.7 M60 0L31.7 23.8 M60 0L24.8 11.4 M60 0L23.0 1.3" />
+        <path d="M59.0 12.0A12 12 0 0 1 48.0 0.4 M57.9 23.9A24 24 0 0 1 36.0 0.8 M56.9 35.9A36 36 0 0 1 24.0 1.3" />
       </g>
       <motion.g animate={{ y: [0, 6, 0] }} transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}>
-        <path d="M44 14v16" stroke="#e9e1d6" strokeOpacity="0.6" strokeWidth="0.6" />
-        <circle cx="44" cy="32" r="2.6" fill="#2a1d18" />
-        <path d="M41 31l-3-2M41 33l-3 2M47 31l3-2M47 33l3 2" stroke="#2a1d18" strokeWidth="0.8" />
+        <path d="M46 22v14" stroke="#e9e1d6" strokeOpacity="0.6" strokeWidth="0.6" />
+        <circle cx="46" cy="38" r="2.6" fill="#2a1d18" />
+        <path d="M43 37l-3-2M43 39l-3 2M49 37l3-2M49 39l3 2" stroke="#2a1d18" strokeWidth="0.8" />
       </motion.g>
     </svg>
   );
