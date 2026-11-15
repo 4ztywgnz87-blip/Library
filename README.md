@@ -3,6 +3,10 @@
 A cosy little library app: track books (owned, reading, read, wishlist), rate them in quarter stars and
 (soon) get personal "what should I read next?" tips. See [PLAN.md](PLAN.md) for the full plan.
 
+Also: a daily reading streak with page progress (`/streak`), a shareable wishlist for gift-givers
+(`/w/<secret>`, with the language of each book and quiet gift reservations) and a yearly
+"year in books" story (`/wrapped`).
+
 Built as a web app (PWA): open it in Safari on iPhone/iPad → Share → **Add to Home Screen**.
 
 ## Stack

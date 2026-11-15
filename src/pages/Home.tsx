@@ -13,6 +13,7 @@ import { useMemo, useState } from 'react';
 import { updateProfile, useProfile } from '../lib/profile';
 import { Greeting } from '../components/Greeting';
 import { PageProgress, StreakCard } from '../components/Streak';
+import { wrappedSeason, wrappedYear } from './Wrapped';
 
 export default function Home() {
   const books = useBooks();
@@ -62,6 +63,25 @@ export default function Home() {
       ) : (
         <div className="space-y-8">
           <StreakCard books={books} />
+
+          {wrappedSeason() && books.some((b) => b.status === 'read') && (
+            <Link
+              to="/wrapped"
+              className="relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-card)] bg-gradient-to-br from-wine to-[#4E3B47] p-4 text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.99]"
+            >
+              <motion.span
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-cream/15 text-2xl"
+                animate={{ rotate: [0, -8, 8, 0] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 2 }}
+              >
+                🎁
+              </motion.span>
+              <div>
+                <p className="font-soft text-xl leading-tight font-semibold">Your {wrappedYear()} in books is ready</p>
+                <p className="text-xs opacity-80">Tap to unwrap your reading year</p>
+              </div>
+            </Link>
+          )}
 
           {/* Currently reading */}
           <section>

@@ -16,6 +16,7 @@ import Wishlist from './pages/Wishlist';
 import NewBooksPage from './pages/NewBooksPage';
 import StreakPage from './pages/StreakPage';
 import SharedWishlist from './pages/SharedWishlist';
+import Wrapped from './pages/Wrapped';
 import { startBackgroundSync } from './lib/sync';
 import { backfillSeries, harmonizeSeriesGenres } from './lib/seriesLookup';
 
@@ -40,6 +41,7 @@ function MainApp() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="wrapped" element={<Wrapped />} />
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="library" element={<Library />} />

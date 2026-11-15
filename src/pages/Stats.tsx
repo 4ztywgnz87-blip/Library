@@ -154,6 +154,18 @@ export default function Stats() {
           </EmptyState>
         ) : (
           <>
+            {year !== 'all' && (
+              <Link
+                to={`/wrapped?year=${year}`}
+                className="flex items-center gap-3 rounded-[var(--radius-card)] bg-gradient-to-br from-wine to-[#4E3B47] p-4 text-cream shadow-[var(--shadow-soft)] transition-transform active:scale-[0.99]"
+              >
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-cream/15 text-xl">▶</span>
+                <div>
+                  <p className="font-soft text-lg leading-tight font-semibold">Your {year} in books</p>
+                  <p className="text-xs opacity-80">A little story of your reading year</p>
+                </div>
+              </Link>
+            )}
             <div className="grid grid-cols-3 gap-3">
               <Tile
                 value={inYear.length}
