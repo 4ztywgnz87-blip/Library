@@ -135,9 +135,12 @@ export default function Library() {
     if (restored.current || !visible.length || search !== target.current.search) return;
     restored.current = true;
     const y = target.current.y;
-    if (!y) return;
-    setTimeout(() => window.scrollTo(0, y), 30);
-    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+    // (only when she was really scrolled down: a few pixels are just the iPhone's bounce at the
+    // top, and scrolling to those made the page shift a little after opening)
+    if (y < 40) return;
+    const back = () => Math.abs(window.scrollY - y) > 1 && window.scrollTo(0, y);
+    setTimeout(back, 30);
+    requestAnimationFrame(() => requestAnimationFrame(back));
   }, [visible.length, search]);
 
   return (

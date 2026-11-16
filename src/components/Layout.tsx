@@ -46,10 +46,10 @@ export function Layout() {
     lastPath.current = pathname;
     if (navType === 'POP') {
       const y = positions.current.get(location.key) ?? 0;
-      window.scrollTo(0, y);
+      if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
       // the page may still be filling up: try again once it has
-      requestAnimationFrame(() => window.scrollTo(0, y));
-    } else if (!samePage) window.scrollTo(0, 0);
+      requestAnimationFrame(() => Math.abs(window.scrollY - y) > 1 && window.scrollTo(0, y));
+    } else if (!samePage && window.scrollY !== 0) window.scrollTo(0, 0); // (already at the top: leave it be)
   }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
   const hideNav = pathname.startsWith('/book/') || pathname === '/quiz';
 

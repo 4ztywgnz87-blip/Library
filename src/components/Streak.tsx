@@ -75,13 +75,14 @@ export function StreakCard({ books }: { books: Book[] }) {
   const days = useDays();
   const profile = useProfile();
   const [sheet, setSheet] = useState<string | null>(null);
-  // the number only pops when it goes up while she's here, not every time Home opens
-  const shown = useRef<number | undefined>(undefined);
+  // the number only pops when she logs her first reading of the day while she's here; not when
+  // Home opens (her profile, with an imported streak, loads a moment after her days)
+  const shown = useRef<boolean | undefined>(undefined);
   if (!days) return null;
   const today = dayKey();
   const s = streakOf(days, profile.streakImport, today);
-  const pop = shown.current !== undefined && shown.current !== s.current;
-  shown.current = s.current;
+  const pop = shown.current === false && s.readToday;
+  shown.current = s.readToday;
   const read = new Set(days.map((d) => d.date));
   const todayLog = days.find((d) => d.date === today);
   const reading = books.find((b) => b.status === 'reading');
