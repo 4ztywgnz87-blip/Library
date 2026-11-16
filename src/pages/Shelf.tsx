@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
@@ -237,6 +237,10 @@ function decorToday(forced: string | null): Set<string> {
   return new Set(on);
 }
 
+/** last measured shelf widths and moved decorations, so coming back draws the shelf right at once */
+const shelfWidth = new Map<string, number>();
+let lastDropped: Record<string, string[]> = {};
+
 function ShelfSection({
   status,
   label,
@@ -265,11 +269,20 @@ function ShelfSection({
 
   // Books first get smaller (down to MIN_SCALE) to stay on one row; only then a new row is added
   const rowRef = useRef<HTMLDivElement>(null);
-  const [available, setAvailable] = useState(0);
-  useEffect(() => {
+  // the width is known before the first paint (and remembered for the next visit), so the
+  // shelf is laid out once, instead of first at a guessed size and then again
+  const [available, setAvailable] = useState(() => shelfWidth.get(status) ?? 0);
+  useLayoutEffect(() => {
     const el = rowRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setAvailable(entry.contentRect.width));
+    const cs = getComputedStyle(el);
+    const w = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    shelfWidth.set(status, w);
+    setAvailable(w);
+    const ro = new ResizeObserver(([entry]) => {
+      shelfWidth.set(status, entry.contentRect.width);
+      setAvailable(entry.contentRect.width);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -515,7 +528,11 @@ export default function Shelf() {
   // the books slide onto the shelf once per visit; coming back, nothing moves
   const bookCount = (books ?? []).filter((b) => !notOwned(b)).length;
   const firstVisit = useFirstVisit('shelf');
-  const [dropped, setDropped] = useState<Record<string, string[]>>({});
+  // (remembered between visits: which decorations moved to the other shelf, so they stand
+  // in the right place from the first frame)
+  const [dropped, setDroppedState] = useState<Record<string, string[]>>(lastDropped);
+  const setDropped = (f: (d: Record<string, string[]>) => Record<string, string[]>) =>
+    setDroppedState((d) => (lastDropped = f(d)));
   const seenBefore = useSeenIds(
     'shelf',
     (books ?? []).map((b) => b.id),

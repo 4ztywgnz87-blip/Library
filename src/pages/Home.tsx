@@ -97,7 +97,7 @@ export default function Home() {
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {reading.map((b) => (
-                  <motion.div key={b.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                  <motion.div key={b.id}>
                     <Link to={`/book/${b.id}`}>
                       <Card className="flex gap-4 transition-transform active:scale-[0.99]">
                         <div className="relative w-24 shrink-0">

@@ -128,7 +128,6 @@ export default function Library() {
   }, [books, sortReady, tab, year, authorFilter, query, genre, lang, sort]);
 
   const filtersActive = !!genre || lang !== 'all';
-  const layoutKey = visible.map((b) => b.id).join('|');
 
   // ...and scrolled back to where she was
   const restored = useRef(false);
@@ -279,10 +278,6 @@ export default function Library() {
             {visible.map((b, i) => (
               <motion.div
                 key={b.id}
-                layout
-                // books only glide to a new place when the list itself changes (sort, filter,
-                // search), not on any other update (that made them drift sideways after opening)
-                layoutDependency={layoutKey}
                 initial={firstVisit ? { opacity: 0, y: 10 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.02, 0.3) }}

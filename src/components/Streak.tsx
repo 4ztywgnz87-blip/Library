@@ -436,7 +436,7 @@ export function PageProgress({ book, className = '' }: { book: Book; className?:
         <div className="h-1.5 overflow-hidden rounded-full bg-linen">
           <motion.div
             className="h-full rounded-full bg-wine/70"
-            initial={{ width: 0 }}
+            initial={false}
             animate={{ width: `${pct}%` }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
           />

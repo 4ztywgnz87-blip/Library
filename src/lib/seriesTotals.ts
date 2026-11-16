@@ -22,8 +22,17 @@ export async function seriesPartsCached(key: string): Promise<SeriesBook[]> {
 }
 
 /** Known parts per series name, for the series she has (loads in the background) */
+/** what was found before, so a screen opening again shows its series at once (no late pop-in) */
+const knownParts: Record<string, SeriesBook[]> = {};
+
 export function useSeriesParts(groups: SeriesGroup[]) {
-  const [parts, setParts] = useState<Record<string, SeriesBook[]>>({});
+  const [parts, setPartsState] = useState<Record<string, SeriesBook[]>>(() => ({ ...knownParts }));
+  const setParts = (f: (p: Record<string, SeriesBook[]>) => Record<string, SeriesBook[]>) =>
+    setPartsState((p) => {
+      const next = f(p);
+      Object.assign(knownParts, next);
+      return next;
+    });
   const wanted = groups
     .map((g) => `${g.name}|${g.books.find((b) => b.series?.key)?.series?.key ?? ''}`)
     .filter((x) => !x.endsWith('|'))
@@ -33,7 +42,9 @@ export function useSeriesParts(groups: SeriesGroup[]) {
     for (const item of wanted ? wanted.split(',') : []) {
       const [name, key] = item.split('|');
       void seriesPartsCached(key).then((books) => {
-        if (!cancelled && books.length) setParts((p) => ({ ...p, [name]: books }));
+        // (unchanged since last time: no new render)
+        if (!cancelled && books.length && JSON.stringify(knownParts[name]) !== JSON.stringify(books))
+          setParts((p) => ({ ...p, [name]: books }));
       });
     }
     return () => {
