@@ -84,16 +84,13 @@ export function Layout() {
         {tabIndex >= 0 ? (
           <motion.div
             key={pathname}
-            initial={slide.current.dir ? { x: slide.current.dir * 48, opacity: 0 } : false}
-            animate={{ x: 0, opacity: 1 }}
+            // slid with `left`, not a transform: the iPhone draws a transformed page a hair higher
+            // and dropped it into place once the slide ended (a visible little jump)
+            className="relative"
+            initial={slide.current.dir ? { left: slide.current.dir * 48 } : false}
+            animate={{ left: 0 }}
             // an ease-out glide that ends exactly in place (a spring overshot a hair and then settled)
             transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}
-            // whole pixels only: on the iPhone a page moved by a fraction of a pixel is drawn
-            // slightly off, and snapped into place once the slide is over (a visible little jump)
-            transformTemplate={({ x }) => {
-              const px = Math.round(parseFloat(String(x ?? 0)));
-              return px ? `translateX(${px}px)` : 'none';
-            }}
           >
             <Outlet />
           </motion.div>

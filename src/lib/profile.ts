@@ -18,10 +18,18 @@ export const EMPTY_PROFILE: ReaderProfile = {
 };
 
 /** Her profile, or undefined while it is still loading */
+/** the profile as last read, so a screen opening again has it at once (her name in the greeting
+ *  no longer pops in a moment later, making the line wrap) */
+let lastProfile: ReaderProfile | undefined;
+
 export function useProfileLoaded(): ReaderProfile | undefined {
   return useLiveQuery(
-    async () => ({ ...EMPTY_PROFILE, ...((await db.meta.get('profile'))?.value as ReaderProfile | undefined) }),
+    async () => {
+      lastProfile = { ...EMPTY_PROFILE, ...((await db.meta.get('profile'))?.value as ReaderProfile | undefined) };
+      return lastProfile;
+    },
     [],
+    lastProfile,
   );
 }
 
