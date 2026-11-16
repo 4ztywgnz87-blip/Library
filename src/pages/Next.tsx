@@ -319,19 +319,12 @@ function EarlierTips({ hide }: { hide: Pick[] }) {
                     {t.author} · {when(t)}
                   </span>
                   {/* what she asked for; a book Snug suggested in more searches lists each of them (once) */}
-                  {!!t.asks?.length && (
-                    <span className="mt-0.5 flex gap-2 text-[0.7rem] text-mocha">
+                  {t.asks?.map((a, k) => (
+                    <span key={k} className="mt-0.5 flex gap-2 text-[0.7rem] text-mocha">
                       <span aria-hidden>🔎</span>
-                      <span className="min-w-0 flex-1">
-                        {t.asks.map((a, k) => (
-                          <span key={k} className="block truncate">
-                            {t.asks!.length > 1 && '• '}
-                            {askLabel(a)}
-                          </span>
-                        ))}
-                      </span>
+                      <span className="min-w-0 flex-1 truncate">{askLabel(a)}</span>
                     </span>
-                  )}
+                  ))}
                   {own && (
                     <span className="mt-0.5 inline-block rounded-full bg-blush px-2 py-0.5 text-[0.65rem] text-wine">
                       {STATUSES.find((s) => s.id === own.status)?.label}
