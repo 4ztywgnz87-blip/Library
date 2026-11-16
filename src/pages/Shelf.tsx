@@ -110,7 +110,8 @@ function Spine({
   /** slides onto the shelf (first visit only) */
   entrance: boolean;
   delay: number;
-  lean: boolean;
+  /** leaning to the left (against its neighbour) or to the right (against the side of the case) */
+  lean: false | 'left' | 'right';
   scale?: number;
   /** A row is filled exactly: its spines get a touch wider or narrower (0.88–1.14) */
   widthFactor?: number;
@@ -159,7 +160,7 @@ function Spine({
       title={`${book.title} · ${book.authors[0] ?? ''}${book.status === 'reading' ? ' · reading now' : ''}`}
       aria-label={book.title}
       initial={entrance ? { opacity: 0, y: 20 } : false}
-      animate={{ opacity: 1, y: 0, rotate: lean ? -7 : 0 }}
+      animate={{ opacity: 1, y: 0, rotate: lean === 'left' ? -7 : lean === 'right' ? 7 : 0 }}
       transition={{ delay, type: 'spring', stiffness: 260, damping: 22 }}
       whileHover={{ y: -8 }}
       whileTap={{ y: -16, scale: 1.04 }}
@@ -171,9 +172,12 @@ function Spine({
         // a leaning book rests its top against its neighbour; its foot slides out a little
         // pivot where the book touches what it leans on: the top of its neighbour book, or the
         // top edge of a (lower) bookend
+        // leaning right, against the side of the case: it tips over its bottom right corner
         transformOrigin: !lean
           ? 'bottom center'
-          : restHeight && restHeight < height
+          : lean === 'right'
+            ? 'bottom right'
+            : restHeight && restHeight < height
             ? `0 ${height - restHeight}px` // taller than its neighbour: touches the neighbour's top corner
             : 'top left', // shorter: its own top corner rests against the neighbour
         // rounded spine: light from the left, shadow on the right, and a fine cloth texture
@@ -330,7 +334,7 @@ function ShelfSection({
         w: number;
         gap: number;
         foot: number;
-        lean: boolean;
+        lean: false | 'left' | 'right';
         factor: number;
       };
   const items: Item[] = [];
@@ -348,7 +352,10 @@ function ShelfSection({
     // their foot slides a little to the right, so they get some room on that side.
     // Who leans: the last book of the shelf, or the book just before a decoration.
     const isLast = i === books.length - 1;
-    const lean = (isLast && !endDecor && !atSet.has(i) && books.length > 2) || (atSet.has(i + 1) && i > 0);
+    const lean =
+      (isLast && !endDecor && !atSet.has(i) && books.length > 2) || (atSet.has(i + 1) && i > 0)
+        ? ('left' as const)
+        : false;
     // (a book right next to a bookend always stands upright: that's what the bookend is for)
     const foot = lean && (!isLast || endDecor) ? Math.ceil((row - BOARD) * 0.13) : 0;
     shown.forEach((d, k) => {
@@ -382,6 +389,25 @@ function ShelfSection({
     );
   const close = (fill: boolean) => {
     if (!cur.length) return;
+    // A full row: sometimes its last book doesn't stand up straight but tilts into the bit of room
+    // left. Mostly to the left, against its neighbour; now and then to the right, against the
+    // side of the case. Decided per book, so the shelf looks the same every visit.
+    const last = cur[cur.length - 1];
+    const before = cur[cur.length - 2];
+    if (fill && last.kind === 'book' && !last.lean) {
+      const roll = hash(`${last.b.id}|tilt`) % 20;
+      const h = Math.round(spineStyle(last.b).height * scale);
+      const tilt: Item | undefined =
+        roll < 8 && before?.kind === 'book'
+          ? { ...last, lean: 'left', foot: Math.ceil((row - BOARD) * 0.13) }
+          : roll >= 8 && roll < 11
+            ? { ...last, lean: 'right', foot: Math.ceil(h * Math.sin((7 * Math.PI) / 180)) + 1 }
+            : undefined;
+      if (tilt) {
+        const { flex, fixed } = widths([...cur.slice(0, -1), tilt]);
+        if (flex * 0.88 + fixed <= room - 1) cur[cur.length - 1] = tilt;
+      }
+    }
     if (fill) {
       const { flex, fixed } = widths(cur);
       const f = Math.max(0.88, Math.min(1.14, (room - fixed - 1) / Math.max(1, flex)));

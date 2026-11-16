@@ -93,7 +93,7 @@ export interface Book {
 
 /** Shape of a record as it travels between app and server */
 export interface SyncRecord {
-  kind: 'book' | 'profile' | 'day';
+  kind: 'book' | 'profile' | 'day' | 'tips';
   id: string;
   data: unknown;
   updatedAt: number;

@@ -2,6 +2,11 @@ import { db, getMeta, setMeta, type DayLog, type LocalBook } from '../db';
 import type { Book, SyncRecord } from '../types';
 import type { ReaderProfile } from '../shared';
 
+// keys of the saved What's next tips (see lib/tips.ts; not imported, to keep the two apart)
+const TIPS_KEY = 'nextTips';
+const TIPS_AT = 'nextTipsAt';
+const TIPS_DIRTY = 'nextTipsDirty';
+
 let timer: ReturnType<typeof setTimeout> | undefined;
 let running: Promise<void> | undefined;
 
@@ -36,6 +41,12 @@ export async function syncNow(): Promise<void> {
         changes.push({ kind: 'profile', id: 'me', data: profile, updatedAt: profile.updatedAt, deleted: false });
       }
 
+      // Her earlier What's next tips, as one record
+      const tipsDirty = await getMeta<boolean>(TIPS_DIRTY, false);
+      const tipsAt = await getMeta<number>(TIPS_AT, 0);
+      if (tipsDirty)
+        changes.push({ kind: 'tips', id: 'me', data: await getMeta(TIPS_KEY, []), updatedAt: tipsAt, deleted: false });
+
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -58,7 +69,15 @@ export async function syncNow(): Promise<void> {
           const cur = await getMeta<ReaderProfile | null>('profile', null);
           if (cur && profile && cur.updatedAt === profile.updatedAt) await setMeta('profileDirty', false);
         }
+        if (tipsDirty && (await getMeta<number>(TIPS_AT, 0)) === tipsAt) await setMeta(TIPS_DIRTY, false);
         for (const r of records) {
+          if (r.kind === 'tips') {
+            if ((await getMeta<number>(TIPS_AT, 0)) < r.updatedAt) {
+              await setMeta(TIPS_KEY, r.data);
+              await setMeta(TIPS_AT, r.updatedAt);
+            }
+            continue;
+          }
           if (r.kind === 'profile') {
             const cur = await getMeta<ReaderProfile | null>('profile', null);
             if (!cur || cur.updatedAt < r.updatedAt) await setMeta('profile', r.data);

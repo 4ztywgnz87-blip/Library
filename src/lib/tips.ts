@@ -1,6 +1,7 @@
 import { db } from '../db';
 import type { Pick } from '../shared';
 import { useMeta } from './hooks';
+import { scheduleSync } from './sync';
 import { normalize } from './library';
 
 /** A "Something new" tip Snug gave her earlier, kept so it isn't lost when she leaves the page */
@@ -16,11 +17,21 @@ const same = (a: { title: string; author: string }, b: { title: string; author: 
 
 export const useSavedTips = () => useMeta<SavedTip[]>(KEY, []);
 
+/** The list travels to her other devices as one record (the newest list wins) */
+
+const TIPS_AT = 'nextTipsAt';
+const TIPS_DIRTY = 'nextTipsDirty';
+
 async function change(f: (tips: SavedTip[]) => SavedTip[]) {
   await db.transaction('rw', db.meta, async () => {
     const tips = ((await db.meta.get(KEY))?.value as SavedTip[] | undefined) ?? [];
-    await db.meta.put({ key: KEY, value: f(tips).slice(0, MAX) });
+    await db.meta.bulkPut([
+      { key: KEY, value: f(tips).slice(0, MAX) },
+      { key: TIPS_AT, value: Date.now() },
+      { key: TIPS_DIRTY, value: true },
+    ]);
   });
+  scheduleSync();
 }
 
 /** New tips go on top (a tip she got before moves up, keeping the cover it had) */

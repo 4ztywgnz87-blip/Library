@@ -160,7 +160,6 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
               Already in your library · open it
             </Link>
           ) : (
-            <div className="flex gap-2">
               <WantButtons
                 size="large"
                 title={details.title}
@@ -172,7 +171,6 @@ export function BookPreview({ book, onClose }: { book: PreviewBook; onClose: () 
                   description: details.description,
                 }}
               />
-            </div>
           )}
         </div>
       </motion.div>

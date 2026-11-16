@@ -362,9 +362,7 @@ function ShopBook({
             {scoring ? 'Snug is checking…' : '✨ Is it my kind of book?'}
           </Button>
         )}
-        <div className="flex gap-2">
           <WantButtons size="large" title={book.title} author={book.authors[0] ?? ''} extra={{ coverUrl: book.coverUrl }} />
-        </div>
       </Card>
     </motion.div>
   );
