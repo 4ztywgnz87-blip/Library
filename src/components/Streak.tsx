@@ -1,5 +1,5 @@
 import { useKeyboardLift } from '../lib/keyboard';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { updateBook } from '../lib/library';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
@@ -75,9 +75,13 @@ export function StreakCard({ books }: { books: Book[] }) {
   const days = useDays();
   const profile = useProfile();
   const [sheet, setSheet] = useState<string | null>(null);
+  // the number only pops when it goes up while she's here, not every time Home opens
+  const shown = useRef<number | undefined>(undefined);
   if (!days) return null;
   const today = dayKey();
   const s = streakOf(days, profile.streakImport, today);
+  const pop = shown.current !== undefined && shown.current !== s.current;
+  shown.current = s.current;
   const read = new Set(days.map((d) => d.date));
   const todayLog = days.find((d) => d.date === today);
   const reading = books.find((b) => b.status === 'reading');
@@ -91,7 +95,12 @@ export function StreakCard({ books }: { books: Book[] }) {
           </div>
           <div className="min-w-0">
             <p className="font-soft text-2xl leading-none font-semibold text-ink">
-              <motion.span key={s.current} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="inline-block">
+              <motion.span
+                key={s.current}
+                initial={pop ? { scale: 1.4 } : false}
+                animate={{ scale: 1 }}
+                className="inline-block"
+              >
                 {s.current}
               </motion.span>{' '}
               <span className="text-base font-medium text-cocoa">day{s.current === 1 ? '' : 's'} in a row</span>

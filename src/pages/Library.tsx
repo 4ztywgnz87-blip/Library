@@ -173,7 +173,9 @@ export default function Library() {
         </div>
 
         {/* Status tabs */}
-        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-3">
+        {/* (its own layer: the iPhone otherwise left this sideways-scrolling row blank for a while
+            after scrolling back up a long way) */}
+        <div className="no-scrollbar -mx-4 flex [transform:translateZ(0)] gap-2 overflow-x-auto px-4 pb-3">
           <Chip active={tab === 'all'} onClick={() => setParams({})}>
             All <span className="opacity-60">{counts.all}</span>
           </Chip>
@@ -312,12 +314,7 @@ export default function Library() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.7, y: 10 }}
             transition={{ type: 'spring', stiffness: 400, damping: 26 }}
-            onClick={() => {
-              // a long way down: jump most of the way at once, then glide the last bit, so the
-              // search and filters are back straight away
-              if (window.scrollY > 500) window.scrollTo(0, 500);
-              requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
-            }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             className="fixed right-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-20 grid h-12 w-12 place-items-center rounded-full bg-wine text-cream shadow-[var(--shadow-soft)] active:scale-95 md:bottom-8"
           >
             <svg

@@ -75,6 +75,12 @@ export function Layout() {
             animate={{ x: 0, opacity: 1 }}
             // an ease-out glide that ends exactly in place (a spring overshot a hair and then settled)
             transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}
+            // whole pixels only: on the iPhone a page moved by a fraction of a pixel is drawn
+            // slightly off, and snapped into place once the slide is over (a visible little jump)
+            transformTemplate={({ x }) => {
+              const px = Math.round(parseFloat(String(x ?? 0)));
+              return px ? `translateX(${px}px)` : 'none';
+            }}
           >
             <Outlet />
           </motion.div>
