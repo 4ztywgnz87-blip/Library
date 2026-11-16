@@ -4,7 +4,10 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useBooks } from '../lib/hooks';
 import { useProfile, updateProfile } from '../lib/profile';
 import { suggestBooks } from '../lib/ai';
-import { matchFor, useTaste } from '../lib/taste';
+import { matchFor, useMatches, useTaste } from '../lib/taste';
+import { clearTips, forgetTip, saveTips, tipCover, useSavedTips, type SavedTip } from '../lib/tips';
+import { profileKey } from '../taste/vocab';
+import { STATUSES } from '../types';
 import { normalize } from '../lib/library';
 import type { Mood } from '../taste/model';
 import { sameBook, searchBooks } from '../lib/bookSearch';
@@ -124,6 +127,8 @@ export default function Next() {
           .slice(0, 3)
           .map(({ b, m }) => ({ title: b.title, author: b.author, why: m!.why, headsUp: m!.headsUp, score: m!.score }));
         setMock(res.mock);
+        // kept on the phone, so they're still there next time (under "Earlier tips")
+        if (!res.mock) void saveTips(found);
       }
       setPicks(found);
       setShown(exclude);
@@ -242,6 +247,7 @@ export default function Next() {
                       source={source}
                       onNotForMe={() => {
                         void updateProfile({ notForMe: [...profile.notForMe, `${p.title} (${p.author})`] });
+                        void forgetTip(p);
                         setPicks((list) => list?.filter((x) => x !== p) ?? null);
                       }}
                     />
@@ -261,9 +267,77 @@ export default function Next() {
             </div>
           </div>
         )}
+
+        {source === 'buy' && !loading && <EarlierTips hide={picks ?? []} />}
       </div>
     </div>
   );
+}
+
+/** The "Something new" tips she got before, so they aren't lost when she leaves the page */
+function EarlierTips({ hide }: { hide: Pick[] }) {
+  const saved = useSavedTips();
+  const books = useBooks();
+  const preview = useHistoryModal<PreviewBook>('tip');
+  const tips = saved.filter((t) => !hide.some((p) => p.title === t.title && p.author === t.author));
+  // scores worked out again with what Snug knows of her taste now (free: these books were analysed before)
+  const fresh = useMatches(tips, {}, { free: true });
+  if (!tips.length) return null;
+  return (
+    <section className="mt-10">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-xl">Earlier tips</h2>
+        <button className="text-xs text-cocoa underline" onClick={() => void clearTips()}>
+          Clear
+        </button>
+      </div>
+      <ul className="divide-y divide-sand/70 rounded-2xl bg-white/70 px-3">
+        {tips.map((t) => {
+          const m = fresh.get(profileKey(t.title, t.author));
+          const score = m?.score ?? t.score;
+          const own = books?.find((b) => normalize(b.title) === normalize(t.title));
+          return (
+            <li key={t.title + t.author}>
+              <button
+                className="flex w-full items-center gap-3 py-2.5 text-left active:opacity-70"
+                onClick={() =>
+                  preview.open({
+                    title: t.title,
+                    author: t.author,
+                    coverUrl: t.coverUrl,
+                    match:
+                      score !== undefined
+                        ? { score, why: m?.why ?? t.why, headsUp: m ? m.headsUp : t.headsUp }
+                        : undefined,
+                  })
+                }
+              >
+                <Cover book={{ title: t.title, authors: [t.author], coverUrl: t.coverUrl }} className="w-10 shrink-0" rounded="rounded" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{t.title}</span>
+                  <span className="block truncate text-xs text-cocoa">
+                    {t.author} · {when(t)}
+                  </span>
+                  {own && (
+                    <span className="mt-0.5 inline-block rounded-full bg-blush px-2 py-0.5 text-[0.65rem] text-wine">
+                      {STATUSES.find((s) => s.id === own.status)?.label}
+                    </span>
+                  )}
+                </span>
+                {score !== undefined && <MatchRing score={score} size={36} />}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {preview.item && <BookPreview book={preview.item} onClose={preview.close} />}
+    </section>
+  );
+}
+
+function when(t: SavedTip) {
+  const days = Math.floor((Date.now() - t.at) / 86_400_000);
+  return days < 1 ? 'today' : days === 1 ? 'yesterday' : days < 7 ? `${days} days ago` : new Date(t.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 function PickCard({
@@ -287,7 +361,11 @@ function PickCard({
   useEffect(() => {
     if (pick.bookId) return; // her own book: it already has its cover
     searchBooks(`${pick.title} ${pick.author}`)
-      .then((r) => setCover(sameBook(r, pick.title, pick.author).find((x) => x.coverUrl)?.coverUrl))
+      .then((r) => {
+        const url = sameBook(r, pick.title, pick.author).find((x) => x.coverUrl)?.coverUrl;
+        setCover(url);
+        if (url) void tipCover(pick, url);
+      })
       .catch(() => {});
   }, [pick.bookId, pick.title, pick.author]);
 
