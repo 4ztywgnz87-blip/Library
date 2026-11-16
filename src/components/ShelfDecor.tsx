@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from 'motion/react';
 import { CatHat, SEASON_LIGHTS, type Season } from './Seasonal';
 
@@ -886,6 +886,100 @@ export function Globe({ className = '' }: { className?: string }) {
       <circle cx="25" cy="9" r="1.8" fill="#c49a5a" />
       <circle cx="25" cy="51" r="1.8" fill="#c49a5a" />
     </svg>
+  );
+}
+
+/**
+ * At Christmas the globe is a snow globe: a little snowy village under glass. A tap shakes it,
+ * and the snow whirls up and slowly settles again.
+ */
+export function SnowGlobe({ className = '' }: { className?: string }) {
+  const id = useId();
+  const [shakes, setShakes] = useState(0);
+  // fresh flakes for every shake: somewhere in the glass, then drifting down with a little sway
+  const flakes = useMemo(
+    () =>
+      Array.from({ length: 34 }, () => {
+        const a = Math.random() * Math.PI * 2;
+        const d = Math.sqrt(Math.random()) * 15;
+        const x = 25 + Math.cos(a) * d;
+        const y = 30 + Math.sin(a) * d - 3;
+        return {
+          x,
+          y,
+          r: 0.45 + Math.random() * 0.6,
+          sway: (Math.random() - 0.5) * 7,
+          fall: 44 - y - Math.random() * 3,
+          time: 3.2 + Math.random() * 2.8,
+          delay: 0.35 + Math.random() * 0.4,
+        };
+      }),
+    [shakes],
+  );
+  return (
+    <motion.svg
+      viewBox="0 0 50 72"
+      className={className}
+      role="button"
+      aria-label="Shake the snow globe"
+      onClick={() => setShakes((n) => n + 1)}
+      style={{ cursor: 'pointer', overflow: 'visible', WebkitTapHighlightColor: 'transparent', transformOrigin: '50% 95%' }}
+      animate={shakes ? { rotate: [0, -9, 8, -7, 6, -3, 0], x: [0, -1.5, 1.5, -1, 1, 0, 0] } : undefined}
+      transition={{ duration: 0.7, ease: 'easeInOut' }}
+      key={`shake-${shakes}`}
+    >
+      <defs>
+        <clipPath id={`${id}glass`}>
+          <circle cx="25" cy="30" r="19" />
+        </clipPath>
+        <radialGradient id={`${id}air`} cx="0.4" cy="0.3" r="0.85">
+          <stop offset="0" stopColor="#dfeef7" />
+          <stop offset="1" stopColor="#9fc0d6" />
+        </radialGradient>
+        <linearGradient id={`${id}base`} x1="0" x2="1">
+          <stop offset="0" stopColor="#5e3c27" />
+          <stop offset="0.45" stopColor="#8b5e3c" />
+          <stop offset="1" stopColor="#5e3c27" />
+        </linearGradient>
+      </defs>
+      {/* wooden base with a little gold band; the glass sits in its collar */}
+      <path d="M8 56h34l3 13H5z" fill={`url(#${id}base)`} />
+      <rect x="9" y="62" width="32" height="1.4" fill="#c49a5a" opacity="0.8" />
+      <g transform="translate(0 6)">
+      {/* the glass, with a snowy scene inside */}
+      <circle cx="25" cy="30" r="19" fill={`url(#${id}air)`} />
+      <g clipPath={`url(#${id}glass)`}>
+        {/* a tiny house with a lit window and a fir tree */}
+        <path d="M27 36l6-6 6 6v8H27z" fill="#9b3a49" />
+        <path d="M26 36.5l7-7.5 7 7.5" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+        <rect x="31.5" y="38" width="3" height="3" fill="#ffd27a" />
+        <path d="M17 23l5 8h-2.5l4 6h-3l4 6H11l4-6h-3l4-6h-2.5z" fill="#4f6b4a" />
+        <path d="M17 22.5l.8 1.6 1.7.2-1.3 1.1.4 1.7-1.6-.9-1.6.9.4-1.7-1.3-1.1 1.7-.2z" fill="#ffd27a" />
+        {/* the snow that has settled */}
+        <path d="M4 44c6-3 12-2 18-1s14-1 24 1v14H4z" fill="#ffffff" />
+        <path d="M6 45c4-1.5 7-1.2 10-.3" stroke="#d8e6ef" strokeWidth="0.8" fill="none" />
+        {/* falling snow after a shake */}
+        {shakes > 0 &&
+          flakes.map((f, i) => (
+            <motion.circle
+              key={`${shakes}-${i}`}
+              cx={f.x}
+              cy={f.y}
+              r={f.r}
+              fill="#fff"
+              initial={{ opacity: 0, x: 0, y: -4 }}
+              animate={{ opacity: [0, 1, 1, 0], x: [0, f.sway, -f.sway / 2, f.sway / 3], y: [-4, f.fall * 0.4, f.fall * 0.75, f.fall] }}
+              transition={{ duration: f.time, delay: f.delay, ease: 'easeOut', times: [0, 0.25, 0.7, 1] }}
+            />
+          ))}
+        {/* light on the glass */}
+        <ellipse cx="17" cy="19" rx="5.5" ry="3" fill="#fff" opacity="0.35" transform="rotate(-38 17 19)" />
+      </g>
+      <circle cx="25" cy="30" r="19" fill="none" stroke="#ffffff" strokeOpacity="0.7" strokeWidth="0.9" />
+      <circle cx="25" cy="30" r="19" fill="none" stroke="#6f8ea3" strokeOpacity="0.35" strokeWidth="0.5" />
+      </g>
+      <path d="M12 52.5h26l1 3.5H11z" fill="#a47148" />
+    </motion.svg>
   );
 }
 

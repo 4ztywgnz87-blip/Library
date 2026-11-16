@@ -14,6 +14,7 @@ import {
   DreamCloud,
   FairyLights,
   Globe,
+  SnowGlobe,
   HangingPlant,
   Mug,
   Painting,
@@ -541,7 +542,17 @@ export default function Shelf() {
     candle: { key: 'candle', el: <Candle className="h-20 w-12" season={season} />, width: 48 },
     painting: { key: 'painting', el: <Painting className="h-[58px] w-12" />, width: 48 },
     mug: { key: 'mug', el: <Mug className="h-20 w-[68px]" season={season} />, width: 68 },
-    globe: { key: 'globe', el: <Globe className="h-[72px] w-[50px]" />, width: 50 },
+    // at Christmas the globe is a snow globe
+    globe: {
+      key: 'globe',
+      el:
+        season === 'christmas' ? (
+          <SnowGlobe className="h-[72px] w-[50px]" />
+        ) : (
+          <Globe className="h-[72px] w-[50px]" />
+        ),
+      width: 50,
+    },
   };
   const today = decorToday(new URLSearchParams(location.search).get('decor'));
   // each decoration stands on either shelf (decided by the day); what has no room moves to the other one

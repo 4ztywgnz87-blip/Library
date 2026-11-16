@@ -96,28 +96,30 @@ function lines(books: Book[], m: Moment): { about: Line[]; other: Line[] } {
 const KEPT = 'snug.greetingLine';
 
 /**
- * One cosy line under the greeting. It stays put from visit to visit, and only changes when it no
- * longer applies: a line about the time of day once that moment has passed, a line about a book
+ * One cosy line under the greeting. It stays put from visit to visit, and changes every day, or
+ * sooner when it no longer applies: a line about the time of day once that moment has passed, a line about a book
  * once she's finished it, a weekday's line the next day. Then a new one is picked, about half of
  * the time about the book she's reading.
  */
 function subline(books: Book[], m: Moment) {
   const { about, other } = lines(books, m);
   const all = [...about, ...other];
-  let kept: { id: string; m: Moment } | null = null;
+  const today = new Date().toDateString();
+  let kept: { id: string; m: Moment; day?: string } | null = null;
   try {
     kept = JSON.parse(localStorage.getItem(KEPT) ?? 'null');
   } catch {
     // no storage (private window): a fresh line each visit is fine
   }
-  const still = kept && all.find((l) => l.id === kept!.id && (!l.moment || kept!.m === m));
+  // a new day always brings a new line
+  const still = kept && kept.day === today && all.find((l) => l.id === kept!.id && (!l.moment || kept!.m === m));
   if (still) return still.text;
   const pool = about.length && Math.random() < 0.5 ? about : other;
   // never the line she just had
   const fresh = pool.filter((l) => l.id !== kept?.id);
   const line = (fresh.length ? fresh : pool)[Math.floor(Math.random() * (fresh.length || pool.length))];
   try {
-    localStorage.setItem(KEPT, JSON.stringify({ id: line.id, m }));
+    localStorage.setItem(KEPT, JSON.stringify({ id: line.id, m, day: today }));
   } catch {
     // see above
   }
