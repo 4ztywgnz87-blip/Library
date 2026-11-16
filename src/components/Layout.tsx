@@ -65,7 +65,9 @@ export function Layout() {
   useTabSwipe(pathname, onSwipe);
   return (
     <div className="paper relative min-h-dvh md:pl-24">
-      <main className={`relative z-10 ${hideNav ? '' : 'pb-28 md:pb-8'}`}>
+      {/* overflow-x clip: a screen sliding in from the right must not make the page wider for a
+          moment (iOS then zooms out and back, so the page seemed to open smaller and jump) */}
+      <main className={`relative z-10 overflow-x-clip ${hideNav ? '' : 'pb-28 md:pb-8'}`}>
         {tabIndex >= 0 ? (
           <motion.div
             key={pathname}
