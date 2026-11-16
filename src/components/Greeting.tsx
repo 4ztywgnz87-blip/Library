@@ -19,26 +19,60 @@ const WORDS: Record<Moment, string> = {
   night: 'Still up reading',
 };
 
-/** One cosy line under the greeting, about her books (changes with the day, never busy) */
-function subline(books: Book[], m: Moment) {
-  const reading = books.find((b) => b.status === 'reading');
+/**
+ * One cosy line under the greeting. There are many: about the book she's reading, her shelves, the
+ * time of day or the day of the week, or just something nice. A new one is picked each visit, and
+ * about half of the time it's about the book she's reading.
+ */
+function subline(books: Book[], m: Moment, r: number) {
+  const reading = books.filter((b) => b.status === 'reading');
+  const book = reading.length ? reading[Math.floor(r * 997) % reading.length] : undefined;
+  const t = book?.title;
   const waiting = books.filter((b) => b.status === 'owned').length;
+  const wishes = books.filter((b) => b.status === 'wishlist').length;
+  const year = new Date().getFullYear();
+  const readThisYear = books.filter(
+    (b) => b.status === 'read' && b.finishedAt && new Date(b.finishedAt).getFullYear() === year,
+  ).length;
   const day = new Date().getDay();
-  const lines: string[] = [];
-  if (reading) {
-    lines.push(
-      m === 'night' ? `Just one more chapter of ${reading.title}?` : `Back to ${reading.title}?`,
-      `${reading.title} is waiting for you`,
-    );
-  } else if (waiting) {
-    lines.push(`${waiting} ${waiting === 1 ? 'book is' : 'books are'} waiting on your shelf`);
+
+  const about: string[] = [];
+  if (book && t) {
+    about.push(`${t} is waiting for you`, `Back to ${t}?`, `Where did you leave off in ${t}?`);
+    if (m === 'night') about.push(`Just one more chapter of ${t}?`);
+    if (m === 'morning') about.push(`A chapter of ${t} with your coffee?`);
+    if (m === 'evening') about.push(`Blanket, tea and ${t}: the perfect evening`);
+    const left = book.pageCount && book.currentPage ? book.pageCount - book.currentPage : undefined;
+    if (left !== undefined && left > 0 && left <= 60)
+      about.push(`Only ${left} pages left in ${t}!`, `The end of ${t} is in sight…`);
+    else if (book.currentPage && book.pageCount)
+      about.push(`Page ${book.currentPage} of ${book.pageCount} in ${t}`);
   }
-  if (day === 0) lines.push('A perfect Sunday for a chapter or two');
-  if (day === 5) lines.push('Weekend reading is almost here');
-  if (!lines.length) lines.push('What shall we read next?');
-  // the same line all day, a different one tomorrow
-  const seed = Math.floor(Date.now() / 86_400_000);
-  return lines[seed % lines.length];
+
+  const other: string[] = [
+    'What shall we read next?',
+    'Every book is a little holiday',
+    'So many books, so little time',
+    'The cat saved you a cosy spot by the shelf',
+    'A good day to get lost in a story',
+    'Your shelves look lovely today',
+  ];
+  if (waiting) other.push(`${waiting} ${waiting === 1 ? 'book is' : 'books are'} waiting on your TBR`);
+  if (waiting >= 10) other.push(`Your TBR is ${waiting} books tall. No pressure 😌`);
+  if (wishes) other.push(`${wishes} ${wishes === 1 ? 'book is' : 'books are'} dreaming on your wishlist`);
+  if (readThisYear) other.push(`${readThisYear} ${readThisYear === 1 ? 'book' : 'books'} read in ${year} so far 📚`);
+  if (m === 'morning') other.push('Fresh coffee, fresh chapter?', 'Rise and read ☀️');
+  if (m === 'afternoon') other.push('Time for tea and a few pages?', 'A little afternoon reading break?');
+  if (m === 'evening') other.push('Candles on, phone away, book open', 'The coziest part of the day');
+  if (m === 'night') other.push('The best stories are read after midnight', 'Snug is sleepy… but one more page is fine');
+  if (day === 0) other.push('A perfect Sunday for a chapter or two');
+  if (day === 5) other.push('Weekend reading is almost here');
+  if (day === 6) other.push('Saturday: a whole day for reading');
+  if (day === 1) other.push('A new week, a new chapter');
+
+  // about half of the visits it's about her book, the rest something else
+  const list = about.length && r < 0.5 ? about : other;
+  return list[Math.floor(r * 7919) % list.length];
 }
 
 /** Small animated picture for the time of day: a rising sun, steaming tea, a candle, a moon */
@@ -162,6 +196,8 @@ export function Greeting({ name, books }: { name?: string; books: Book[] }) {
   const m = forced && forced in WORDS ? forced : moment(new Date().getHours());
   const words = `${WORDS[m]}${name ? `, ${name}` : ''}`.split(' ');
   const [animate] = useState(!greeted);
+  // a new line on every visit to Home (the same while she stays)
+  const [roll] = useState(Math.random);
   useEffect(() => {
     greeted = true;
   }, []);
@@ -205,7 +241,7 @@ export function Greeting({ name, books }: { name?: string; books: Book[] }) {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.08 * words.length + 0.3, duration: 0.6 }}
           >
-            {subline(books, m)}
+            {subline(books, m, roll)}
           </motion.p>
         )}
       </div>

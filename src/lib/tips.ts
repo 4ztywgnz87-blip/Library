@@ -8,6 +8,14 @@ import { normalize } from './library';
 export interface SavedTip extends Pick {
   at: number;
   coverUrl?: string;
+  /** what she asked for when Snug suggested it (newest first; a book can come up in more searches) */
+  asks?: TipAsk[];
+}
+
+/** The choices on the What's next page: a genre (none = "Surprise me") and a mood */
+export interface TipAsk {
+  genre?: string;
+  mood?: string;
 }
 
 const KEY = 'nextTips';
@@ -35,10 +43,15 @@ async function change(f: (tips: SavedTip[]) => SavedTip[]) {
 }
 
 /** New tips go on top (a tip she got before moves up, keeping the cover it had) */
-export const saveTips = (picks: Pick[]) =>
+export const saveTips = (picks: Pick[], ask: TipAsk) =>
   change((tips) => {
     const at = Date.now();
-    const fresh = picks.map((p) => ({ ...tips.find((t) => same(t, p)), ...p, at }));
+    const key = (a: TipAsk) => `${a.genre ?? ''}|${a.mood ?? ''}`;
+    const fresh = picks.map((p) => {
+      const old = tips.find((t) => same(t, p));
+      const asks = [ask, ...(old?.asks ?? []).filter((a) => key(a) !== key(ask))].slice(0, 4);
+      return { ...old, ...p, at, asks };
+    });
     return [...fresh, ...tips.filter((t) => !picks.some((p) => same(t, p)))];
   });
 

@@ -5,7 +5,7 @@ import { useBooks } from '../lib/hooks';
 import { useProfile, updateProfile } from '../lib/profile';
 import { suggestBooks } from '../lib/ai';
 import { matchFor, useMatches, useTaste } from '../lib/taste';
-import { clearTips, forgetTip, saveTips, tipCover, useSavedTips, type SavedTip } from '../lib/tips';
+import { clearTips, forgetTip, saveTips, tipCover, useSavedTips, type SavedTip, type TipAsk } from '../lib/tips';
 import { profileKey } from '../taste/vocab';
 import { STATUSES } from '../types';
 import { normalize } from '../lib/library';
@@ -128,7 +128,7 @@ export default function Next() {
           .map(({ b, m }) => ({ title: b.title, author: b.author, why: m!.why, headsUp: m!.headsUp, score: m!.score }));
         setMock(res.mock);
         // kept on the phone, so they're still there next time (under "Earlier tips")
-        if (!res.mock) void saveTips(found);
+        if (!res.mock) void saveTips(found, { genre, mood });
       }
       setPicks(found);
       setShown(exclude);
@@ -318,6 +318,12 @@ function EarlierTips({ hide }: { hide: Pick[] }) {
                   <span className="block truncate text-xs text-cocoa">
                     {t.author} · {when(t)}
                   </span>
+                  {/* what she asked for; a book Snug suggested in more searches shows each of them */}
+                  {t.asks?.map((a, k) => (
+                    <span key={k} className="block truncate text-[0.7rem] text-mocha">
+                      {k === 0 ? '🔎' : 'also for'} {askLabel(a)}
+                    </span>
+                  ))}
                   {own && (
                     <span className="mt-0.5 inline-block rounded-full bg-blush px-2 py-0.5 text-[0.65rem] text-wine">
                       {STATUSES.find((s) => s.id === own.status)?.label}
@@ -333,6 +339,12 @@ function EarlierTips({ hide }: { hide: Pick[] }) {
       {preview.item && <BookPreview book={preview.item} onClose={preview.close} />}
     </section>
   );
+}
+
+/** "Romantasy · 💕 Swoony": what she asked for */
+function askLabel(a: TipAsk) {
+  const m = MOODS.find((x) => x.id === a.mood);
+  return [a.genre ?? 'Surprise me', m && `${m.emoji} ${m.label}`].filter(Boolean).join(' · ');
 }
 
 function when(t: SavedTip) {

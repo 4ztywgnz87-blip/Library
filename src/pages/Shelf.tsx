@@ -662,7 +662,7 @@ export default function Shelf() {
             {/* one shelf with her books (the ones she's reading first, with a bookmark), one with read books */}
             {(
               [
-                { status: 'owned', label: 'To read', books: [...byStatus.reading, ...byStatus.owned] },
+                { status: 'owned', label: 'TBR', books: [...byStatus.reading, ...byStatus.owned] },
                 { status: 'read', label: 'Read', books: byStatus.read },
               ] as const
             ).map((shelf, i) => (
