@@ -73,7 +73,8 @@ export function Layout() {
             key={pathname}
             initial={dir ? { x: dir * 48, opacity: 0 } : false}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+            // an ease-out glide that ends exactly in place (a spring overshot a hair and then settled)
+            transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}
           >
             <Outlet />
           </motion.div>
