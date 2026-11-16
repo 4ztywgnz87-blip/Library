@@ -149,12 +149,35 @@ function LentLink() {
 }
 
 /** Adding lots of books at once? Pause the automatic AI work, then switch it on again afterwards */
+const PAUSED_KEY = 'snug.aiPaused';
+const lastKnown = () => {
+  try {
+    return localStorage.getItem(PAUSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
 function AiPauseCard() {
-  const [paused, setPaused] = useState<boolean | null>(null);
+  // shown straight away with the last known setting, so the page doesn't jump when the answer
+  // comes in; the switch works once the server has answered
+  const [paused, setPausedState] = useState(lastKnown);
+  const [known, setKnown] = useState(false);
+  const setPaused = (v: boolean) => {
+    setPausedState(v);
+    try {
+      localStorage.setItem(PAUSED_KEY, v ? '1' : '0');
+    } catch {
+      // no storage: it just loads again next time
+    }
+  };
   useEffect(() => {
-    void aiStatus().then((s) => setPaused(s ? !!s.paused : null));
+    void aiStatus().then((s) => {
+      if (!s) return;
+      setPaused(!!s.paused);
+      setKnown(true);
+    });
   }, []);
-  if (paused === null) return null;
   return (
     <Card className="flex items-center gap-3">
       <div className="min-w-0 flex-1">
@@ -170,8 +193,9 @@ function AiPauseCard() {
         role="switch"
         aria-checked={paused}
         aria-label="Pause AI"
+        disabled={!known}
         onClick={async () => setPaused(await setAiPause(!paused))}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${paused ? 'bg-wine' : 'bg-sand'}`}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60 ${paused ? 'bg-wine' : 'bg-sand'}`}
       >
         <span
           className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${paused ? 'translate-x-5' : ''}`}
