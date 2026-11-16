@@ -60,8 +60,21 @@ export function Layout() {
   useEffect(() => {
     if (tabIndex >= 0) lastTab.current = tabIndex;
   }, [tabIndex]);
+  // The screens only slide in after a swipe; tapping a tab just shows the screen
+  const swiped = useRef(false);
+  const slide = useRef<{ key: string; dir: number }>({ key: location.key, dir: 0 });
+  if (slide.current.key !== location.key) {
+    slide.current = { key: location.key, dir: swiped.current ? dir : 0 };
+    swiped.current = false;
+  }
 
-  const onSwipe = useCallback((to: string) => navigate(to), [navigate]);
+  const onSwipe = useCallback(
+    (to: string) => {
+      swiped.current = true;
+      navigate(to);
+    },
+    [navigate],
+  );
   useTabSwipe(pathname, onSwipe);
   return (
     <div className="paper relative min-h-dvh md:pl-24">
@@ -71,7 +84,7 @@ export function Layout() {
         {tabIndex >= 0 ? (
           <motion.div
             key={pathname}
-            initial={dir ? { x: dir * 48, opacity: 0 } : false}
+            initial={slide.current.dir ? { x: slide.current.dir * 48, opacity: 0 } : false}
             animate={{ x: 0, opacity: 1 }}
             // an ease-out glide that ends exactly in place (a spring overshot a hair and then settled)
             transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}
