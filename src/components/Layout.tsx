@@ -71,7 +71,7 @@ export function Layout() {
   const onSwipe = useCallback(
     (to: string) => {
       swiped.current = true;
-      navigate(to);
+      navigate(to === '/library' ? `/library${libraryMemory.search}` : to);
     },
     [navigate],
   );
@@ -110,7 +110,9 @@ export function Layout() {
           {items.map(({ to, label, icon: Icon, end, primary }) => (
             <NavLink
               key={to}
-              to={to}
+              // the Library tab goes straight back to the view she left (same filter tab), so it
+              // doesn't show "All" for a moment first
+              to={to === '/library' ? `/library${libraryMemory.search}` : to}
               end={end}
               className={({ isActive }) =>
                 primary

@@ -24,6 +24,19 @@ export function useBook(id: string | undefined) {
   return useLiveQuery(() => (id ? db.books.get(id) : undefined), [id]);
 }
 
+/** settings as last read, so a screen opening again has them at once (e.g. her name in the greeting) */
+const lastMeta = new Map<string, unknown>();
+
 export function useMeta<T>(key: string, fallback: T): T {
-  return useLiveQuery(async () => ((await db.meta.get(key))?.value as T) ?? fallback, [key]) ?? fallback;
+  return (
+    useLiveQuery(
+      async () => {
+        const v = ((await db.meta.get(key))?.value as T) ?? fallback;
+        lastMeta.set(key, v);
+        return v;
+      },
+      [key],
+      lastMeta.get(key) as T | undefined,
+    ) ?? fallback
+  );
 }
